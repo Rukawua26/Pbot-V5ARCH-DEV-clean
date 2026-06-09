@@ -1,5 +1,6 @@
 import threading
 import unittest
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -7,8 +8,6 @@ from config import Config
 from core.bot_guardian import run_guardian_loop
 from core.bot_trade_monitor import monitor_open_trades
 from core.strategy.agents.ghost_agent import GhostAgent
-from datetime import timedelta
-
 from core.time_utils import utc_now, utc_now_iso
 
 
@@ -23,9 +22,7 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
 
     @patch("core.strategy.agents.ghost_agent.os.path.exists", return_value=True)
     @patch("core.strategy.agents.ghost_agent.safe_pickle_load")
-    def test_ghost_agent_assigns_selected_model_after_pickle_load(
-        self, mocked_load, _exists
-    ):
+    def test_ghost_agent_assigns_selected_model_after_pickle_load(self, mocked_load, _exists):
         model = _PredictProbaModel()
         mocked_load.return_value = {"n_samples": 7, "rf": model, "feature_cols": ["rsi"]}
 
@@ -37,9 +34,7 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
 
     @patch("core.strategy.agents.ghost_agent.os.path.exists", return_value=True)
     @patch("core.strategy.agents.ghost_agent.safe_pickle_load", return_value={"n_samples": 7})
-    def test_ghost_agent_keeps_model_none_when_pickle_has_no_predictor(
-        self, _load, _exists
-    ):
+    def test_ghost_agent_keeps_model_none_when_pickle_has_no_predictor(self, _load, _exists):
         agent = GhostAgent()
 
         agent.load_trained_model()
@@ -47,9 +42,7 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         self.assertIsNone(agent.model)
 
     @patch("core.bot_guardian.time.sleep", return_value=None)
-    def test_guardian_uses_shadow_threshold_and_entry_confidence_fallback(
-        self, _sleep_mock
-    ):
+    def test_guardian_uses_shadow_threshold_and_entry_confidence_fallback(self, _sleep_mock):
         trade = {
             "symbol": "XPL/USDT",
             "side": "BUY",
@@ -314,9 +307,7 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         bot.close_trade.assert_not_called()
 
     @patch("core.bot_trade_monitor.Strategy.analyze")
-    def test_monitor_defers_degraded_exit_when_move_does_not_cover_fees(
-        self, analyze_mock
-    ):
+    def test_monitor_defers_degraded_exit_when_move_does_not_cover_fees(self, analyze_mock):
         trade = {
             "symbol": "TRX/USDT",
             "side": "BUY",
@@ -346,13 +337,9 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         bot.scaler = None
         bot.bootstrap_heuristic_mode = False
         bot.market_btc_change_tf = 0.0
-        bot.data_service = SimpleNamespace(
-            fetch_and_update_data=MagicMock(return_value=market_df)
-        )
+        bot.data_service = SimpleNamespace(fetch_and_update_data=MagicMock(return_value=market_df))
         bot.risk_engine = SimpleNamespace(
-            check_signal_integrity=MagicMock(
-                return_value=(True, "CONFIDENCE_FLOOR_VIOLATED_22.1")
-            ),
+            check_signal_integrity=MagicMock(return_value=(True, "CONFIDENCE_FLOOR_VIOLATED_22.1")),
             should_defer_confidence_exit_for_fee_noise=MagicMock(
                 return_value=(True, "FEE_NOISE_GROSS=0.100%_FLOOR=0.200%")
             ),

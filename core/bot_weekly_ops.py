@@ -1,8 +1,7 @@
 from datetime import UTC, datetime
 
-from tools.notifier import send_telegram_msg
 from core.strategy.utils import StrategyUtils
-
+from tools.notifier import send_telegram_msg
 
 MAINTENANCE_WEEKDAY_UTC = 4  # Friday
 MAINTENANCE_HOUR_UTC = 10
@@ -18,13 +17,9 @@ def check_weekly_schedule(bot, module_available_fn):
                     from evolution_logger import get_evolution_report
 
                     report = get_evolution_report()
-                    send_telegram_msg(
-                        f"📊 *RESUMEN DE CRECIMIENTO SEMANAL*\n\n{report}"
-                    )
+                    send_telegram_msg(f"📊 *RESUMEN DE CRECIMIENTO SEMANAL*\n\n{report}")
                 else:
-                    bot.log(
-                        "ℹ️ Resumen semanal omitido: evolution_logger no disponible."
-                    )
+                    bot.log("ℹ️ Resumen semanal omitido: evolution_logger no disponible.")
             except Exception as error:
                 bot.log(f"⚠️ Error en reporte semanal: {error}")
             bot._weekly_sent = True

@@ -41,10 +41,10 @@ def _execute_and_update_symbol(
 
     final_verdict_for_ui = audit_verdict
     if not should_execute and prob_final >= 65.0:
-        filter_reason = (ctx or {}).get("filter_reason") or (ctx or {}).get("reason") or "FILTER_VETO"
-        bot.log(
-            f"⚠️ {symbol} {audit_signal} prob={prob_final:.1f}% → NO EJECUTA: {filter_reason}"
+        filter_reason = (
+            (ctx or {}).get("filter_reason") or (ctx or {}).get("reason") or "FILTER_VETO"
         )
+        bot.log(f"⚠️ {symbol} {audit_signal} prob={prob_final:.1f}% → NO EJECUTA: {filter_reason}")
 
     if should_execute:
         if ctx:
@@ -78,9 +78,7 @@ def _execute_and_update_symbol(
         )
 
         if prob_final >= 65.0 and not exec_result.startswith("OK"):
-            bot.log(
-                f"⚠️ {symbol} {audit_signal} prob={prob_final:.1f}% → RECHAZADO: {exec_result}"
-            )
+            bot.log(f"⚠️ {symbol} {audit_signal} prob={prob_final:.1f}% → RECHAZADO: {exec_result}")
 
         append_execution_event(
             bot,
@@ -95,9 +93,7 @@ def _execute_and_update_symbol(
 
         if exec_result.startswith("OK"):
             modo_str = "REAL" if not is_shadow_exec else "SHADOW"
-            bot.log(
-                f"✅ GATILLO {modo_str}: {symbol} [{audit_signal}] -> {audit_verdict}"
-            )
+            bot.log(f"✅ GATILLO {modo_str}: {symbol} [{audit_signal}] -> {audit_verdict}")
             with bot.lock:
                 if symbol in bot.active_trades:
                     final_verdict_for_ui = "⚡ OPEN | 🔒 OPERACIÓN ACTIVA"
@@ -105,18 +101,14 @@ def _execute_and_update_symbol(
                     final_verdict_for_ui = audit_verdict
 
             if "DEGRADED" in exec_result:
-                deg_msg = (
-                    exec_result.split(": ")[1] if ": " in exec_result else "PROTECTION"
-                )
+                deg_msg = exec_result.split(": ")[1] if ": " in exec_result else "PROTECTION"
                 audit_verdict = f"🧪 SHADOW (PROT: {deg_msg})"
                 for item in bot.scanner_history:
                     if item["symbol"] == symbol:
                         item["result"] = audit_verdict
                         break
         elif exec_result not in ["COOLDOWN", "ALREADY_ACTIVE"]:
-            error_msg = (
-                exec_result.split(": ")[0] if ": " in exec_result else exec_result
-            )
+            error_msg = exec_result.split(": ")[0] if ": " in exec_result else exec_result
             bot.log(f"❌ FALLO EJECUCIÓN {symbol}: {exec_result}")
             if error_msg in veto_codes:
                 final_verdict_for_ui = f"⛔ VETO: {veto_codes[error_msg]}"

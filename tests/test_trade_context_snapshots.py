@@ -1,4 +1,3 @@
-import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,8 +38,10 @@ class TradeContextSnapshotsTest(unittest.TestCase):
     def test_save_trade_context_snapshot(self):
         ctx = self._fake_context()
         sid = self.brain.save_trade_context_snapshot(
-            symbol="BTC/USDT", side="BUY",
-            context_json=ctx, entry_timestamp="2026-01-01T00:00:00",
+            symbol="BTC/USDT",
+            side="BUY",
+            context_json=ctx,
+            entry_timestamp="2026-01-01T00:00:00",
             is_shadow=True,
         )
         self.assertIsNotNone(sid)
@@ -49,22 +50,28 @@ class TradeContextSnapshotsTest(unittest.TestCase):
     def test_update_trade_context_result(self):
         ctx = self._fake_context()
         sid = self.brain.save_trade_context_snapshot(
-            symbol="BTC/USDT", side="BUY",
-            context_json=ctx, entry_timestamp="2026-01-01T00:00:00",
+            symbol="BTC/USDT",
+            side="BUY",
+            context_json=ctx,
+            entry_timestamp="2026-01-01T00:00:00",
             is_shadow=True,
         )
         self.assertIsNotNone(sid)
         ok = self.brain.update_trade_context_result(
-            trade_id=1, pnl_percent=2.5,
-            exit_timestamp="2026-01-02T00:00:00", is_winner=1,
+            trade_id=1,
+            pnl_percent=2.5,
+            exit_timestamp="2026-01-02T00:00:00",
+            is_winner=1,
         )
         self.assertFalse(ok)
 
     def test_update_trade_context_result_with_matching_symbol(self):
         ctx = self._fake_context()
         sid = self.brain.save_trade_context_snapshot(
-            symbol="BTC/USDT", side="BUY",
-            context_json=ctx, entry_timestamp="2026-01-01T00:00:00",
+            symbol="BTC/USDT",
+            side="BUY",
+            context_json=ctx,
+            entry_timestamp="2026-01-01T00:00:00",
             is_shadow=True,
         )
         self.assertIsNotNone(sid)
@@ -76,8 +83,10 @@ class TradeContextSnapshotsTest(unittest.TestCase):
         conn.commit()
         conn.close()
         ok = self.brain.update_trade_context_result(
-            trade_id=1, pnl_percent=2.5,
-            exit_timestamp="2026-01-02T00:00:00", is_winner=1,
+            trade_id=1,
+            pnl_percent=2.5,
+            exit_timestamp="2026-01-02T00:00:00",
+            is_winner=1,
         )
         self.assertTrue(ok)
 
@@ -88,8 +97,10 @@ class TradeContextSnapshotsTest(unittest.TestCase):
     def test_find_similar_contexts_with_data(self):
         ctx_win = self._fake_context(rsi=60, adx=30, vol_rel=1.5)
         self.brain.save_trade_context_snapshot(
-            symbol="BTC/USDT", side="BUY",
-            context_json=ctx_win, entry_timestamp="2026-01-01T00:00:00",
+            symbol="BTC/USDT",
+            side="BUY",
+            context_json=ctx_win,
+            entry_timestamp="2026-01-01T00:00:00",
             is_shadow=True,
         )
         conn = self.brain._get_conn()
@@ -107,13 +118,17 @@ class TradeContextSnapshotsTest(unittest.TestCase):
     def test_cleanup_stale_snapshots(self):
         ctx = self._fake_context()
         self.brain.save_trade_context_snapshot(
-            symbol="BTC/USDT", side="BUY",
-            context_json=ctx, entry_timestamp="2020-01-01T00:00:00",
+            symbol="BTC/USDT",
+            side="BUY",
+            context_json=ctx,
+            entry_timestamp="2020-01-01T00:00:00",
             is_shadow=True,
         )
         self.brain.save_trade_context_snapshot(
-            symbol="BTC/USDT", side="SELL",
-            context_json=ctx, entry_timestamp="2026-01-01T00:00:00",
+            symbol="BTC/USDT",
+            side="SELL",
+            context_json=ctx,
+            entry_timestamp="2026-01-01T00:00:00",
             is_shadow=True,
         )
         deleted = self.brain.cleanup_stale_snapshots(max_age_days=30)

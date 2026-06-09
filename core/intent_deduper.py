@@ -1,12 +1,11 @@
 import threading
 import time
-from typing import Dict, Set
 
 
 class IntentDeduper:
     _window: int
     _lock: threading.RLock
-    _registry: Dict[str, float]
+    _registry: dict[str, float]
 
     def __init__(self, window_seconds: int = 300):
         self._window = window_seconds

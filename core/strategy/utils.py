@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import pandas as pd
-import tools.pandas_ta as ta
-import numpy as np
-from datetime import datetime
-from typing import Dict, Any, Optional, TYPE_CHECKING
 import logging
-from config import Config
+from typing import TYPE_CHECKING
+
+import numpy as np
+import pandas as pd
+
+import tools.pandas_ta as pandas_ta  # noqa: F401 - registers the pandas df.ta accessor
 
 if TYPE_CHECKING:
     from core.candle_close_cache import CandleCloseCache
@@ -20,11 +20,13 @@ class StrategyUtils:
     Maneja indicadores, preprocesamiento y detección de estructuras.
     """
 
-    _ob_cache: Dict[str, str] = {}
-    _candle_cache: Optional["CandleCloseCache"] = None
+    _ob_cache: dict[str, str] = {}
+    _candle_cache: CandleCloseCache | None = None
 
     @staticmethod
-    def compute_runtime_snapshot(df: pd.DataFrame, cache_symbol: str = "runtime") -> Optional[Dict[str, float]]:
+    def compute_runtime_snapshot(
+        df: pd.DataFrame, cache_symbol: str = "runtime"
+    ) -> dict[str, float] | None:
         if df is None or df.empty:
             return None
 
@@ -160,9 +162,7 @@ class StrategyUtils:
             body = abs(candle["close"] - candle["open"])
             vol = candle["volume"] if "volume" in df.columns else 1.0
 
-            if float(body) > (float(avg_body) * 1.6) and float(vol) > (
-                float(avg_volume) * 1.2
-            ):
+            if float(body) > (float(avg_body) * 1.6) and float(vol) > (float(avg_volume) * 1.2):
                 is_bullish_ob = candle["close"] < candle["open"]
                 is_bearish_ob = candle["close"] > candle["open"]
                 current_price = df["close"].iloc[-1]
@@ -190,11 +190,9 @@ class StrategyUtils:
         return result
 
     @staticmethod
-    def preprocess_data(df: pd.DataFrame, mode: str = "full") -> Optional[pd.DataFrame]:
+    def preprocess_data(df: pd.DataFrame, mode: str = "full") -> pd.DataFrame | None:
         """Punto único de cálculo de indicadores y normalización dinámica Z-Score."""
-        if (
-            df is None or len(df) < 100
-        ):  # Aumentado a 100 para soportar la ventana de normalización
+        if df is None or len(df) < 100:  # Aumentado a 100 para soportar la ventana de normalización
             return None
 
         try:
@@ -254,11 +252,7 @@ class StrategyUtils:
                 )
             else:
                 df.drop(
-                    columns=[
-                        c
-                        for c in ["ema", "ema_200", "EMA_50", "EMA_200"]
-                        if c in df.columns
-                    ],
+                    columns=[c for c in ["ema", "ema_200", "EMA_50", "EMA_200"] if c in df.columns],
                     inplace=True,
                     errors="ignore",
                 )
@@ -338,14 +332,9 @@ class StrategyUtils:
             window_size = 100
             for col in all_scaled_cols:
                 if col in df.columns:
-                    rolling_mean = (
-                        df[col].rolling(window=window_size, min_periods=10).mean()
-                    )
+                    rolling_mean = df[col].rolling(window=window_size, min_periods=10).mean()
                     rolling_std = (
-                        df[col]
-                        .rolling(window=window_size, min_periods=10)
-                        .std()
-                        .replace(0, 1e-10)
+                        df[col].rolling(window=window_size, min_periods=10).std().replace(0, 1e-10)
                     )
                     df[col] = (df[col] - rolling_mean) / rolling_std
 
@@ -355,7 +344,5 @@ class StrategyUtils:
 
             return df
         except Exception as e:
-            logger.error(
-                f"❌ Error en preprocess_data (mode={mode}): {e}", exc_info=True
-            )
+            logger.error(f"❌ Error en preprocess_data (mode={mode}): {e}", exc_info=True)
             return None

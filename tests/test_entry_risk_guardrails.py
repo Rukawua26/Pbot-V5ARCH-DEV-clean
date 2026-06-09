@@ -67,9 +67,16 @@ class EntryRiskGuardrailsTest(unittest.TestCase):
 
         try:
             passed, reason, *_ = Strategy.check_entry_filters(
-                rsi=55, adx=25, current_time=None,
-                audit_signal="SELL", volatility=0.0, vol_rel=1.2,
-                is_shadow=True, price=100.0, atr=1.4, side="SELL",
+                rsi=55,
+                adx=25,
+                current_time=None,
+                audit_signal="SELL",
+                volatility=0.0,
+                vol_rel=1.2,
+                is_shadow=True,
+                price=100.0,
+                atr=1.4,
+                side="SELL",
                 regime="DOWN",
             )
             self.assertTrue(passed)
@@ -85,9 +92,16 @@ class EntryRiskGuardrailsTest(unittest.TestCase):
 
         try:
             passed, reason, *_ = Strategy.check_entry_filters(
-                rsi=55, adx=25, current_time=None,
-                audit_signal="SELL", volatility=0.0, vol_rel=1.2,
-                is_shadow=True, price=100.0, atr=1.8, side="SELL",
+                rsi=55,
+                adx=25,
+                current_time=None,
+                audit_signal="SELL",
+                volatility=0.0,
+                vol_rel=1.2,
+                is_shadow=True,
+                price=100.0,
+                atr=1.8,
+                side="SELL",
                 regime="DOWN",
             )
             self.assertFalse(passed)

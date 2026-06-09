@@ -1,7 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from tools.shadow_delta_report import (
@@ -40,8 +40,8 @@ class ShadowDeltaReportTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            start = datetime(2026, 5, 14, 9, 59, tzinfo=timezone.utc)
-            end = datetime(2026, 5, 14, 10, 3, tzinfo=timezone.utc)
+            start = datetime(2026, 5, 14, 9, 59, tzinfo=UTC)
+            end = datetime(2026, 5, 14, 10, 3, tzinfo=UTC)
             summary = summarize_log(path, start, end)
             self.assertEqual(summary["signals_total"], 3)
             self.assertEqual(summary["verdict_shadow"], 1)
@@ -62,8 +62,8 @@ class ShadowDeltaReportTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            start = datetime(2026, 5, 14, 9, 59, tzinfo=timezone.utc)
-            end = datetime(2026, 5, 14, 10, 3, tzinfo=timezone.utc)
+            start = datetime(2026, 5, 14, 9, 59, tzinfo=UTC)
+            end = datetime(2026, 5, 14, 10, 3, tzinfo=UTC)
             summary = summarize_execution_events(path, start, end)
             self.assertEqual(summary["order_intents"], 1)
             self.assertEqual(summary["order_filled"], 1)
@@ -124,8 +124,8 @@ class ShadowDeltaReportTests(unittest.TestCase):
             conn.commit()
             conn.close()
 
-            start = datetime(2026, 5, 14, 9, 0, tzinfo=timezone.utc)
-            end = datetime(2026, 5, 14, 12, 0, tzinfo=timezone.utc)
+            start = datetime(2026, 5, 14, 9, 0, tzinfo=UTC)
+            end = datetime(2026, 5, 14, 12, 0, tzinfo=UTC)
             summary = summarize_trades(db_path, start, end)
             self.assertEqual(summary["shadow_entries"], 2)
             self.assertEqual(summary["shadow_closed"], 2)
@@ -180,8 +180,8 @@ class ShadowDeltaReportTests(unittest.TestCase):
             conn.commit()
             conn.close()
 
-            start = datetime(2026, 5, 14, 9, 30, tzinfo=timezone.utc)
-            end = datetime(2026, 5, 14, 11, 0, tzinfo=timezone.utc)
+            start = datetime(2026, 5, 14, 9, 30, tzinfo=UTC)
+            end = datetime(2026, 5, 14, 11, 0, tzinfo=UTC)
             metrics = build_window_metrics(
                 label="current",
                 start=start,

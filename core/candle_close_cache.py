@@ -1,19 +1,18 @@
 import threading
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 
 class CandleCloseCache:
     _lock: threading.RLock
-    _cache: Dict[Tuple[str, str, str], Tuple[int, Any]]
+    _cache: dict[tuple[str, str, str], tuple[int, Any]]
     _max: int
 
     def __init__(self, max_entries: int = 500):
         self._lock = threading.RLock()
-        self._cache: Dict[Tuple[str, str, str], Tuple[int, Any]] = {}
+        self._cache: dict[tuple[str, str, str], tuple[int, Any]] = {}
         self._max = max_entries
 
-    def get(self, namespace: str, symbol: str, timeframe: str,
-            candle_close_ms: int) -> Optional[Any]:
+    def get(self, namespace: str, symbol: str, timeframe: str, candle_close_ms: int) -> Any | None:
         key = (namespace, symbol.upper(), timeframe)
         with self._lock:
             entry = self._cache.get(key)
@@ -21,16 +20,16 @@ class CandleCloseCache:
                 return entry[1]
         return None
 
-    def set(self, namespace: str, symbol: str, timeframe: str,
-            candle_close_ms: int, value: Any):
+    def set(self, namespace: str, symbol: str, timeframe: str, candle_close_ms: int, value: Any):
         key = (namespace, symbol.upper(), timeframe)
         with self._lock:
             self._cache[key] = (candle_close_ms, value)
             if len(self._cache) > self._max:
                 self._evict()
 
-    def is_new_candle(self, namespace: str, symbol: str, timeframe: str,
-                      candle_close_ms: int) -> bool:
+    def is_new_candle(
+        self, namespace: str, symbol: str, timeframe: str, candle_close_ms: int
+    ) -> bool:
         key = (namespace, symbol.upper(), timeframe)
         with self._lock:
             entry = self._cache.get(key)

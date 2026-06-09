@@ -29,11 +29,13 @@ class HyperoptConfigLoaderTest(unittest.TestCase):
         self.assertEqual(HyperoptConfigLoader.get_param("stop_loss_pct"), 1.2)
 
     def test_symbol_params_override_global_params(self):
-        self._write_config({
-            "enabled": True,
-            "params": {"stop_loss_pct": 1.2, "take_profit_pct": 2.0},
-            "symbols": {"BTC/USDT": {"stop_loss_pct": 0.8}},
-        })
+        self._write_config(
+            {
+                "enabled": True,
+                "params": {"stop_loss_pct": 1.2, "take_profit_pct": 2.0},
+                "symbols": {"BTC/USDT": {"stop_loss_pct": 0.8}},
+            }
+        )
 
         params = HyperoptConfigLoader.get_params_for_symbol("BTC/USDT:USDT")
 
@@ -41,11 +43,13 @@ class HyperoptConfigLoaderTest(unittest.TestCase):
         self.assertEqual(params["take_profit_pct"], 2.0)
 
     def test_unknown_symbol_uses_global_params(self):
-        self._write_config({
-            "enabled": True,
-            "params": {"stop_loss_pct": 1.2},
-            "symbols": {"BTC/USDT": {"stop_loss_pct": 0.8}},
-        })
+        self._write_config(
+            {
+                "enabled": True,
+                "params": {"stop_loss_pct": 1.2},
+                "symbols": {"BTC/USDT": {"stop_loss_pct": 0.8}},
+            }
+        )
 
         params = HyperoptConfigLoader.get_params_for_symbol("ETH/USDT")
 

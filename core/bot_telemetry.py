@@ -17,9 +17,7 @@ def collect_telemetry(bot, logger):
                 {
                     "ai_xp": maturity.get("xp_percent", 0),
                     "rank": maturity.get("rank", "BRONZE"),
-                    "daily_pnl": pnl_data[0]
-                    if isinstance(pnl_data, tuple)
-                    else pnl_data,
+                    "daily_pnl": pnl_data[0] if isinstance(pnl_data, tuple) else pnl_data,
                     "total_real_trades": brain_stats.get("total_trades", 0),
                     "total_shadow_trades": brain_stats.get("shadow_trades", 0),
                     "win_rate": shadow_wr,

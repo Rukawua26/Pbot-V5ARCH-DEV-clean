@@ -79,8 +79,10 @@ class WeeklyMaintenanceTest(unittest.TestCase):
         bot = SimpleNamespace(
             _last_weekly_maintenance_utc=None,
             brain=SimpleNamespace(
-                weekly_maintenance=lambda **kwargs: calls.append(kwargs)
-                or {"error": None, "shadow_deleted": 0, "signal_deleted": 0, "vacuum_ok": True}
+                weekly_maintenance=lambda **kwargs: (
+                    calls.append(kwargs)
+                    or {"error": None, "shadow_deleted": 0, "signal_deleted": 0, "vacuum_ok": True}
+                )
             ),
             log=logs.append,
         )

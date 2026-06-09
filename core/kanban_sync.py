@@ -4,11 +4,10 @@ Solo se rastrean operaciones REALES (PAPER/LIVE). Los trades SHADOW
 son simulaciones internas y no se reflejan en el tablero.
 """
 
+import logging
 import threading
 import time
-from typing import Any, Dict
-
-import logging
+from typing import Any
 
 from tools.github_projects_kanban import (
     actualizar_pnl_tarjeta,
@@ -61,7 +60,9 @@ def async_crear_tarjeta(
             if move_res.get("ok"):
                 logger.info(f"✅ Kanban: {symbol} movida a '{target_col}'")
             else:
-                logger.error(f"Kanban Sync Error [mover tras crear {symbol}]: {move_res.get('error')}")
+                logger.error(
+                    f"Kanban Sync Error [mover tras crear {symbol}]: {move_res.get('error')}"
+                )
         else:
             logger.error(f"Kanban Sync Error [crear_tarjeta {symbol}]: {res.get('error')}")
 
@@ -82,12 +83,10 @@ def async_mover_tarjeta(item_id: str, columna_destino: str) -> None:
                 f"Kanban Sync Error [mover_tarjeta a {columna_destino}]: {res.get('error')}"
             )
 
-    threading.Thread(
-        target=_run, daemon=True, name=f"kanban-mover-{columna_destino}"
-    ).start()
+    threading.Thread(target=_run, daemon=True, name=f"kanban-mover-{columna_destino}").start()
 
 
-_last_pnl_updates: Dict[str, float] = {}
+_last_pnl_updates: dict[str, float] = {}
 
 
 def async_actualizar_pnl(item_id: str, pnl_actual: float, precio_actual: float) -> None:

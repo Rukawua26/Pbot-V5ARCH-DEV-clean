@@ -1,18 +1,20 @@
+from datetime import UTC
+
 from config import Config
 from tools.strategy import Strategy
 
 
 def _snapshot_age_seconds(snapshot):
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         ts_raw = snapshot.get("ts") if isinstance(snapshot, dict) else None
         if not ts_raw:
             return float("inf")
         parsed = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
+            parsed = parsed.replace(tzinfo=UTC)
+        return max(0.0, (datetime.now(UTC) - parsed).total_seconds())
     except Exception:
         return float("inf")
 
@@ -146,11 +148,7 @@ def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
             dynamic_params = bot.brain.get_dynamic_settings(symbol)
 
         default_min = Config.SHADOW_MIN_PROBABILITY_RANGE / 10.0
-        min_score = (
-            dynamic_params.get("min_score", default_min)
-            if dynamic_params
-            else default_min
-        )
+        min_score = dynamic_params.get("min_score", default_min) if dynamic_params else default_min
         if bot.global_rag_impact > 10.0:
             min_score = max(min_score, 8.8)
 
@@ -200,9 +198,7 @@ def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
         return res
 
     except KeyError as e_key:
-        bot.log(
-            f"⚠️ {symbol} descartado: Datos insuficientes para indicador clave ({e_key})."
-        )
+        bot.log(f"⚠️ {symbol} descartado: Datos insuficientes para indicador clave ({e_key}).")
         bot.update_radar(
             symbol_raw,
             {"signal": "WAIT", "mode": "NONE"},

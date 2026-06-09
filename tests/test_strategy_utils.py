@@ -1,6 +1,7 @@
 import unittest
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
 from core.strategy.utils import StrategyUtils
 
@@ -81,9 +82,9 @@ class TestDetectOrderBlock(unittest.TestCase):
                 o = base + np.random.uniform(-0.5, 0.5)
                 c = o + np.random.uniform(-0.5, 0.5)
             h = max(o, c) + np.random.uniform(0.1, 0.5)
-            l = min(o, c) - np.random.uniform(0.1, 0.5)
+            low = min(o, c) - np.random.uniform(0.1, 0.5)
             v = np.random.uniform(10, 100)
-            rows.append({"time": i, "open": o, "high": h, "low": l, "close": c, "volume": v})
+            rows.append({"time": i, "open": o, "high": h, "low": low, "close": c, "volume": v})
         df = pd.DataFrame(rows)
         df["time"] = df["time"].astype(int)
         return df
@@ -123,15 +124,15 @@ class TestDetectOrderBlock(unittest.TestCase):
         for i in range(n):
             if i == n - 5:
                 o, c = 102.0, 100.5
-                h, l = 102.2, 100.3
+                h, low = 102.2, 100.3
                 v = 500
             else:
                 o = base + np.random.uniform(-0.3, 0.3)
                 c = o + np.random.uniform(-0.3, 0.3)
                 h = max(o, c) + 0.3
-                l = min(o, c) - 0.3
+                low = min(o, c) - 0.3
                 v = np.random.uniform(10, 50)
-            rows.append({"time": i, "open": o, "high": h, "low": l, "close": c, "volume": v})
+            rows.append({"time": i, "open": o, "high": h, "low": low, "close": c, "volume": v})
         df = pd.DataFrame(rows)
         df["time"] = df["time"].astype(int)
         StrategyUtils._ob_cache.clear()
@@ -147,9 +148,9 @@ class TestPreprocessData(unittest.TestCase):
             o = base + i * 0.1 + np.random.uniform(-0.5, 0.5)
             c = o + np.random.uniform(-0.5, 0.5)
             h = max(o, c) + np.random.uniform(0.1, 0.5)
-            l = min(o, c) - np.random.uniform(0.1, 0.5)
+            low = min(o, c) - np.random.uniform(0.1, 0.5)
             v = np.random.uniform(10, 100)
-            rows.append({"open": o, "high": h, "low": l, "close": c, "volume": v})
+            rows.append({"open": o, "high": h, "low": low, "close": c, "volume": v})
         return pd.DataFrame(rows)
 
     def test_returns_none_for_none(self):

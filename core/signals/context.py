@@ -25,17 +25,11 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
     )
     current_rsi = float(raw_metrics.get("rsi", _safe_series_float(df_main, "rsi", 50.0)))
     current_atr = float(raw_metrics.get("atr", _safe_series_float(df_main, "atr", 0.0)))
-    volume_now = _safe_series_float(df_main, "volume_raw", _safe_series_float(df_main, "volume", 0.0))
+    volume_now = _safe_series_float(
+        df_main, "volume_raw", _safe_series_float(df_main, "volume", 0.0)
+    )
     volume_ma = float(raw_metrics.get("volume_ma", _safe_series_float(df_main, "volume_ma", 0.0)))
     close_raw = _safe_series_float(df_main, "close", price)
-    open_raw = _safe_series_float(df_main, "open", price)
-    high_raw = _safe_series_float(df_main, "high", price)
-    low_raw = _safe_series_float(df_main, "low", price)
-    ema_dist_pct_raw = ((close_raw - float(ema_ref)) / float(ema_ref) * 100.0) if ema_ref else 0.0
-    bb_lower = float(raw_metrics.get("bb_lower", 0.0))
-    bb_upper = float(raw_metrics.get("bb_upper", 0.0))
-    bb_width_raw = float(raw_metrics.get("bb_width", 0.0))
-    bb_pos_raw = float(raw_metrics.get("bb_pos", 0.5))
 
     if current_adx > 25:
         trend_label = "UP" if price > ema_ref else "DOWN"

@@ -1,35 +1,22 @@
+import logging
 import os
+from importlib.util import find_spec
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Optional, Union
+
 from core.model_loader import safe_pickle_load
 from core.strategy.base_agent import BaseAgent
-import logging
 
 logger = logging.getLogger("SniperAI")
 
-# Imports condicionales para modelos pesados
-try:
-    from sklearn.neural_network import MLPClassifier
-    from sklearn.preprocessing import StandardScaler
-
-    SKLEARN_AVAILABLE = True
-except ImportError:
-    SKLEARN_AVAILABLE = False
-
-try:
-    from tools.ultimate_ml import UltimateMLSystem
-
-    ULTIMATE_ML_AVAILABLE = True
-except ImportError:
-    ULTIMATE_ML_AVAILABLE = False
-
-try:
-    from advanced_ensemble import OrderBookAnalyzer
-
-    OB_ANALYZER_AVAILABLE = True
-except ImportError:
-    OB_ANALYZER_AVAILABLE = False
+SKLEARN_AVAILABLE = (
+    find_spec("sklearn.neural_network") is not None
+    and find_spec("sklearn.preprocessing") is not None
+)
+ULTIMATE_ML_AVAILABLE = find_spec("tools.ultimate_ml") is not None
+OB_ANALYZER_AVAILABLE = find_spec("advanced_ensemble") is not None
 
 
 class GhostAgent(BaseAgent):
@@ -45,7 +32,7 @@ class GhostAgent(BaseAgent):
         self.model = None
         self._ultimate_ml = None
 
-    def load_trained_model(self) -> Optional[Dict[str, Any]]:
+    def load_trained_model(self) -> dict[str, Any] | None:
         """Carga el modelo entrenado si existe."""
         if self._model_loaded:
             return self._trained_model
@@ -54,12 +41,14 @@ class GhostAgent(BaseAgent):
         if os.path.exists(model_path):
             try:
                 self._trained_model = safe_pickle_load(model_path)
+                assert self._trained_model is not None
                 self.model = self._select_boost_model(self._trained_model)
                 if self.model is None:
                     logger.warning(
                         "⚠️ Ghost Model cargado pero sin predictor usable "
                         "(predict/predict_proba no disponible)"
                     )
+                assert self._trained_model is not None
                 logger.debug(
                     f"✅ Ghost Model cargado: {self._trained_model.get('n_samples', 0)} muestras"
                 )
@@ -71,7 +60,7 @@ class GhostAgent(BaseAgent):
         self._model_loaded = True
         return None
 
-    def _select_boost_model(self, model_data: Dict[str, Any]) -> Optional[Any]:
+    def _select_boost_model(self, model_data: dict[str, Any]) -> Any | None:
         """Selecciona el mejor modelo disponible para boost IA."""
         if not isinstance(model_data, dict):
             return None
@@ -198,7 +187,7 @@ class GhostAgent(BaseAgent):
         except Exception:
             return 0.0
 
-    def vote(self, context: Dict[str, Any]) -> float:
+    def vote(self, context: dict[str, Any]) -> float:
         model = context.get("model")
         if model is None:
             return 50.0
@@ -218,16 +207,12 @@ class GhostAgent(BaseAgent):
 
         try:
             # --- [Advanced Ensemble v118/compat] ---
-            if isinstance(model, dict) and str(model.get("version", "")).startswith(
-                "v"
-            ):
+            if isinstance(model, dict) and str(model.get("version", "")).startswith("v"):
                 return self._predict_advanced_ensemble(model, context, ai_boost)
 
             # --- [LSTM / Legacy Models] ---
             if hasattr(model, "input_shape"):
-                return self._predict_lstm(
-                    model, df, scaler, rsi, funding_rate, ai_boost
-                )
+                return self._predict_lstm(model, df, scaler, rsi, funding_rate, ai_boost)
 
             # --- [v111_ultimate] ---
             if isinstance(model, dict) and model.get("version") == "v111_ultimate":
@@ -239,7 +224,7 @@ class GhostAgent(BaseAgent):
         return 50.0
 
     def _predict_advanced_ensemble(
-        self, model: Any, context: Dict[str, Any], ai_boost: float
+        self, model: Any, context: dict[str, Any], ai_boost: float
     ) -> float:
         try:
             return 50.0 + ai_boost
@@ -249,8 +234,8 @@ class GhostAgent(BaseAgent):
     def _predict_lstm(
         self,
         model: Any,
-        df: Optional[pd.DataFrame],
-        scaler: Optional[Any],
+        df: pd.DataFrame | None,
+        scaler: Any | None,
         rsi: float,
         funding_rate: float,
         ai_boost: float,
@@ -259,7 +244,5 @@ class GhostAgent(BaseAgent):
             return 0.0
         return 50.0 + ai_boost
 
-    def _predict_v111_ultimate(
-        self, model: Any, context: Dict[str, Any], ai_boost: float
-    ) -> float:
+    def _predict_v111_ultimate(self, model: Any, context: dict[str, Any], ai_boost: float) -> float:
         return 50.0 + ai_boost

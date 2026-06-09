@@ -77,7 +77,7 @@ def connect_to_binance(bot):
                 raise RuntimeError(
                     "La clase de exchange actual no soporta sandbox/testnet de forma nativa."
                 )
-            exchange.options['disableFuturesSandboxWarning'] = True
+            exchange.options["disableFuturesSandboxWarning"] = True
             try:
                 exchange.set_sandbox_mode(True)
             except Exception as error:
@@ -106,13 +106,9 @@ def connect_to_binance(bot):
             if not float(getattr(bot, "balance", 0.0) or 0.0):
                 bot.balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
             if not float(getattr(bot, "available_balance", 0.0) or 0.0):
-                bot.available_balance = float(
-                    getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0)
-                )
+                bot.available_balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
             if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
-                bot.daily_initial_balance = float(
-                    getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0)
-                )
+                bot.daily_initial_balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
             if Config.BINANCE_API_KEY and Config.BINANCE_API_SECRET:
                 try:
                     _call_auth_read_with_time_resync(
@@ -136,7 +132,9 @@ def connect_to_binance(bot):
                 try:
                     _sync_exchange_time(bot, exchange, "bootstrap REAL")
                 except Exception as error:
-                    bot.log(f"⚠️ Binance time sync previo falló; se validará con request autenticada: {error}")
+                    bot.log(
+                        f"⚠️ Binance time sync previo falló; se validará con request autenticada: {error}"
+                    )
 
                 _call_auth_read_with_time_resync(
                     bot, "fetch_balance(REAL)", bot.execution.fetch_balance
@@ -152,9 +150,7 @@ def connect_to_binance(bot):
                             mode = _call_auth_read_with_time_resync(
                                 bot,
                                 "fetch_position_mode(BTC/USDT:USDT)",
-                                lambda: bot.execution.fetch_position_mode(
-                                    symbol="BTC/USDT:USDT"
-                                ),
+                                lambda: bot.execution.fetch_position_mode(symbol="BTC/USDT:USDT"),
                             )
                             bot.is_hedge_mode = mode.get("hedged", False)
                         except Exception:
@@ -173,9 +169,7 @@ def connect_to_binance(bot):
                             bot.execution.get_position_side_dual,
                         )
                         bot.is_hedge_mode = mode["dualSidePosition"]
-                    bot.log(
-                        f"ℹ️ Modo de Posición: {'HEDGE' if bot.is_hedge_mode else 'ONE-WAY'}"
-                    )
+                    bot.log(f"ℹ️ Modo de Posición: {'HEDGE' if bot.is_hedge_mode else 'ONE-WAY'}")
                 except Exception as error:
                     bot.is_paused = True
                     bot.integrity_lock_active = True
@@ -195,10 +189,12 @@ def connect_to_binance(bot):
             mode_tag = "TESTNET" if Config.USE_TESTNET else "REAL"
             bot.log(f"🔥 MODO {mode_tag}: sincronizando wallet...")
             bot.sync_wallet()
-        mode_label = "TESTNET" if Config.USE_TESTNET else ("📝 PAPER (Simulado)" if Config.PAPER_MODE else "🔥 REAL (Dinero Real)")
+        mode_label = (
+            "TESTNET"
+            if Config.USE_TESTNET
+            else ("📝 PAPER (Simulado)" if Config.PAPER_MODE else "🔥 REAL (Dinero Real)")
+        )
         bot.log(f"🛡️ MODO OPERATIVO: {mode_label}")
     except Exception as error:
         bot.log(f"❌ ERROR FATAL: {error}")
-        raise RuntimeError(
-            f"No se pudo inicializar conexión Binance: {error}"
-        ) from error
+        raise RuntimeError(f"No se pudo inicializar conexión Binance: {error}") from error

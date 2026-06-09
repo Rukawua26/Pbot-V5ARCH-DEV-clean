@@ -1,4 +1,4 @@
-from typing import Any, Optional, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
@@ -15,7 +15,7 @@ class ExecutionPort(Protocol):
 
     def fetch_positions(self): ...
 
-    def fetch_open_orders(self, symbol: Optional[str] = None): ...
+    def fetch_open_orders(self, symbol: str | None = None): ...
 
     def fetch_order_by_client_id(self, symbol: str, client_order_id: str): ...
 
@@ -42,7 +42,7 @@ class ExecutionPort(Protocol):
         amount: float,
         price: float,
         slippage_pct: float = 0.1,
-        client_order_id: Optional[str] = None,
+        client_order_id: str | None = None,
     ): ...
 
     def create_reduce_only_market_order(
@@ -55,7 +55,7 @@ class ExecutionPort(Protocol):
         side: str,
         amount: float,
         stop_price: float,
-        client_order_id: Optional[str] = None,
+        client_order_id: str | None = None,
     ): ...
 
     def close_position(self, symbol: str, side: str, amount: float): ...

@@ -13,9 +13,8 @@ Reglas:
   Todo lo demás                       → NEUTRAL (sin datos suficientes)
 """
 
-import time
 import logging
-from typing import Optional, Tuple
+import time
 
 from config import Config
 
@@ -25,7 +24,7 @@ logger = logging.getLogger("SniperAI")
 _oi_cache: dict = {}
 
 
-def _get_cached_oi(symbol: str) -> Optional[float]:
+def _get_cached_oi(symbol: str) -> float | None:
     """Retorna el OI anterior cacheado si no ha expirado."""
     entry = _oi_cache.get(symbol)
     if not entry:
@@ -42,7 +41,7 @@ def _update_oi_cache(symbol: str, oi_value: float):
     _oi_cache[symbol] = {"oi": oi_value, "ts": time.time()}
 
 
-def _get_cached_oi_api(symbol: str) -> Optional[float]:
+def _get_cached_oi_api(symbol: str) -> float | None:
     """Retorna OI cacheado (API-level TTL) o None si expiró."""
     entry = _oi_cache.get(symbol)
     if not entry:
@@ -53,7 +52,7 @@ def _get_cached_oi_api(symbol: str) -> Optional[float]:
     return entry["oi"]
 
 
-def fetch_oi_delta(bot, symbol: str) -> Tuple[Optional[float], Optional[float]]:
+def fetch_oi_delta(bot, symbol: str) -> tuple[float | None, float | None]:
     """
     Obtiene el OI actual y calcula el delta contra el valor cacheado.
     Usa cache TTL para evitar llamadas API redundantes.
@@ -103,7 +102,7 @@ def fetch_oi_delta(bot, symbol: str) -> Tuple[Optional[float], Optional[float]]:
 
 
 def validate_signal_with_oi(
-    audit_signal: str, delta_price_pct: float, oi_delta_pct: Optional[float]
+    audit_signal: str, delta_price_pct: float, oi_delta_pct: float | None
 ) -> str:
     """
     Valida la señal contra el cambio de OI.

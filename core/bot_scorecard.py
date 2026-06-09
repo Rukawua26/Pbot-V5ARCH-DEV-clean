@@ -19,8 +19,7 @@ def send_daily_exit_scorecard(bot):
               AND timestamp >= ?
               AND timestamp < ?
             ORDER BY id DESC
-            """
-            ,
+            """,
             (day_start.isoformat(), day_end.isoformat()),
         ).fetchall()
         real_rows = conn.execute(

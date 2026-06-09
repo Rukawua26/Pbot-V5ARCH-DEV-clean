@@ -1,10 +1,11 @@
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 
 class TestGetLocalOpenTradeCounts(unittest.TestCase):
     def test_returns_zero_when_no_active_trades(self):
         from core.trade_manager import _get_local_open_trade_counts
+
         bot = MagicMock()
         bot.active_trades = {}
         bot.log = MagicMock()
@@ -13,6 +14,7 @@ class TestGetLocalOpenTradeCounts(unittest.TestCase):
 
     def test_counts_open_trades_correctly(self):
         from core.trade_manager import _get_local_open_trade_counts
+
         bot = MagicMock()
         bot.active_trades = {
             "BTC/USDT": {"status": "OPEN"},
@@ -26,6 +28,7 @@ class TestGetLocalOpenTradeCounts(unittest.TestCase):
 
     def test_returns_defaults_on_exception(self):
         from core.trade_manager import _get_local_open_trade_counts
+
         bot = MagicMock()
         # Make active_trades raise an exception when accessed
         type(bot).active_trades = PropertyMock(side_effect=Exception("error"))
@@ -39,6 +42,7 @@ class TestExchangePositionIsFlat(unittest.TestCase):
     @patch("core.trade_entry.normalize_position_symbol")
     def test_returns_true_when_no_positions(self, mock_norm):
         from core.trade_manager import _exchange_position_is_flat
+
         bot = MagicMock()
         bot.execution.fetch_positions.return_value = []
         mock_norm.return_value = "BTC/USDT"
@@ -48,16 +52,16 @@ class TestExchangePositionIsFlat(unittest.TestCase):
     @patch("core.trade_entry.normalize_position_symbol")
     def test_returns_false_when_position_open(self, mock_norm):
         from core.trade_manager import _exchange_position_is_flat
+
         bot = MagicMock()
-        bot.execution.fetch_positions.return_value = [
-            {"symbol": "BTC/USDT", "contracts": 1.0}
-        ]
+        bot.execution.fetch_positions.return_value = [{"symbol": "BTC/USDT", "contracts": 1.0}]
         mock_norm.return_value = "BTC/USDT"
         result = _exchange_position_is_flat(bot, "BTC/USDT")
         self.assertFalse(result)
 
     def test_raises_when_fetch_positions_unavailable(self):
         from core.trade_manager import _exchange_position_is_flat
+
         bot = MagicMock()
         bot.execution = MagicMock()
         del bot.execution.fetch_positions
@@ -68,6 +72,7 @@ class TestExchangePositionIsFlat(unittest.TestCase):
 class TestSafeLogSignalAlert(unittest.TestCase):
     def test_calls_method_without_lock(self):
         from core.trade_manager import _safe_log_signal_alert
+
         bot = MagicMock()
         bot.brain = MagicMock()
         bot.db_lock = None
@@ -76,6 +81,7 @@ class TestSafeLogSignalAlert(unittest.TestCase):
 
     def test_skips_when_method_not_callable(self):
         from core.trade_manager import _safe_log_signal_alert
+
         bot = MagicMock()
         bot.brain = MagicMock()
         bot.brain.log_signal_alert = "not_callable"
@@ -99,6 +105,7 @@ class TestValidateEntryPreconditionsExtended(unittest.TestCase):
     @patch("core.trade_entry.shadow_logger")
     def test_returns_halted_when_shadow_logger_halted(self, mock_shadow):
         from core.trade_manager import _validate_entry_preconditions
+
         mock_shadow.is_trading_halted.return_value = True
         bot = self._make_bot()
         result = _validate_entry_preconditions(bot, "BTC/USDT", False)
@@ -106,12 +113,14 @@ class TestValidateEntryPreconditionsExtended(unittest.TestCase):
 
     def test_returns_halt_system_active(self):
         from core.trade_manager import _validate_entry_preconditions
+
         bot = self._make_bot(halt=True)
         result = _validate_entry_preconditions(bot, "BTC/USDT", False)
         self.assertEqual(result, "HALT_SYSTEM_ACTIVE")
 
     def test_returns_stagnation_lock(self):
         from core.trade_manager import _validate_entry_preconditions
+
         bot = self._make_bot(stagnation=True)
         result = _validate_entry_preconditions(bot, "BTC/USDT", False)
         self.assertEqual(result, "CONFIDENCE_STAGNATION_LOCK")

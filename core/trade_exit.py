@@ -1,31 +1,31 @@
 import logging
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from config import Config
 from core.cooldown_state import set_symbol_cooldown
 from core.execution_telemetry import append_execution_event
+from core.kanban_sync import async_mover_tarjeta
 from core.postmortem import label_exit_reason
 from core.regime_tuning import record_trade as record_regime_trade
-from core.trade_state import TradeStatus
-import core.trade_helpers as _trade_helpers
+from core.time_utils import parse_datetime_utc, utc_now
 from core.trade_helpers import (
     _calculate_pnl_and_metrics,
-    _exchange_position_is_flat as _helper_exchange_position_is_flat,
     _module_available,
     _order_looks_filled,
     _release_simulated_margin,
 )
-from core.symbol_utils import normalize_position_symbol
-from core.time_utils import parse_datetime_utc, utc_now
+from core.trade_helpers import (
+    _exchange_position_is_flat as _helper_exchange_position_is_flat,
+)
+from core.trade_state import TradeStatus
 from tools.learning import shadow_logger
-from core.kanban_sync import async_mover_tarjeta
 
 logger = logging.getLogger("SniperAI")
 
 # MTF win-rate tracking accumulators
-_MTF_TRADE_RESULTS: List[Dict[str, Any]] = []
+_MTF_TRADE_RESULTS: list[dict[str, Any]] = []
 
 
 def _record_mtf_trade_outcome(trade: dict, pnl_percent: float, bot=None) -> None:
@@ -35,11 +35,13 @@ def _record_mtf_trade_outcome(trade: dict, pnl_percent: float, bot=None) -> None
     mtf_reason = snapshot.get("mtf_reason")
     if not mtf_reason:
         return
-    _MTF_TRADE_RESULTS.append({
-        "mtf_reason": mtf_reason,
-        "pnl_percent": pnl_percent,
-        "is_win": pnl_percent > 0,
-    })
+    _MTF_TRADE_RESULTS.append(
+        {
+            "mtf_reason": mtf_reason,
+            "pnl_percent": pnl_percent,
+            "is_win": pnl_percent > 0,
+        }
+    )
     if len(_MTF_TRADE_RESULTS) >= int(getattr(Config, "MTF_METRICS_WINDOW", 100)):
         _log_mtf_winrate_report(bot)
 
@@ -70,7 +72,9 @@ def _log_mtf_winrate_report(bot=None) -> None:
         per_reason[reason] = {
             "total": stats["total"],
             "wins": stats["wins"],
-            "win_rate_pct": round((stats["wins"] / stats["total"]) * 100, 2) if stats["total"] > 0 else 0.0,
+            "win_rate_pct": round((stats["wins"] / stats["total"]) * 100, 2)
+            if stats["total"] > 0
+            else 0.0,
         }
 
     append_execution_event(
@@ -84,6 +88,8 @@ def _log_mtf_winrate_report(bot=None) -> None:
             "per_reason": per_reason,
         },
     )
+
+
 from tools.notifier import Priority, send_telegram_msg, send_telegram_photo
 
 
@@ -97,7 +103,7 @@ def close_trade(
     reason: str,
     exit_price: float,
     exit_confidence: float = 0.0,
-    latency_context: Optional[Dict[str, Any]] = None,
+    latency_context: dict[str, Any] | None = None,
 ):
     with bot.lock:
         trade = bot.active_trades.get(symbol)
@@ -125,9 +131,7 @@ def close_trade(
                         symbol, trade["side"], trade["amount"]
                     )
                 else:
-                    order = bot.execution.close_position(
-                        symbol, trade["side"], trade["amount"]
-                    )
+                    order = bot.execution.close_position(symbol, trade["side"], trade["amount"])
                 post_api_ts = time.perf_counter()
 
                 if order:
@@ -152,13 +156,9 @@ def close_trade(
                     )
 
                 if latency_context and latency_context.get("signal_ts") is not None:
-                    signal_to_api_ms = (
-                        pre_api_ts - float(latency_context["signal_ts"])
-                    ) * 1000.0
+                    signal_to_api_ms = (pre_api_ts - float(latency_context["signal_ts"])) * 1000.0
                     api_ms = (post_api_ts - pre_api_ts) * 1000.0
-                    total_ms = (
-                        post_api_ts - float(latency_context["signal_ts"])
-                    ) * 1000.0
+                    total_ms = (post_api_ts - float(latency_context["signal_ts"])) * 1000.0
                     status = "OK" if total_ms < 450.0 else "SLOW"
                     trigger = latency_context.get("trigger", "UNKNOWN")
                     bot.log(
@@ -168,9 +168,7 @@ def close_trade(
             except Exception as e:
                 bot.log(f"❌ ERROR CRÍTICO CERRANDO {symbol}: {e}")
 
-                if any(
-                    x in str(e).lower() for x in ["notional", "-4164", "insufficient"]
-                ):
+                if any(x in str(e).lower() for x in ["notional", "-4164", "insufficient"]):
                     try:
                         if not _exchange_position_is_flat(bot, symbol):
                             raise RuntimeError(
@@ -200,32 +198,22 @@ def close_trade(
             time.sleep(1)
             try:
                 my_trades = bot.execution.fetch_my_trades(symbol, limit=2)
-                fees = sum(
-                    t["fee"]["cost"]
-                    for t in my_trades
-                    if t["fee"]["currency"] == "USDT"
-                )
+                fees = sum(t["fee"]["cost"] for t in my_trades if t["fee"]["currency"] == "USDT")
             except Exception as error:
-                bot.log(
-                    f"⚠️ No se pudo calcular fees reales de cierre para {symbol}: {error}"
-                )
+                bot.log(f"⚠️ No se pudo calcular fees reales de cierre para {symbol}: {error}")
         else:
             fees = (trade["entry"] * float(trade["amount"]) * Config.VIRTUAL_FEE) + (
                 exit_price * float(trade["amount"]) * Config.VIRTUAL_FEE
             )
             if latency_context and latency_context.get("signal_ts") is not None:
-                total_ms = (
-                    time.perf_counter() - float(latency_context["signal_ts"])
-                ) * 1000.0
+                total_ms = (time.perf_counter() - float(latency_context["signal_ts"])) * 1000.0
                 trigger = latency_context.get("trigger", "UNKNOWN")
                 bot.log(
                     f"\u23f1\ufe0f SMART_EXIT_LATENCY {symbol} trigger={trigger} total_ms={total_ms:.1f} simulated=1 (PAPER/SHADOW)"
                 )
 
         side = trade.get("side", "BUY")
-        pnl_metrics = _calculate_pnl_and_metrics(
-            trade, exit_price, fees, side
-        )
+        pnl_metrics = _calculate_pnl_and_metrics(trade, exit_price, fees, side)
         entry_price = trade["entry"]
         mae_price = trade.get("mae_price", entry_price)
         mfe_price = trade.get("mfe_price", entry_price)
@@ -389,9 +377,7 @@ def close_trade(
                 )
 
                 try:
-                    df_snap = bot.data_service.fetch_and_update_data(
-                        symbol, Config.TIMEFRAME
-                    )
+                    df_snap = bot.data_service.fetch_and_update_data(symbol, Config.TIMEFRAME)
                     if df_snap is not None and not df_snap.empty:
                         if _module_available("tools.ai_mapper"):
                             from tools.ai_mapper import generate_strategy_snapshot
@@ -455,9 +441,7 @@ def close_trade(
             if float(exit_price) > 0 and atr_val > 0
             else 0.0
         )
-        shock_dist_txt = (
-            f"{shock_dist_pct:.2f}%" if shock_dist_pct is not None else "N/A"
-        )
+        shock_dist_txt = f"{shock_dist_pct:.2f}%" if shock_dist_pct is not None else "N/A"
         duration = "N/A"
         if entry_time:
             try:
@@ -595,7 +579,9 @@ def close_trade(
             current = bot.active_trades.get(symbol)
             if current:
                 current["closing_in_progress"] = False
-                if is_stuck_or_unconfirmed and not (trade.get("is_shadow", False) or Config.PAPER_MODE):
+                if is_stuck_or_unconfirmed and not (
+                    trade.get("is_shadow", False) or Config.PAPER_MODE
+                ):
                     current["status"] = TradeStatus.EXIT_STUCK.value
                     bot.integrity_lock_active = True
                     setattr(bot, "halt_system_active", True)

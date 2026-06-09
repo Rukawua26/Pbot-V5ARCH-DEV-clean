@@ -30,9 +30,7 @@ def _load_stats() -> dict[str, Any]:
 def _save_stats(stats: dict[str, Any]):
     _ensure_dir()
     try:
-        _STATS_PATH.write_text(
-            json.dumps(stats, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        _STATS_PATH.write_text(json.dumps(stats, indent=2, ensure_ascii=False), encoding="utf-8")
     except Exception as e:
         logger.warning(f"⚠️ No se pudo guardar regime_tuning_stats: {e}")
 

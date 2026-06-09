@@ -10,7 +10,6 @@ from core.signals import filters
 from core.signals.mtf.analyzer import analyze_mtf_alignment
 from core.signals.mtf.filter import apply_mtf_filter
 
-
 _UPTREND = list(range(100, 120))
 _DOWNTREND = list(range(119, 99, -1))
 _FLAT = [100] * 20
@@ -151,9 +150,7 @@ class MTFAnalyzerTests(unittest.TestCase):
         df_15m = _make_df(_DOWNTREND)
         df_5m = _make_df(_UPTREND)
 
-        weight, reason = analyze_mtf_alignment(
-            df_1h, df_15m, df_5m, "BUY", regime="BULL_TREND"
-        )
+        weight, reason = analyze_mtf_alignment(df_1h, df_15m, df_5m, "BUY", regime="BULL_TREND")
 
         self.assertGreater(weight, 0.0)
         self.assertIn("PULLBACK", reason)
@@ -164,9 +161,7 @@ class MTFAnalyzerTests(unittest.TestCase):
         df_15m = _make_df(_UPTREND)
         df_5m = _make_df(_DOWNTREND)
 
-        weight, reason = analyze_mtf_alignment(
-            df_1h, df_15m, df_5m, "SELL", regime="BEAR_TREND"
-        )
+        weight, reason = analyze_mtf_alignment(df_1h, df_15m, df_5m, "SELL", regime="BEAR_TREND")
 
         self.assertGreater(weight, 0.0)
         self.assertIn("PULLBACK", reason)
@@ -177,9 +172,7 @@ class MTFAnalyzerTests(unittest.TestCase):
         df_15m = _make_df(_DOWNTREND)
         df_5m = _make_df(_UPTREND)
 
-        weight, reason = analyze_mtf_alignment(
-            df_1h, df_15m, df_5m, "BUY", regime="RANGE"
-        )
+        weight, reason = analyze_mtf_alignment(df_1h, df_15m, df_5m, "BUY", regime="RANGE")
 
         self.assertEqual(weight, 0.0)
         self.assertIn("VETO", reason)
@@ -228,8 +221,9 @@ class MTFFilterTests(unittest.TestCase):
         )
         ctx = {}
 
-        with patch.object(Config, "MTF_FILTER_ENABLED", True), patch(
-            "core.signals.mtf.filter.append_execution_event"
+        with (
+            patch.object(Config, "MTF_FILTER_ENABLED", True),
+            patch("core.signals.mtf.filter.append_execution_event"),
         ):
             prob, passed, reason = apply_mtf_filter(
                 bot, "BTC/USDT", "BUY", 70.0, ctx, _make_df(_UPTREND)
@@ -250,8 +244,9 @@ class MTFFilterTests(unittest.TestCase):
         )
         ctx = {}
 
-        with patch.object(Config, "MTF_FILTER_ENABLED", True), patch(
-            "core.signals.mtf.filter.append_execution_event"
+        with (
+            patch.object(Config, "MTF_FILTER_ENABLED", True),
+            patch("core.signals.mtf.filter.append_execution_event"),
         ):
             prob, passed, reason = apply_mtf_filter(
                 bot, "BTC/USDT", "BUY", 80.0, ctx, _make_df(_UPTREND)
@@ -290,13 +285,17 @@ class MTFFilterTests(unittest.TestCase):
             "tier": "IRON",
         }
 
-        with patch.object(filters.Config, "MTF_FILTER_ENABLED", False), patch.object(
-            filters.Config, "OI_FILTER_ENABLED", False
-        ), patch.object(filters.Config, "BREAKOUT_WATCH_ENABLED", False), patch.object(
-            filters.Strategy,
-            "check_entry_filters",
-            return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
-        ), patch.object(filters, "append_execution_event"):
+        with (
+            patch.object(filters.Config, "MTF_FILTER_ENABLED", False),
+            patch.object(filters.Config, "OI_FILTER_ENABLED", False),
+            patch.object(filters.Config, "BREAKOUT_WATCH_ENABLED", False),
+            patch.object(
+                filters.Strategy,
+                "check_entry_filters",
+                return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
+            ),
+            patch.object(filters, "append_execution_event"),
+        ):
             prob, passed, reason, updated_ctx = filters._apply_entry_filters_and_adjust_prob(
                 bot,
                 "BTC/USDT",

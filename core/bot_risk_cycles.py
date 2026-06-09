@@ -47,9 +47,7 @@ def run_crash_predictor_cycle(bot) -> bool:
                 f"🚨 CRASH INMINENTE (Prob: {crash_result.get('crash_probability', 0):.0f}%) - ¡EJECUTANDO VETO DE EMERGENCIA!"
             )
             closed_count = bot._close_all_positions_emergency()
-            bot.log(
-                f"🛡️ PROTOCOLO COMPLETADO: {closed_count} posiciones liquidadas a mercado."
-            )
+            bot.log(f"🛡️ PROTOCOLO COMPLETADO: {closed_count} posiciones liquidadas a mercado.")
 
             send_telegram_msg(
                 f"🚨 *ALERTA CRASH*\nProtocolo de emergencia activado. {closed_count} posiciones cerradas de inmediato por seguridad."

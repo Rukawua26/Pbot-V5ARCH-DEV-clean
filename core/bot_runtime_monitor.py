@@ -3,8 +3,8 @@ import os
 import time
 
 from config import Config
-from core.time_utils import monotonic_now, utc_now_iso
 from core.metrics_export import export_metrics_summary
+from core.time_utils import monotonic_now, utc_now_iso
 
 
 def _rotate_jsonl(path: str, max_bytes: int, backups: int) -> None:
@@ -31,7 +31,7 @@ def _rotate_jsonl(path: str, max_bytes: int, backups: int) -> None:
 def get_rss_mb(bot) -> float:
     """Read process RSS memory in MB without extra dependencies."""
     try:
-        with open("/proc/self/status", "r", encoding="utf-8") as file_obj:
+        with open("/proc/self/status", encoding="utf-8") as file_obj:
             for line in file_obj:
                 if line.startswith("VmRSS:"):
                     parts = line.split()
@@ -66,14 +66,12 @@ def run_runtime_monitor_loop(bot):
     weight_monitor = None
     try:
         from core.strategy.weight_monitor import AgentWeightMonitor
+
         if getattr(bot, "brain", None) is not None:
             weight_monitor = AgentWeightMonitor(bot.brain)
     except Exception as exc:
         bot.log(f"⚠️ Weight monitor init skipped: {exc}")
     weight_check_counter = 0
-
-    # MTF metrics counter (reset window counter)
-    mtf_metrics_counter = 0
 
     while bot.is_running:
         time.sleep(60)
@@ -133,7 +131,10 @@ def run_runtime_monitor_loop(bot):
 
         # Periodic agent weight degradation check (every ~60min)
         weight_check_counter += 1
-        if weight_monitor is not None and weight_check_counter >= Config.AGENT_MONITOR_INTERVAL_MINUTES:
+        if (
+            weight_monitor is not None
+            and weight_check_counter >= Config.AGENT_MONITOR_INTERVAL_MINUTES
+        ):
             weight_check_counter = 0
             try:
                 weight_monitor.run_check(bot=bot)

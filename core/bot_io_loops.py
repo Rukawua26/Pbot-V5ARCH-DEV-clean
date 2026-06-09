@@ -10,12 +10,7 @@ from core.time_utils import monotonic_now, parse_datetime_utc, utc_now
 def _extract_telegram_message(update):
     if not isinstance(update, dict):
         return {}
-    return (
-        update.get("message")
-        or update.get("edited_message")
-        or update.get("channel_post")
-        or {}
-    )
+    return update.get("message") or update.get("edited_message") or update.get("channel_post") or {}
 
 
 def _is_authorized_telegram_chat(chat_id) -> bool:
@@ -83,9 +78,7 @@ def websocket_monitor(bot):
     def on_open(ws):
         nonlocal is_reconnecting, reconnect_delay
         if is_reconnecting:
-            bot.log(
-                "⚡ WEBSOCKET: Reconectado exitosamente. Precios en tiempo real restaurados."
-            )
+            bot.log("⚡ WEBSOCKET: Reconectado exitosamente. Precios en tiempo real restaurados.")
         else:
             bot.log("⚡ WEBSOCKET: Conectado. Precios en tiempo real activos.")
         is_reconnecting = False
@@ -103,9 +96,7 @@ def websocket_monitor(bot):
             if bot.is_running:
                 is_reconnecting = True
                 wait_s = reconnect_delay + random.uniform(0.0, 1.0)
-                bot.log(
-                    f"🔌 WEBSOCKET: Conexión cerrada. Reintentando en {wait_s:.1f}s..."
-                )
+                bot.log(f"🔌 WEBSOCKET: Conexión cerrada. Reintentando en {wait_s:.1f}s...")
                 time.sleep(wait_s)
                 reconnect_delay = min(reconnect_delay * 1.8, 60.0)
         except Exception as error:

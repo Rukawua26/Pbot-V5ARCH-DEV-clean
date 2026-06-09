@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 import pandas as pd
 
@@ -26,7 +26,7 @@ class BreakoutAgent:
         self.volume_multiplier = float(volume_multiplier)
         self.breakout_buffer_pct = float(breakout_buffer_pct)
         self.timeout_minutes = int(timeout_minutes)
-        self.watchlist: Dict[str, Dict[str, Any]] = {}
+        self.watchlist: dict[str, dict[str, Any]] = {}
 
     def add_to_watchlist(
         self,
@@ -35,14 +35,12 @@ class BreakoutAgent:
         ia_prob: float,
         shock_level: float,
         trend: str,
-        metadata: Optional[Dict[str, Any]] = None,
-        min_ia_prob: Optional[float] = None,
+        metadata: dict[str, Any] | None = None,
+        min_ia_prob: float | None = None,
     ) -> bool:
         if not symbol or side not in {"BUY", "SELL"}:
             return False
-        min_prob = (
-            float(min_ia_prob) if min_ia_prob is not None else float(self.min_ia_prob)
-        )
+        min_prob = float(min_ia_prob) if min_ia_prob is not None else float(self.min_ia_prob)
         if ia_prob < min_prob or shock_level is None:
             return False
 
@@ -63,8 +61,8 @@ class BreakoutAgent:
         return True
 
     def evaluate_breakout(
-        self, symbol: str, df: Optional[pd.DataFrame]
-    ) -> Tuple[bool, Optional[Dict[str, Any]]]:
+        self, symbol: str, df: pd.DataFrame | None
+    ) -> tuple[bool, dict[str, Any] | None]:
         if symbol not in self.watchlist:
             return False, None
         if df is None or df.empty:
@@ -128,8 +126,8 @@ class BreakoutAgent:
     def size(self) -> int:
         return len(self.watchlist)
 
-    def summary_by_source(self) -> Dict[str, int]:
-        out: Dict[str, int] = {}
+    def summary_by_source(self) -> dict[str, int]:
+        out: dict[str, int] = {}
         for row in self.watchlist.values():
             meta = row.get("meta") or {}
             source = str(meta.get("source", "UNKNOWN"))

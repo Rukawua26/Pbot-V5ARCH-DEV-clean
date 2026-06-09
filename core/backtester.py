@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -36,11 +35,7 @@ class VectorBacktester:
         elif not pd.api.types.is_datetime64_any_dtype(work["time"]):
             work["time"] = pd.to_datetime(work["time"], utc=True, errors="coerce")
 
-        work = (
-            work.sort_values("time")
-            .drop_duplicates(subset=["time"])
-            .reset_index(drop=True)
-        )
+        work = work.sort_values("time").drop_duplicates(subset=["time"]).reset_index(drop=True)
         self.df = work
         self.close = work["close"].astype(float).to_numpy()
         self.high = work["high"].astype(float).to_numpy()
@@ -86,9 +81,7 @@ class VectorBacktester:
         return out
 
     @staticmethod
-    def _rolling_entropy(
-        returns: np.ndarray, bins: int, window: int = 20
-    ) -> np.ndarray:
+    def _rolling_entropy(returns: np.ndarray, bins: int, window: int = 20) -> np.ndarray:
         out = np.zeros(returns.shape[0], dtype=float)
         if returns.shape[0] < window:
             return out
@@ -199,12 +192,8 @@ class VectorBacktester:
         entropy = self._rolling_entropy(ret, bins=max(2, int(entropy_bins)), window=20)
 
         sr_vote = np.full(self.close.shape[0], 50.0, dtype=float)
-        sr_vote = np.where(
-            z_dynamic > z_score_threshold, 20.0 + (entropy * 5.0), sr_vote
-        )
-        sr_vote = np.where(
-            z_dynamic < -z_score_threshold, 80.0 - (entropy * 5.0), sr_vote
-        )
+        sr_vote = np.where(z_dynamic > z_score_threshold, 20.0 + (entropy * 5.0), sr_vote)
+        sr_vote = np.where(z_dynamic < -z_score_threshold, 80.0 - (entropy * 5.0), sr_vote)
         sr_vote = np.clip(sr_vote, 0.0, 100.0)
 
         # Árbitro de régimen por ADX
@@ -376,9 +365,7 @@ class VectorBacktester:
             i = exit_idx + 1
 
         trade_arr = (
-            np.array(trade_returns, dtype=float)
-            if trade_returns
-            else np.array([], dtype=float)
+            np.array(trade_returns, dtype=float) if trade_returns else np.array([], dtype=float)
         )
         gross_profit = float(trade_arr[trade_arr > 0].sum()) if trade_arr.size else 0.0
         gross_loss = float(-trade_arr[trade_arr < 0].sum()) if trade_arr.size else 0.0
@@ -409,7 +396,7 @@ class VectorBacktester:
             gross_loss=gross_loss,
         )
 
-    def metadata(self) -> Dict[str, str]:
+    def metadata(self) -> dict[str, str]:
         start = self.df["time"].iloc[0]
         end = self.df["time"].iloc[-1]
         rows = len(self.df)

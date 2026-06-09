@@ -4,9 +4,9 @@ from threading import RLock
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from core.bot_runtime_ops import check_instinctive_safety
 from core.reconciliation import reconcile_bootstrap_state
 from core.time_utils import parse_datetime_utc
-from core.bot_runtime_ops import check_instinctive_safety
 from core.trade_manager import execute_order
 
 
@@ -133,9 +133,7 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
     @patch("core.trade_entry.Config.PAPER_MODE", False)
     @patch("core.trade_entry.send_telegram_msg")
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
-    def test_timeout_after_pending_send_recovers_via_reconciliation(
-        self, _mock_halted, _mock_tg
-    ):
+    def test_timeout_after_pending_send_recovers_via_reconciliation(self, _mock_halted, _mock_tg):
         bot = SimpleNamespace()
         bot.lock = RLock()
         bot.db_lock = RLock()
@@ -184,9 +182,7 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
             exchange=object(),
             fetch_ticker=lambda _symbol: {"last": 100.0},
             set_leverage=MagicMock(),
-            create_precision_order=MagicMock(
-                side_effect=TimeoutError("network timeout")
-            ),
+            create_precision_order=MagicMock(side_effect=TimeoutError("network timeout")),
             fetch_positions=lambda: [],
             fetch_open_orders=lambda: [],
             fetch_order_by_client_id=lambda _symbol, _coid: None,
@@ -211,9 +207,9 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
         self.assertIn("BTC/USDT", saved_states)
         self.assertEqual(saved_states["BTC/USDT"].get("status"), "PENDING_SEND")
 
-        stale = parse_datetime_utc(
-            saved_states["BTC/USDT"]["intent_created_at_utc"]
-        ) - timedelta(seconds=180)
+        stale = parse_datetime_utc(saved_states["BTC/USDT"]["intent_created_at_utc"]) - timedelta(
+            seconds=180
+        )
         saved_states["BTC/USDT"]["intent_created_at_utc"] = stale.isoformat()
 
         bot.active_trades = {"BTC/USDT": dict(saved_states["BTC/USDT"])}
@@ -309,9 +305,7 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
     @patch("core.trade_entry.Config.MAX_SHADOW_TRADES", 2)
     @patch("core.trade_entry.send_telegram_msg")
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
-    def test_execute_order_paper_directional_limit_degrades_to_shadow(
-        self, _mock_halted, _mock_tg
-    ):
+    def test_execute_order_paper_directional_limit_degrades_to_shadow(self, _mock_halted, _mock_tg):
         bot = SimpleNamespace()
         bot.lock = RLock()
         bot.db_lock = RLock()

@@ -1,12 +1,12 @@
+import logging
 import threading
 import time
 from datetime import datetime
-import logging
 
 from config import Config
 from core.cycle_context import CycleContext
-from core.risk_policy import activate_runtime_protection
 from core.risk_engine import get_daily_pnl_pct
+from core.risk_policy import activate_runtime_protection
 
 
 def check_daily_drawdown_breaker(bot) -> bool:
@@ -94,7 +94,9 @@ def run_main_logic(bot):
             if bool(getattr(Config, "BREAKOUT_WATCH_ENABLED", True)):
                 cleaned = bot.breakout_agent.clean_stale_watchlist()
                 if cleaned > 0:
-                    bot.log(f"🧹 BREAKOUT_WATCH cleaned={cleaned} remaining={bot.breakout_agent.size()}")
+                    bot.log(
+                        f"🧹 BREAKOUT_WATCH cleaned={cleaned} remaining={bot.breakout_agent.size()}"
+                    )
 
             if bot._run_crash_predictor_cycle():
                 continue
@@ -103,7 +105,9 @@ def run_main_logic(bot):
             bot.check_weekly_schedule()
             bot.check_weekly_maintenance_utc()
             try:
-                base_bal_safe = bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
+                base_bal_safe = (
+                    bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
+                )
                 pnl_real_safe, _ = bot.brain.get_daily_real_pnl(base_bal_safe)
                 bot.check_safety_and_goals(current_pnl=pnl_real_safe)
             except Exception as e_safety:

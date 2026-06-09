@@ -75,9 +75,7 @@ class ShadowWalletRuntimeTest(unittest.TestCase):
             available_balance=1.0,
             balance_lock=threading.Lock(),
         )
-        ok, reason = _reserve_simulated_margin(
-            bot, {"is_shadow": True, "margin_used": 2.0}
-        )
+        ok, reason = _reserve_simulated_margin(bot, {"is_shadow": True, "margin_used": 2.0})
         self.assertFalse(ok)
         self.assertIn("SIM_BALANCE_INSUFFICIENT", reason)
         self.assertAlmostEqual(bot.available_balance, 1.0)
@@ -99,9 +97,7 @@ class ShadowWalletRuntimeTest(unittest.TestCase):
         self.assertAlmostEqual(pnl["net_pct"], 48.95)
 
     def test_shadow_adapter_balance_provider(self):
-        adapter = ShadowExecutionAdapter(
-            _LiveExecution(), simulated_balance_provider=lambda: 42.5
-        )
+        adapter = ShadowExecutionAdapter(_LiveExecution(), simulated_balance_provider=lambda: 42.5)
         self.assertEqual(adapter.get_balance(), 42.5)
         self.assertEqual(adapter.fetch_balance()["total"]["USDT"], 42.5)
 

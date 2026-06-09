@@ -169,9 +169,9 @@ def _find_redundant_groups(
                   "model_bb_width"}
     redundant = []
 
-    raw_model_pairs = []
+    raw_model_pairs: list[dict] = []
     for rk in sorted(raw_keys):
-        mk = rk.replace("_raw", "").replace("ema_dist_pct_raw", "model_dist_ema")
+        mk: str | None = rk.replace("_raw", "").replace("ema_dist_pct_raw", "model_dist_ema")
         if rk == "ema_dist_pct_raw":
             mk = "model_dist_ema"
         elif rk == "volume_raw":

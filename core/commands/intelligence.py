@@ -40,9 +40,7 @@ def _handle_intelligence_commands(bot, text: str) -> bool:
         if not source_txt:
             source_txt = "N/A"
 
-        msg = (
-            f"👁️ *WATCHLIST BREAKOUT*\n• Total: {len(rows)}\n• Fuentes: {source_txt}\n\n"
-        )
+        msg = f"👁️ *WATCHLIST BREAKOUT*\n• Total: {len(rows)}\n• Fuentes: {source_txt}\n\n"
         for row in rows[:10]:
             meta = row.get("meta") or {}
             source = str(meta.get("source", "UNK"))
@@ -83,9 +81,7 @@ def _handle_intelligence_commands(bot, text: str) -> bool:
             "G": "👻 IA (G)",
             "R": "🧠 RAG Vectorial",
         }
-        for agent_id, score in sorted(
-            reps.items(), key=lambda item: item[1], reverse=True
-        ):
+        for agent_id, score in sorted(reps.items(), key=lambda item: item[1], reverse=True):
             name = agent_names.get(agent_id, agent_id)
             icon = "🟢" if score >= 100 else ("🟡" if score >= 90 else "🔴")
             msg += f"{icon} *{name}:* {score:.1f}\n"
@@ -126,9 +122,7 @@ def _handle_intelligence_commands(bot, text: str) -> bool:
                 timeout=(5, 20),
             )
         except Exception as error:
-            send_telegram_msg(
-                f"❌ Error generando XAI: {sanitize_telegram_error(error)}"
-            )
+            send_telegram_msg(f"❌ Error generando XAI: {sanitize_telegram_error(error)}")
         return True
 
     if text == "/report":

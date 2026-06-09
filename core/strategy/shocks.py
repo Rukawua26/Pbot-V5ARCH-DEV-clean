@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional, Tuple
-
 import numpy as np
 import pandas as pd
 
@@ -11,7 +9,7 @@ def next_shock_distance_pct(
     side: str,
     pivot_window: int = 3,
     lookback_bars: int = 240,
-) -> Tuple[Optional[float], Optional[float]]:
+) -> tuple[float | None, float | None]:
     """
     Estima distancia al proximo SHOCK usando pivots locales.
 

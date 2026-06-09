@@ -1,4 +1,4 @@
-from typing import Optional, Dict, Any
+from typing import Any
 
 from config import Config
 
@@ -27,7 +27,7 @@ class PostMortemLabeler:
         side: str,
         mae_percent: float,
         mfe_percent: float,
-        trade: Dict[str, Any],
+        trade: dict[str, Any],
     ) -> str:
         reason_upper = reason.upper() if reason else ""
 
@@ -72,7 +72,7 @@ class PostMortemLabeler:
         side: str,
         mae_percent: float,
         mfe_percent: float,
-        trade: Dict[str, Any],
+        trade: dict[str, Any],
     ) -> str:
         entry_atr = trade.get("entry_atr", 0)
         volatility_at_entry = trade.get("market_snapshot", {}).get("atr_pct", 0)
@@ -98,7 +98,7 @@ class PostMortemLabeler:
     @classmethod
     def compute_mae_mfe_at_sl(
         cls,
-        trade: Dict[str, Any],
+        trade: dict[str, Any],
         exit_price: float,
     ) -> tuple:
         entry = trade.get("entry", 0)
@@ -126,9 +126,9 @@ def label_exit_reason(
     side: str,
     mae_percent: float,
     mfe_percent: float,
-    trade: Dict[str, Any],
+    trade: dict[str, Any],
     is_adopted: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     label = PostMortemLabeler.classify_exit(
         reason,
         entry_price,
@@ -144,7 +144,9 @@ def label_exit_reason(
     return {
         "exit_reason": label,
         "is_adopted": 1 if is_adopted else 0,
-        "is_dirty": 1 if is_adopted and not trade.get("market_snapshot", {}).get("features_json") else 0,
+        "is_dirty": 1
+        if is_adopted and not trade.get("market_snapshot", {}).get("features_json")
+        else 0,
         "mae_at_sl": mae_at_sl,
         "mfe_at_sl": mfe_at_sl,
     }

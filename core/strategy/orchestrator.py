@@ -1,13 +1,14 @@
 import logging
+from collections import deque
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from collections import deque
-from typing import Dict, Any, List, Optional, Tuple
 
 from config import Config
+from core.strategy.agents.ghost_agent import GhostAgent
 from core.strategy.agents.mt_agent import MTAgent
 from core.strategy.agents.sr_agent import SRAgent
-from core.strategy.agents.ghost_agent import GhostAgent
 from core.strategy.consensus_nn import AgentConsensusNN
 from tools.learning import shadow_logger
 
@@ -35,11 +36,9 @@ class StrategyOrchestrator:
         self.consensus_nn = AgentConsensusNN()
         self._base_weights = self._initialize_base_weights()
         # Historial para cálculo de correlación de Pearson.
-        self.vote_history = {
-            name: deque(maxlen=CORRELATION_VETO_WINDOW) for name in self.agents
-        }
+        self.vote_history = {name: deque(maxlen=CORRELATION_VETO_WINDOW) for name in self.agents}
 
-    def _initialize_base_weights(self) -> Dict[str, Dict[str, float]]:
+    def _initialize_base_weights(self) -> dict[str, dict[str, float]]:
         """Pesos base para la Trinidad (MT/SR/G)."""
         return {
             "BULL_TREND": {
@@ -59,7 +58,7 @@ class StrategyOrchestrator:
             },
         }
 
-    def _normalize_weights(self, weights: Dict[str, float]) -> Dict[str, float]:
+    def _normalize_weights(self, weights: dict[str, float]) -> dict[str, float]:
         total = sum(weights.values())
         if total <= 0:
             return weights
@@ -67,10 +66,10 @@ class StrategyOrchestrator:
 
     def _apply_correlation_veto(
         self,
-        weights: Dict[str, float],
-        votes: Dict[str, float],
-        agent_performances: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, float]:
+        weights: dict[str, float],
+        votes: dict[str, float],
+        agent_performances: dict[str, float] | None = None,
+    ) -> dict[str, float]:
         """
         Hard-Veto de Correlación v118.1: Si la correlación entre dos agentes
         supera 0.90 en una ventana de 30 votos, el de menor WR histórico queda en peso 0.
@@ -81,7 +80,6 @@ class StrategyOrchestrator:
 
         # Si no hay suficiente historial, no aplicar veto.
         if len(list(self.vote_history.values())[0]) < CORRELATION_VETO_WINDOW:
-
             return weights
 
         adjusted_weights = weights.copy()
@@ -94,22 +92,15 @@ class StrategyOrchestrator:
                     a1, a2 = agent_names[i], agent_names[j]
                     h1, h2 = list(self.vote_history[a1]), list(self.vote_history[a2])
 
-                    if (
-                        len(h1) >= CORRELATION_VETO_WINDOW
-                        and len(h2) >= CORRELATION_VETO_WINDOW
-                    ):
+                    if len(h1) >= CORRELATION_VETO_WINDOW and len(h2) >= CORRELATION_VETO_WINDOW:
                         corr = np.corrcoef(h1, h2)[0, 1]
                         if not np.isnan(corr) and abs(corr) > 0.90:
                             # Excluir el agente correlacionado con menor rendimiento.
                             perf1 = (
-                                agent_performances.get(a1, 100.0)
-                                if agent_performances
-                                else 100.0
+                                agent_performances.get(a1, 100.0) if agent_performances else 100.0
                             )
                             perf2 = (
-                                agent_performances.get(a2, 100.0)
-                                if agent_performances
-                                else 100.0
+                                agent_performances.get(a2, 100.0) if agent_performances else 100.0
                             )
 
                             if perf1 < perf2:
@@ -124,10 +115,10 @@ class StrategyOrchestrator:
     def get_adaptive_weights(
         self,
         regime: str,
-        agent_performances: Optional[Dict[str, float]] = None,
-        adx: Optional[float] = None,
-        rsi: Optional[float] = None,
-    ) -> Dict[str, float]:
+        agent_performances: dict[str, float] | None = None,
+        adx: float | None = None,
+        rsi: float | None = None,
+    ) -> dict[str, float]:
         """Calcula los pesos finales basados en el régimen y rendimiento."""
         target_regime = regime if regime in self._base_weights else "RANGE"
         adx_value = float(adx) if adx is not None else None
@@ -158,7 +149,7 @@ class StrategyOrchestrator:
         if not agent_performances:
             return weights
 
-        perf_factor: Dict[str, float] = {}
+        perf_factor: dict[str, float] = {}
         for agent in weights:
             perf = agent_performances.get(agent, 100.0)
             if perf > 120:
@@ -171,19 +162,17 @@ class StrategyOrchestrator:
         total_adjusted = sum(weights[a] * perf_factor.get(a, 1.0) for a in weights)
         if total_adjusted > 0:
             for agent in weights:
-                weights[agent] = (
-                    weights[agent] * perf_factor.get(agent, 1.0)
-                ) / total_adjusted
+                weights[agent] = (weights[agent] * perf_factor.get(agent, 1.0)) / total_adjusted
 
         return weights
 
     def calculate_consensus(
         self,
-        context: Dict[str, Any],
-        agent_performances: Optional[Dict[str, float]] = None,
-    ) -> Tuple[float, Dict[str, float]]:
+        context: dict[str, Any],
+        agent_performances: dict[str, float] | None = None,
+    ) -> tuple[float, dict[str, float]]:
         """Ejecuta los 3 agentes, aplica pesos y consenso neuronal."""
-        votes: Dict[str, float] = {}
+        votes: dict[str, float] = {}
 
         # Ejecución de agentes
         for name, agent in self.agents.items():

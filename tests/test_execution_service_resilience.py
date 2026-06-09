@@ -1,6 +1,5 @@
-import unittest
 import threading
-from concurrent.futures import ThreadPoolExecutor
+import unittest
 from unittest.mock import patch
 
 import ccxt
@@ -207,9 +206,7 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
             loaded = service.has_markets_loaded()
 
         self.assertFalse(loaded)
-        self.assertTrue(
-            any("markets cargados" in message for message in captured.output)
-        )
+        self.assertTrue(any("markets cargados" in message for message in captured.output))
 
     @patch("core.execution_service.time.sleep", return_value=None)
     def test_cancel_order_retries_on_network_error(self, _sleep_mock):
@@ -228,9 +225,7 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         service.exchange = _FlakyHardSlExchange()
         service.set_weight_tracker(None)
 
-        result = service.place_hard_sl(
-            "BTC/USDT", side="BUY", amount=1.0, stop_price=99.5
-        )
+        result = service.place_hard_sl("BTC/USDT", side="BUY", amount=1.0, stop_price=99.5)
 
         self.assertIsNotNone(result)
         self.assertEqual(service.exchange.create_attempts, 2)
@@ -241,9 +236,7 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         service.exchange = _FlakyHardSlExchange()
         service.set_weight_tracker(None)
 
-        result = service.place_hard_sl(
-            "BTC/USDT", side="BUY", amount=1.0, stop_price=float("nan")
-        )
+        result = service.place_hard_sl("BTC/USDT", side="BUY", amount=1.0, stop_price=float("nan"))
 
         self.assertIsNone(result)
         self.assertIn("finite", service.last_hard_sl_error)
@@ -310,12 +303,8 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         service.set_weight_tracker(None)
 
         with (
-            patch(
-                "core.execution_service.Config.NO_PRICE_EXIT_ESCALATION_SECONDS", 180
-            ),
-            patch(
-                "core.execution_service.Config.NO_PRICE_EXIT_MIN_ESCALATION_SECONDS", 45
-            ),
+            patch("core.execution_service.Config.NO_PRICE_EXIT_ESCALATION_SECONDS", 180),
+            patch("core.execution_service.Config.NO_PRICE_EXIT_MIN_ESCALATION_SECONDS", 45),
         ):
             base = service._resolve_no_price_threshold("BTC/USDT")
             service._record_no_price_market_exit("BTC/USDT")
@@ -346,12 +335,8 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         service.set_weight_tracker(None)
 
         with (
-            patch(
-                "core.execution_service.Config.CANCEL_ALL_DEGRADED_WINDOW_SECONDS", 300
-            ),
-            patch(
-                "core.execution_service.Config.CANCEL_ALL_DEGRADED_QUARANTINE_EVENTS", 3
-            ),
+            patch("core.execution_service.Config.CANCEL_ALL_DEGRADED_WINDOW_SECONDS", 300),
+            patch("core.execution_service.Config.CANCEL_ALL_DEGRADED_QUARANTINE_EVENTS", 3),
             patch(
                 "core.execution_service.Config.CANCEL_ALL_DEGRADED_QUARANTINE_SECONDS",
                 600,

@@ -1,7 +1,6 @@
 from datetime import datetime
 
-from core.time_utils import monotonic_now, parse_datetime_utc, utc_now, utc_now_iso
-
+from core.time_utils import monotonic_now, parse_datetime_utc, utc_now
 
 COOLDOWN_META_KEY = "cooldown_pairs_utc"
 
@@ -59,10 +58,7 @@ def set_symbol_cooldown(bot, symbol: str, until_utc) -> None:
 
     if not hasattr(bot, "cooldown_pairs") or bot.cooldown_pairs is None:
         bot.cooldown_pairs = {}
-    if (
-        not hasattr(bot, "cooldown_deadlines_mono")
-        or bot.cooldown_deadlines_mono is None
-    ):
+    if not hasattr(bot, "cooldown_deadlines_mono") or bot.cooldown_deadlines_mono is None:
         bot.cooldown_deadlines_mono = {}
 
     bot.cooldown_pairs[symbol] = dt
@@ -75,10 +71,7 @@ def set_symbol_cooldown(bot, symbol: str, until_utc) -> None:
 def clear_symbol_cooldown(bot, symbol: str) -> None:
     if hasattr(bot, "cooldown_pairs") and symbol in bot.cooldown_pairs:
         del bot.cooldown_pairs[symbol]
-    if (
-        hasattr(bot, "cooldown_deadlines_mono")
-        and symbol in bot.cooldown_deadlines_mono
-    ):
+    if hasattr(bot, "cooldown_deadlines_mono") and symbol in bot.cooldown_deadlines_mono:
         del bot.cooldown_deadlines_mono[symbol]
     persist_cooldowns(bot)
 
@@ -128,10 +121,7 @@ def cleanup_expired_cooldowns(bot) -> None:
             changed = True
             if symbol in bot.cooldown_pairs:
                 del bot.cooldown_pairs[symbol]
-            if (
-                hasattr(bot, "cooldown_deadlines_mono")
-                and symbol in bot.cooldown_deadlines_mono
-            ):
+            if hasattr(bot, "cooldown_deadlines_mono") and symbol in bot.cooldown_deadlines_mono:
                 del bot.cooldown_deadlines_mono[symbol]
             continue
 
@@ -140,10 +130,7 @@ def cleanup_expired_cooldowns(bot) -> None:
             changed = True
             if symbol in bot.cooldown_pairs:
                 del bot.cooldown_pairs[symbol]
-            if (
-                hasattr(bot, "cooldown_deadlines_mono")
-                and symbol in bot.cooldown_deadlines_mono
-            ):
+            if hasattr(bot, "cooldown_deadlines_mono") and symbol in bot.cooldown_deadlines_mono:
                 del bot.cooldown_deadlines_mono[symbol]
     if changed:
         persist_cooldowns(bot)

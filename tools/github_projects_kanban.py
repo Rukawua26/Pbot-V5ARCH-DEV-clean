@@ -772,7 +772,7 @@ def _read_int_env(name: str) -> int | None:
     if raw_value in (None, ""):
         return None
     try:
-        return int(raw_value)
+        return int(raw_value or "0")
     except ValueError as exc:
         raise GitHubProjectsError(f"La variable {name} debe ser un entero.") from exc
 

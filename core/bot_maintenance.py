@@ -45,15 +45,11 @@ def check_for_evolution(bot):
 
     # Reentrenar cada 7 días O si hay más de 100 nuevos trades
     cursor = bot.brain._get_conn().cursor()
-    cursor.execute(
-        "SELECT COUNT(*) FROM trades WHERE timestamp > ?", (last_train.isoformat(),)
-    )
+    cursor.execute("SELECT COUNT(*) FROM trades WHERE timestamp > ?", (last_train.isoformat(),))
     new_trades = cursor.fetchone()[0]
 
     if days_since_train >= 7 or new_trades >= 100:
-        bot.log(
-            f"🧠 Reentrenando IA (días: {days_since_train}, trades nuevos: {new_trades})"
-        )
+        bot.log(f"🧠 Reentrenando IA (días: {days_since_train}, trades nuevos: {new_trades})")
         # Aquí se llamaría al entrenamiento
         # Por ahora solo actualizamos el timestamp
         bot.brain.update_last_train_timestamp(datetime.now())

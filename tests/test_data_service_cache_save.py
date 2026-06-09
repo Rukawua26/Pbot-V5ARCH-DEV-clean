@@ -77,9 +77,10 @@ class DataServiceCacheSaveTest(unittest.TestCase):
         service.maturity_cache = {"BTC/USDT": True}
         service._maturity_last_save_ts = 123.0
 
-        with patch("core.data_service.time.time", return_value=124.0), patch.object(
-            service, "_maturity_save_executor"
-        ) as executor:
+        with (
+            patch("core.data_service.time.time", return_value=124.0),
+            patch.object(service, "_maturity_save_executor") as executor,
+        ):
             scheduled = service.save_maturity_cache_async()
 
         self.assertFalse(scheduled)

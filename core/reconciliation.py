@@ -5,9 +5,9 @@ from config import Config
 from core.config.operational import OperationalConfig
 from core.execution_telemetry import append_execution_event
 from core.symbol_utils import normalize_position_symbol
+from core.time_utils import parse_datetime_utc, utc_now, utc_now_iso
 from core.trade_state import TradeStatus
 from tools.notifier import send_telegram_msg
-from core.time_utils import parse_datetime_utc, utc_now, utc_now_iso
 
 PENDING_SEND_STALE_SECONDS = 30
 
@@ -56,8 +56,7 @@ def generate_order_ids(
             )
         if len(val) > _MAX_BINANCE_ID_LEN:
             raise ValueError(
-                f"CRITICAL: {name} ID '{val}' exceeds Binance 36 chars limit. "
-                f"Length: {len(val)}"
+                f"CRITICAL: {name} ID '{val}' exceeds Binance 36 chars limit. Length: {len(val)}"
             )
 
     return entry_id, sl_id, tp_id
@@ -80,9 +79,7 @@ def validate_binance_limits(order_id: str) -> None:
 # Mantenidas para compatibilidad con código existente.
 
 
-def generate_client_order_id(
-    symbol: str, side: str, signal_ts: float, instance_id: str
-) -> str:
+def generate_client_order_id(symbol: str, side: str, signal_ts: float, instance_id: str) -> str:
     """DEPRECADO: Usar generate_order_ids().
 
     Genera un client_order_id para entrada (formato legacy).
@@ -150,8 +147,7 @@ def generate_child_client_order_id(entry_client_order_id: str, leg: str) -> str:
         )
     if len(result) > _MAX_BINANCE_ID_LEN:
         raise ValueError(
-            f"CRITICAL: child ID '{result}' exceeds Binance 36 chars limit. "
-            f"Length: {len(result)}"
+            f"CRITICAL: child ID '{result}' exceeds Binance 36 chars limit. Length: {len(result)}"
         )
     return result
 
@@ -242,9 +238,7 @@ def reconcile_bootstrap_state(bot):
             try:
                 open_orders = fetch_open_orders() or []
             except Exception as error:
-                bot.log(
-                    f"⚠️ No se pudieron consultar open orders en reconciliación: {error}"
-                )
+                bot.log(f"⚠️ No se pudieron consultar open orders en reconciliación: {error}")
         exchange_positions = {}
         for pos in positions:
             amount = float(pos.get("contracts") or 0)
@@ -266,13 +260,9 @@ def reconcile_bootstrap_state(bot):
                 "amount": abs(amount),
             }
 
-        open_orders_by_coid, open_orders_by_symbol = _build_open_order_index(
-            open_orders
-        )
+        open_orders_by_coid, open_orders_by_symbol = _build_open_order_index(open_orders)
 
-        db_symbols = {
-            s for s, t in db_snapshot.items() if not (t or {}).get("is_shadow", False)
-        }
+        db_symbols = {s for s, t in db_snapshot.items() if not (t or {}).get("is_shadow", False)}
         position_symbols = set(exchange_positions.keys())
         order_symbols = set(open_orders_by_symbol.keys())
         ex_symbols = position_symbols | order_symbols
@@ -296,7 +286,9 @@ def reconcile_bootstrap_state(bot):
 
             verify_valid, verify_reason = _verify_orphan_multiple(bot, symbol)
             if not verify_valid:
-                bot.log(f"⚠️ Huérfano {symbol} rechazado: verificación múltiple falló: {verify_reason}")
+                bot.log(
+                    f"⚠️ Huérfano {symbol} rechazado: verificación múltiple falló: {verify_reason}"
+                )
                 continue
 
             market_price = 0.0
@@ -326,7 +318,11 @@ def reconcile_bootstrap_state(bot):
                 "early_be_armed": False,
                 "mae_price": entry_price,
                 "mfe_price": entry_price,
-                "market_snapshot": {"is_adopted": True, "prob_final": 99.0, "market_price": market_price},
+                "market_snapshot": {
+                    "is_adopted": True,
+                    "prob_final": 99.0,
+                    "market_price": market_price,
+                },
                 "adopted_orphan": True,
             }
             with bot.lock:
@@ -335,18 +331,12 @@ def reconcile_bootstrap_state(bot):
                 bot.brain.save_active_trade_state(symbol, adopted_trade)
 
             try:
-                sl_order = bot.execution.place_hard_sl(
-                    symbol, info["side"], amount, sl
-                )
+                sl_order = bot.execution.place_hard_sl(symbol, info["side"], amount, sl)
                 if sl_order:
                     with bot.lock:
-                        bot.active_trades[symbol]["sl_exchange_order_id"] = (
-                            sl_order.get("id")
-                        )
+                        bot.active_trades[symbol]["sl_exchange_order_id"] = sl_order.get("id")
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(
-                            symbol, bot.active_trades[symbol]
-                        )
+                        bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
                 else:
                     bot.is_paused = True
                     bot.integrity_lock_active = True
@@ -354,9 +344,7 @@ def reconcile_bootstrap_state(bot):
                     with bot.lock:
                         bot.active_trades[symbol]["status"] = "ADOPTED_UNPROTECTED"
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(
-                            symbol, bot.active_trades[symbol]
-                        )
+                        bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
                         bot.brain.save_error_snapshot(
                             symbol,
                             "ORPHAN_HARD_SL_ATTACH_FAILED",
@@ -405,21 +393,18 @@ def reconcile_bootstrap_state(bot):
                 continue
 
             status = str(state.get("status") or "").upper()
-            
-            intent_created = state.get("intent_created_at_utc") or state.get(
-                "open_time"
-            )
+
+            intent_created = state.get("intent_created_at_utc") or state.get("open_time")
             intent_age_seconds = None
             if intent_created:
                 try:
                     intent_age_seconds = max(
                         0.0,
-                        (
-                            utc_now() - parse_datetime_utc(intent_created)
-                        ).total_seconds(),
+                        (utc_now() - parse_datetime_utc(intent_created)).total_seconds(),
                     )
                 except Exception:
                     import traceback as _tb
+
                     _tb.print_exc()
                     intent_age_seconds = None
 
@@ -433,17 +418,13 @@ def reconcile_bootstrap_state(bot):
                 except Exception as error:
                     order_lookup_failed = True
                     order_lookup_error = str(error)[:220]
-                    bot.log(
-                        f"⚠️ Consulta order-by-client-id falló {symbol}/{entry_coid}: {error}"
-                    )
+                    bot.log(f"⚠️ Consulta order-by-client-id falló {symbol}/{entry_coid}: {error}")
 
             if exchange_order is None and entry_coid in open_orders_by_coid:
                 exchange_order = open_orders_by_coid[entry_coid]
 
             state["intent_last_check_at_utc"] = utc_now_iso()
-            state["intent_check_attempts"] = (
-                int(state.get("intent_check_attempts", 0) or 0) + 1
-            )
+            state["intent_check_attempts"] = int(state.get("intent_check_attempts", 0) or 0) + 1
 
             if order_lookup_failed and exchange_order is None:
                 state["status"] = "ORDER_LOOKUP_FAILED"
@@ -548,9 +529,7 @@ def reconcile_bootstrap_state(bot):
                 state["exchange_open_order_id"] = exchange_order.get("id")
                 state["exchange_open_order_status"] = exchange_order.get("status")
                 state["reconciled_at"] = utc_now_iso()
-                state["intent_created_at_utc"] = (
-                    state.get("intent_created_at_utc") or utc_now_iso()
-                )
+                state["intent_created_at_utc"] = state.get("intent_created_at_utc") or utc_now_iso()
                 with bot.lock:
                     bot.active_trades[symbol] = state
                 with bot.db_lock:
@@ -562,9 +541,7 @@ def reconcile_bootstrap_state(bot):
                 state["exchange_entry_order_id"] = exchange_order.get("id")
                 state["exchange_open_order_status"] = exchange_order.get("status")
                 state["reconciled_at"] = utc_now_iso()
-                state["intent_created_at_utc"] = (
-                    state.get("intent_created_at_utc") or utc_now_iso()
-                )
+                state["intent_created_at_utc"] = state.get("intent_created_at_utc") or utc_now_iso()
                 with bot.lock:
                     bot.active_trades[symbol] = state
                 with bot.db_lock:
@@ -676,7 +653,7 @@ def recover_halt_if_exchange_consistent(bot, required_snapshots: int = 2) -> tup
         return False, f"RECOVERY_BLOCKED_EXCHANGE_EXPOSURE: {', '.join(exchange_symbols)}"
 
     fetch_open_orders = getattr(bot.execution, "fetch_open_orders", None)
-    open_orders = []
+    open_orders: list[dict] = []
     if callable(fetch_open_orders):
         try:
             open_orders = fetch_open_orders() or []

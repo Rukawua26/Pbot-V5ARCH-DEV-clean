@@ -1,24 +1,26 @@
 import unittest
-from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from core.commands.history import _handle_history_commands
 
 
 def _mock_bot(brain_methods=None):
-    brain = SimpleNamespace(**{
-        "get_paper_trades_history": MagicMock(return_value=[]),
-        "get_stats_by_trend": MagicMock(return_value={}),
-        "get_todays_trades": MagicMock(return_value=[]),
-        "get_genetic_params": MagicMock(return_value=None),
-        "get_trade_by_id": MagicMock(return_value=None),
-        "get_similar_trades": MagicMock(return_value=[]),
-        "get_agent_performance": MagicMock(return_value={}),
-        "get_trades_by_market_regime": MagicMock(return_value={}),
-        "get_recent_debug_logs": MagicMock(return_value=[]),
-        "get_shadow_trades_history": MagicMock(return_value=[]),
-        **(brain_methods or {}),
-    })
+    brain = SimpleNamespace(
+        **{
+            "get_paper_trades_history": MagicMock(return_value=[]),
+            "get_stats_by_trend": MagicMock(return_value={}),
+            "get_todays_trades": MagicMock(return_value=[]),
+            "get_genetic_params": MagicMock(return_value=None),
+            "get_trade_by_id": MagicMock(return_value=None),
+            "get_similar_trades": MagicMock(return_value=[]),
+            "get_agent_performance": MagicMock(return_value={}),
+            "get_trades_by_market_regime": MagicMock(return_value={}),
+            "get_recent_debug_logs": MagicMock(return_value=[]),
+            "get_shadow_trades_history": MagicMock(return_value=[]),
+            **(brain_methods or {}),
+        }
+    )
     return SimpleNamespace(brain=brain, scanner_history=[], log=MagicMock())
 
 
@@ -126,19 +128,21 @@ class TestHandleHistoryCommands(unittest.TestCase):
     @patch("core.commands.history.send_telegram_msg")
     def test_trade_detail_found_with_votes(self, mock_send):
         bot = _mock_bot()
-        bot.scanner_history = [{
-            "symbol": "BTC/USDT",
-            "rsi_val": 55,
-            "adx_val": 22,
-            "z_score": 1.2,
-            "ia_prob": "77%",
-            "signal": "BUY",
-            "result": "OK",
-            "ob": "⚪",
-            "trend_val": "UP",
-            "funding_rate": 0.001,
-            "votos": {"MT": 80, "SR": 60},
-        }]
+        bot.scanner_history = [
+            {
+                "symbol": "BTC/USDT",
+                "rsi_val": 55,
+                "adx_val": 22,
+                "z_score": 1.2,
+                "ia_prob": "77%",
+                "signal": "BUY",
+                "result": "OK",
+                "ob": "⚪",
+                "trend_val": "UP",
+                "funding_rate": 0.001,
+                "votos": {"MT": 80, "SR": 60},
+            }
+        ]
         result = _handle_history_commands(bot, "/trade_detail BTC/USDT")
         self.assertTrue(result)
         mock_send.assert_called_once()
@@ -181,10 +185,12 @@ class TestHandleHistoryCommands(unittest.TestCase):
             "market_snapshot": '{"trend":"UP","z_score":1.2,"bb_pos":0.8,"dist_ema":0.02,"btc_delta_tf":0.5}',
         }
         similar = [{"id": 2, "symbol": "ETH/USDT", "pnl_percent": -1.5}]
-        bot = _mock_bot({
-            "get_trade_by_id": MagicMock(return_value=trade),
-            "get_similar_trades": MagicMock(return_value=similar),
-        })
+        bot = _mock_bot(
+            {
+                "get_trade_by_id": MagicMock(return_value=trade),
+                "get_similar_trades": MagicMock(return_value=similar),
+            }
+        )
         result = _handle_history_commands(bot, "/trade 1")
         self.assertTrue(result)
         mock_send.assert_called_once()

@@ -7,11 +7,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 
-from core import bot_balance_ops
-from core import bot_cycles
-from core import bot_main_loop
-from core import bot_market_state
-from core import market_intelligence
+from core import bot_balance_ops, bot_cycles, bot_main_loop, bot_market_state, market_intelligence
 from core.strategy.regime_hmm import DynamicHMMRegime
 
 
@@ -48,9 +44,9 @@ def _build_market_bot(tickers, *, fetch_tickers_error=None):
     )
     brain = SimpleNamespace(
         get_symbol_performance=MagicMock(
-            side_effect=lambda sym: {"wr": 85, "trades": 10}
-            if sym.startswith("ALPHA")
-            else {"wr": 45, "trades": 10}
+            side_effect=lambda sym: (
+                {"wr": 85, "trades": 10} if sym.startswith("ALPHA") else {"wr": 45, "trades": 10}
+            )
         ),
         get_symbol_blacklist=MagicMock(return_value=[]),
     )
@@ -103,9 +99,7 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
             bot.pairs_to_scan.index("BETA/USDT"),
         )
         self.assertEqual(bot.market_btc_price, 65_000.0)
-        self.assertTrue(
-            any(item["symbol"] == "ALPHA/USDT" for item in bot.scanner_history)
-        )
+        self.assertTrue(any(item["symbol"] == "ALPHA/USDT" for item in bot.scanner_history))
         bot.execution.fetch_tickers.assert_not_called()
 
     @patch.object(market_intelligence.Config, "MAX_REAL_PAIRS", 10)
@@ -239,13 +233,21 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
         cached_candidates = [
             {
                 "symbol": "LOW/USDT",
-                "ticker": {**_ticker("LOW/USDT", volume=20_000_000, price=1.0), "bid": 0.999, "ask": 1.0},
+                "ticker": {
+                    **_ticker("LOW/USDT", volume=20_000_000, price=1.0),
+                    "bid": 0.999,
+                    "ask": 1.0,
+                },
                 "vol_24h": 20_000_000,
                 "last": 1.0,
             },
             {
                 "symbol": "HIGH/USDT",
-                "ticker": {**_ticker("HIGH/USDT", volume=80_000_000, price=1.0), "bid": 0.999, "ask": 1.0},
+                "ticker": {
+                    **_ticker("HIGH/USDT", volume=80_000_000, price=1.0),
+                    "bid": 0.999,
+                    "ask": 1.0,
+                },
                 "vol_24h": 80_000_000,
                 "last": 1.0,
             },
@@ -355,9 +357,7 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
                 get_symbol_blacklist=MagicMock(return_value=[]),
             ),
             data_service=SimpleNamespace(
-                audit_symbol_maturity=MagicMock(
-                    side_effect=[RuntimeError("maturity down"), True]
-                )
+                audit_symbol_maturity=MagicMock(side_effect=[RuntimeError("maturity down"), True])
             ),
             risk_engine=SimpleNamespace(
                 check_anti_revenge_blacklist=MagicMock(return_value=(True, ""))
@@ -450,9 +450,7 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
         self.assertIn("KEEP/USDT", symbols)
         self.assertNotIn("WIDE/USDT", symbols)
         self.assertNotIn("MISSING/USDT", symbols)
-        keep_ticker = next(
-            item["ticker"] for item in ranked if item["symbol"] == "KEEP/USDT"
-        )
+        keep_ticker = next(item["ticker"] for item in ranked if item["symbol"] == "KEEP/USDT")
         self.assertEqual(keep_ticker["last"], 1.0)
         self.assertEqual(keep_ticker["quoteVolume"], 50_000_000.0)
         self.assertNotIn("info", keep_ticker)
@@ -499,7 +497,9 @@ class RegimePipelineTests(unittest.TestCase):
         df_sideways = pd.DataFrame({"close": close})
         hmm = DynamicHMMRegime(lookback_candles=200)
         hmm._fit_features(df_sideways)
-        hmm.model = SimpleNamespace(predict_proba=MagicMock(return_value=np.array([[0.1, 0.8, 0.1]])))
+        hmm.model = SimpleNamespace(
+            predict_proba=MagicMock(return_value=np.array([[0.1, 0.8, 0.1]]))
+        )
         hmm.state_map = {0: "BEAR_TREND", 1: "RANGE", 2: "BULL_TREND"}
         hmm.is_ready = True
 

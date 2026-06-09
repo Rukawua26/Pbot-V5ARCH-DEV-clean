@@ -1,7 +1,7 @@
 import unittest
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch, ANY
-from datetime import datetime, timezone
+from unittest.mock import ANY, MagicMock, patch
 
 from config import Config
 
@@ -34,20 +34,19 @@ class TestRecordMtfTradeOutcome(unittest.TestCase):
 
     def setUp(self):
         import core.trade_exit as _te
+
         _te._MTF_TRADE_RESULTS = []
 
     def test_skips_when_no_mtf_reason(self):
-        from core.trade_exit import _record_mtf_trade_outcome, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _record_mtf_trade_outcome
 
         _record_mtf_trade_outcome({"market_snapshot": {}}, 1.0)
         self.assertEqual(len(_MTF_TRADE_RESULTS), 0)
 
     def test_appends_win_entry(self):
-        from core.trade_exit import _record_mtf_trade_outcome, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _record_mtf_trade_outcome
 
-        _record_mtf_trade_outcome(
-            {"market_snapshot": {"mtf_reason": "ALIGNED"}}, 2.5
-        )
+        _record_mtf_trade_outcome({"market_snapshot": {"mtf_reason": "ALIGNED"}}, 2.5)
         self.assertEqual(len(_MTF_TRADE_RESULTS), 1)
         entry = _MTF_TRADE_RESULTS[0]
         self.assertEqual(entry["mtf_reason"], "ALIGNED")
@@ -55,22 +54,18 @@ class TestRecordMtfTradeOutcome(unittest.TestCase):
         self.assertTrue(entry["is_win"])
 
     def test_appends_loss_entry(self):
-        from core.trade_exit import _record_mtf_trade_outcome, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _record_mtf_trade_outcome
 
-        _record_mtf_trade_outcome(
-            {"market_snapshot": {"mtf_reason": "CONFLICT_15M"}}, -3.0
-        )
+        _record_mtf_trade_outcome({"market_snapshot": {"mtf_reason": "CONFLICT_15M"}}, -3.0)
         entry = _MTF_TRADE_RESULTS[0]
         self.assertFalse(entry["is_win"])
         self.assertAlmostEqual(entry["pnl_percent"], -3.0)
 
     def test_accumulates_multiple_entries(self):
-        from core.trade_exit import _record_mtf_trade_outcome, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _record_mtf_trade_outcome
 
         for i in range(5):
-            _record_mtf_trade_outcome(
-                {"market_snapshot": {"mtf_reason": "ALIGNED"}}, float(i)
-            )
+            _record_mtf_trade_outcome({"market_snapshot": {"mtf_reason": "ALIGNED"}}, float(i))
         self.assertEqual(len(_MTF_TRADE_RESULTS), 5)
 
     def test_triggers_report_at_window_boundary(self):
@@ -79,9 +74,7 @@ class TestRecordMtfTradeOutcome(unittest.TestCase):
         with patch.object(Config, "MTF_METRICS_WINDOW", 3):
             with patch("core.trade_exit.append_execution_event"):
                 for i in range(3):
-                    te._record_mtf_trade_outcome(
-                        {"market_snapshot": {"mtf_reason": f"R{i}"}}, 1.0
-                    )
+                    te._record_mtf_trade_outcome({"market_snapshot": {"mtf_reason": f"R{i}"}}, 1.0)
         self.assertEqual(len(te._MTF_TRADE_RESULTS), 0)
 
     def test_does_not_trigger_before_window(self):
@@ -90,17 +83,13 @@ class TestRecordMtfTradeOutcome(unittest.TestCase):
         with patch.object(Config, "MTF_METRICS_WINDOW", 10):
             with patch("core.trade_exit.append_execution_event") as mock_append:
                 for i in range(5):
-                    te._record_mtf_trade_outcome(
-                        {"market_snapshot": {"mtf_reason": "A"}}, 1.0
-                    )
+                    te._record_mtf_trade_outcome({"market_snapshot": {"mtf_reason": "A"}}, 1.0)
         mock_append.assert_not_called()
 
     def test_zero_pnl_is_considered_loss(self):
-        from core.trade_exit import _record_mtf_trade_outcome, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _record_mtf_trade_outcome
 
-        _record_mtf_trade_outcome(
-            {"market_snapshot": {"mtf_reason": "NEUTRAL"}}, 0.0
-        )
+        _record_mtf_trade_outcome({"market_snapshot": {"mtf_reason": "NEUTRAL"}}, 0.0)
         self.assertFalse(_MTF_TRADE_RESULTS[0]["is_win"])
 
 
@@ -109,6 +98,7 @@ class TestLogMtfWinrateReport(unittest.TestCase):
 
     def setUp(self):
         import core.trade_exit as _te
+
         _te._MTF_TRADE_RESULTS = []
 
     def test_early_return_when_empty(self):
@@ -121,15 +111,13 @@ class TestLogMtfWinrateReport(unittest.TestCase):
     def test_resets_accumulator_after_report(self):
         import core.trade_exit as te
 
-        te._MTF_TRADE_RESULTS.append(
-            {"mtf_reason": "A", "pnl_percent": 1.0, "is_win": True}
-        )
+        te._MTF_TRADE_RESULTS.append({"mtf_reason": "A", "pnl_percent": 1.0, "is_win": True})
         with patch("core.trade_exit.append_execution_event"):
             te._log_mtf_winrate_report()
         self.assertEqual(len(te._MTF_TRADE_RESULTS), 0)
 
     def test_reports_correct_win_rate_single_reason(self):
-        from core.trade_exit import _log_mtf_winrate_report, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _log_mtf_winrate_report
 
         for pnl in [2.0, -1.0, 3.0, -4.0, 1.5]:
             _MTF_TRADE_RESULTS.append(
@@ -148,14 +136,10 @@ class TestLogMtfWinrateReport(unittest.TestCase):
         self.assertAlmostEqual(data["per_reason"]["ALIGNED"]["win_rate_pct"], 60.0)
 
     def test_aggregates_multiple_reasons(self):
-        from core.trade_exit import _log_mtf_winrate_report, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _log_mtf_winrate_report
 
-        _MTF_TRADE_RESULTS.append(
-            {"mtf_reason": "ALIGNED", "pnl_percent": 2.0, "is_win": True}
-        )
-        _MTF_TRADE_RESULTS.append(
-            {"mtf_reason": "ALIGNED", "pnl_percent": 1.0, "is_win": True}
-        )
+        _MTF_TRADE_RESULTS.append({"mtf_reason": "ALIGNED", "pnl_percent": 2.0, "is_win": True})
+        _MTF_TRADE_RESULTS.append({"mtf_reason": "ALIGNED", "pnl_percent": 1.0, "is_win": True})
         _MTF_TRADE_RESULTS.append(
             {"mtf_reason": "CONFLICT_15M", "pnl_percent": -3.0, "is_win": False}
         )
@@ -169,23 +153,17 @@ class TestLogMtfWinrateReport(unittest.TestCase):
         self.assertEqual(data["total_trades"], 4)
         self.assertEqual(data["per_reason"]["ALIGNED"]["total"], 2)
         self.assertEqual(data["per_reason"]["ALIGNED"]["wins"], 2)
-        self.assertAlmostEqual(
-            data["per_reason"]["ALIGNED"]["win_rate_pct"], 100.0
-        )
+        self.assertAlmostEqual(data["per_reason"]["ALIGNED"]["win_rate_pct"], 100.0)
         self.assertEqual(data["per_reason"]["CONFLICT_15M"]["total"], 1)
         self.assertEqual(data["per_reason"]["CONFLICT_15M"]["wins"], 0)
-        self.assertAlmostEqual(
-            data["per_reason"]["CONFLICT_15M"]["win_rate_pct"], 0.0
-        )
+        self.assertAlmostEqual(data["per_reason"]["CONFLICT_15M"]["win_rate_pct"], 0.0)
         self.assertEqual(data["per_reason"]["CONFLICT_5M"]["total"], 1)
 
     def test_passes_bot_to_append_execution_event(self):
-        from core.trade_exit import _log_mtf_winrate_report, _MTF_TRADE_RESULTS
+        from core.trade_exit import _MTF_TRADE_RESULTS, _log_mtf_winrate_report
 
         bot = MagicMock()
-        _MTF_TRADE_RESULTS.append(
-            {"mtf_reason": "A", "pnl_percent": 1.0, "is_win": True}
-        )
+        _MTF_TRADE_RESULTS.append({"mtf_reason": "A", "pnl_percent": 1.0, "is_win": True})
         with patch("core.trade_exit.append_execution_event") as mock_append:
             _log_mtf_winrate_report(bot=bot)
         mock_append.assert_called_once_with(bot, "MTF_WINRATE_REPORT", ANY)
@@ -238,6 +216,7 @@ class TestCloseTradePaperPath(unittest.TestCase):
 
     def setUp(self):
         import core.trade_exit as _te
+
         _te._MTF_TRADE_RESULTS = []
 
     @patch("core.trade_exit.send_telegram_photo")
@@ -284,7 +263,7 @@ class TestCloseTradePaperPath(unittest.TestCase):
             "mfe_at_sl": 0.0,
         }
 
-        open_time = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        open_time = datetime(2024, 1, 1, tzinfo=UTC)
         trade = {
             "symbol": "BTCUSDT",
             "side": "BUY",
@@ -314,9 +293,7 @@ class TestCloseTradePaperPath(unittest.TestCase):
                 update_agent_reputation=MagicMock(),
                 evolve_genetics=MagicMock(return_value=False),
                 check_eureka_status=MagicMock(return_value=("UNKNOWN", {})),
-                get_recent_exit_confidence_stagnation=MagicMock(
-                    return_value=None
-                ),
+                get_recent_exit_confidence_stagnation=MagicMock(return_value=None),
             ),
             risk_engine=SimpleNamespace(
                 record_trade_result=MagicMock(),
@@ -350,9 +327,7 @@ class TestCloseTradePaperPath(unittest.TestCase):
         self.assertEqual(log_args["side"], "BUY")
         self.assertAlmostEqual(log_args["entry"], 50000.0)
         self.assertAlmostEqual(log_args["exit"], 51000.0)
-        expected_fees = (
-            50000.0 * 0.001 * 0.001 + 51000.0 * 0.001 * 0.001
-        )
+        expected_fees = 50000.0 * 0.001 * 0.001 + 51000.0 * 0.001 * 0.001
         self.assertAlmostEqual(log_args["fees"], expected_fees, places=6)
         self.assertAlmostEqual(log_args["pnl_percent"], 1.798)
 
@@ -361,19 +336,16 @@ class TestCloseTradePaperPath(unittest.TestCase):
 
         # -- Recent trades updated --
         self.assertEqual(len(bot.recent_closed_trades), 1)
-        self.assertEqual(
-            bot.recent_closed_trades[0]["symbol"], "BTCUSDT"
-        )
+        self.assertEqual(bot.recent_closed_trades[0]["symbol"], "BTCUSDT")
 
         # -- Post-close bookkeeping --
-        bot.risk_engine.record_trade_result.assert_called_once_with(
-            "BTCUSDT", 1.798
-        )
+        bot.risk_engine.record_trade_result.assert_called_once_with("BTCUSDT", 1.798)
         bot._update_dynamic_risk.assert_called_once()
         bot._check_recent_mfe_health.assert_called_once()
 
         # -- Cooldown was applied --
         import core.trade_exit as te
+
         te.set_symbol_cooldown.assert_called_once()
 
         # -- Telegram notification sent --

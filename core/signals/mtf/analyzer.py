@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import pandas as pd
 
 
-def _is_usable_df(df: Optional[pd.DataFrame], min_rows: int = 5) -> bool:
+def _is_usable_df(df: pd.DataFrame | None, min_rows: int = 5) -> bool:
     if df is None or not isinstance(df, pd.DataFrame) or df.empty:
         return False
     return "close" in df.columns and len(df) >= min_rows
 
 
-def _infer_direction(df: Optional[pd.DataFrame], min_candles: int = 20) -> str:
+def _infer_direction(df: pd.DataFrame | None, min_candles: int = 20) -> str:
     if not _is_usable_df(df, min_rows=min_candles):
         return "UNKNOWN"
+    assert df is not None
     closes = pd.to_numeric(df["close"], errors="coerce").dropna()
     if len(closes) < min_candles:
         return "UNKNOWN"
@@ -24,6 +23,7 @@ def _infer_direction(df: Optional[pd.DataFrame], min_candles: int = 20) -> str:
         return "UNKNOWN"
 
     from config import Config
+
     threshold = float(getattr(Config, "MTF_DIRECTION_THRESHOLD_PCT", 0.002))
     change_pct = (last - first) / first
     if change_pct >= threshold:
@@ -34,9 +34,7 @@ def _infer_direction(df: Optional[pd.DataFrame], min_candles: int = 20) -> str:
 
 
 def _opposes_signal(direction: str, signal: str) -> bool:
-    return (signal == "BUY" and direction == "SELL") or (
-        signal == "SELL" and direction == "BUY"
-    )
+    return (signal == "BUY" and direction == "SELL") or (signal == "SELL" and direction == "BUY")
 
 
 def _confirms_signal(direction: str, signal: str) -> bool:
@@ -62,8 +60,8 @@ def _regime_confirms_signal(regime: str, signal: str) -> bool:
 
 def analyze_mtf_alignment(
     df_1h: pd.DataFrame,
-    df_15m: Optional[pd.DataFrame],
-    df_5m: Optional[pd.DataFrame],
+    df_15m: pd.DataFrame | None,
+    df_5m: pd.DataFrame | None,
     signal: str,
     regime: str = "",
 ) -> tuple[float, str]:
@@ -107,6 +105,7 @@ def analyze_mtf_alignment(
 
     if confirms_15m and confirms_5m:
         from config import Config
+
         boost = float(getattr(Config, "MTF_ALIGNED_BOOST", 1.0))
         return boost, "MTF_ALIGNED_15M_5M"
 

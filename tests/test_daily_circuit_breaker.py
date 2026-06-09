@@ -1,7 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -23,9 +23,7 @@ def _create_trade_db(rows):
         )
         """
     )
-    conn.executemany(
-        "INSERT INTO trades (timestamp, pnl, is_shadow) VALUES (?, ?, ?)", rows
-    )
+    conn.executemany("INSERT INTO trades (timestamp, pnl, is_shadow) VALUES (?, ?, ?)", rows)
     conn.commit()
     conn.close()
     return tmpdir, db_path
@@ -33,8 +31,8 @@ def _create_trade_db(rows):
 
 class DailyCircuitBreakerTest(unittest.TestCase):
     def test_daily_pnl_pct_uses_utc_real_trades_only(self):
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        yesterday = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
+        yesterday = (datetime.now(UTC) - timedelta(days=1)).strftime("%Y-%m-%d")
         tmpdir, db_path = _create_trade_db(
             [
                 (f"{today}T01:00:00+00:00", -20.0, 0),
@@ -53,7 +51,7 @@ class DailyCircuitBreakerTest(unittest.TestCase):
     @patch("core.bot_main_loop.Config.PAPER_MODE", True)
     @patch("core.risk_policy.send_telegram_msg")
     def test_breaker_does_not_apply_in_paper(self, mocked_send):
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         tmpdir, db_path = _create_trade_db([(f"{today}T01:00:00+00:00", -100.0, 0)])
         try:
             bot = SimpleNamespace(
@@ -74,9 +72,7 @@ class DailyCircuitBreakerTest(unittest.TestCase):
     @patch("core.bot_main_loop.Config.PAPER_MODE", False)
     @patch("core.risk_policy.send_telegram_msg")
     @patch("core.bot_main_loop.get_daily_pnl_pct", return_value=(None, None))
-    def test_breaker_fails_closed_when_drawdown_is_unverifiable(
-        self, _mock_drawdown, mocked_send
-    ):
+    def test_breaker_fails_closed_when_drawdown_is_unverifiable(self, _mock_drawdown, mocked_send):
         bot = SimpleNamespace(
             brain=SimpleNamespace(db_name="missing.db"),
             get_current_balance=MagicMock(return_value=1000.0),
@@ -95,7 +91,7 @@ class DailyCircuitBreakerTest(unittest.TestCase):
     @patch("core.bot_main_loop.Config.PAPER_MODE", False)
     @patch("core.risk_policy.send_telegram_msg")
     def test_breaker_activates_once_in_real_when_limit_is_breached(self, mocked_send):
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         tmpdir, db_path = _create_trade_db([(f"{today}T01:00:00+00:00", -31.0, 0)])
         try:
             bot = SimpleNamespace(
@@ -120,7 +116,7 @@ class DailyCircuitBreakerTest(unittest.TestCase):
     @patch("core.bot_main_loop.Config.PAPER_MODE", False)
     @patch("core.risk_policy.send_telegram_msg")
     def test_breaker_stays_open_when_drawdown_is_above_limit(self, mocked_send):
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         tmpdir, db_path = _create_trade_db([(f"{today}T01:00:00+00:00", -29.0, 0)])
         try:
             bot = SimpleNamespace(

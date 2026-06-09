@@ -1,8 +1,10 @@
-from typing import Dict, Tuple, Any, Optional
+import logging
 import os
 import pickle
+from typing import Any
+
 import numpy as np
-import logging
+
 from core.model_loader import safe_pickle_load
 
 try:
@@ -27,9 +29,9 @@ class AgentConsensusNN:
     AGENT_NAMES = ["MT", "SR", "LB", "V", "J", "G", "C", "S"]
 
     def __init__(self, model_path: str = "v118_1H_consensus.pkl"):
-        self.model: Optional[Any] = None
+        self.model: Any | None = None
         if SKLEARN_AVAILABLE:
-            self.scaler: Optional[Any] = StandardScaler()
+            self.scaler: Any | None = StandardScaler()
         else:
             self.scaler = None
         self.is_trained: bool = False
@@ -45,9 +47,7 @@ class AgentConsensusNN:
                 self.model = data["model"]
                 self.scaler = data["scaler"]
                 self.is_trained = True
-                logger.info(
-                    f"✅ Neural Consensus 1H cargado: {data.get('n_samples', 0)} muestras"
-                )
+                logger.info(f"✅ Neural Consensus 1H cargado: {data.get('n_samples', 0)} muestras")
             except Exception as e:
                 logger.warning(f"⚠️ Error cargando Neural Consensus: {e}")
                 self.is_trained = False
@@ -70,12 +70,12 @@ class AgentConsensusNN:
         except Exception as e:
             logger.error(f"⚠️ Error guardando Neural Consensus: {e}")
 
-    def prepare_features(self, votes_dict: Dict[str, float]) -> np.ndarray:
+    def prepare_features(self, votes_dict: dict[str, float]) -> np.ndarray:
         """Convierte el diccionario de votos a vector de features (8D)."""
         features = [votes_dict.get(agent, 50.0) for agent in self.AGENT_NAMES]
         return np.array(features).reshape(1, -1)
 
-    def predict(self, votes_dict: Dict[str, float]) -> Tuple[float, float]:
+    def predict(self, votes_dict: dict[str, float]) -> tuple[float, float]:
         """
         Predice la probabilidad de éxito dado los votos de los 8 agentes.
         Retorna: (probabilidad, confianza)
@@ -123,6 +123,7 @@ class AgentConsensusNN:
             return False
 
         try:
+            assert self.scaler is not None
             X_scaled = self.scaler.fit_transform(X_train)
 
             self.model = MLPClassifier(
@@ -143,9 +144,7 @@ class AgentConsensusNN:
             self.is_trained = True
 
             train_score = self.model.score(X_scaled, y_train)
-            logger.info(
-                f"✅ Neural Consensus 1H Entrenada - Accuracy: {train_score:.2%}"
-            )
+            logger.info(f"✅ Neural Consensus 1H Entrenada - Accuracy: {train_score:.2%}")
             return True
         except Exception as e:
             logger.error(f"❌ Error entrenando Neural Consensus v118: {e}")

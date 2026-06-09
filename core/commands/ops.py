@@ -1,14 +1,14 @@
 import asyncio
 import json
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from config import Config
-from tools.notifier import send_telegram_msg
 from core.cooldown_state import persist_cooldowns
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import monotonic_now
+from tools.notifier import send_telegram_msg
 
 
 def _help_message() -> str:
@@ -52,7 +52,7 @@ def _help_message() -> str:
         "⚙️ *SISTEMA*\n"
         "• `/reset`: Reiniciar PnL diario\n"
         "• `/api_status` | `/weight`: Estado del API Weight (Binance)\n"
-"• `/test`: Test de notificaciones\n\n"
+        "• `/test`: Test de notificaciones\n\n"
         "🚫 *COMANDOS BLOQUEADOS EN CUARENTENA*\n"
         "• `/force_shadow`, `/clean`, `/dump_db`, `/evolution` y `/genetic`"
     )
@@ -78,8 +78,8 @@ def _handle_misc_commands(bot, text: str) -> bool:
             if markov_ts:
                 parsed_ts = datetime.fromisoformat(str(markov_ts).replace("Z", "+00:00"))
                 if parsed_ts.tzinfo is None:
-                    parsed_ts = parsed_ts.replace(tzinfo=timezone.utc)
-                markov_age = max(0.0, (datetime.now(timezone.utc) - parsed_ts).total_seconds())
+                    parsed_ts = parsed_ts.replace(tzinfo=UTC)
+                markov_age = max(0.0, (datetime.now(UTC) - parsed_ts).total_seconds())
                 markov_age_text = f"{markov_age / 60:.1f}m"
             markov_stats = getattr(bot, "markov_decision_stats", {}) or {}
             send_telegram_msg(
@@ -108,12 +108,10 @@ def _handle_misc_commands(bot, text: str) -> bool:
         try:
             events_path = Path("logs/execution_events.jsonl")
             if not events_path.exists():
-                send_telegram_msg(
-                    "ℹ️ SRE Intent: aún no existe logs/execution_events.jsonl"
-                )
+                send_telegram_msg("ℹ️ SRE Intent: aún no existe logs/execution_events.jsonl")
                 return True
 
-            now_utc = datetime.now(timezone.utc)
+            now_utc = datetime.now(UTC)
             cut_1h = now_utc - timedelta(hours=1)
             cut_24h = now_utc - timedelta(hours=24)
 
@@ -142,9 +140,9 @@ def _handle_misc_commands(bot, text: str) -> bool:
                     except Exception:
                         continue
                     if ts.tzinfo is None:
-                        ts = ts.replace(tzinfo=timezone.utc)
+                        ts = ts.replace(tzinfo=UTC)
                     else:
-                        ts = ts.astimezone(timezone.utc)
+                        ts = ts.astimezone(UTC)
 
                     if ts >= cut_24h:
                         if event == "ENTRY_ORDER_ACK":
@@ -196,7 +194,7 @@ def _handle_misc_commands(bot, text: str) -> bool:
             send_telegram_msg("🕵️ *TIERS:* No hay señales en el radar todavía.")
             return True
 
-        tiers = {"ELITE": [], "GOLD": [], "SILVER": [], "IRON": []}
+        tiers: dict[str, list[str]] = {"ELITE": [], "GOLD": [], "SILVER": [], "IRON": []}
         for item in bot.scanner_history:
             tier = item.get("tier", "IRON")
             if tier in tiers:
@@ -204,23 +202,11 @@ def _handle_misc_commands(bot, text: str) -> bool:
 
         msg = "🏆 *SEÑALES POR TIER*\n\n"
         if tiers["ELITE"]:
-            msg += (
-                "💎 *ELITE*\n"
-                + "\n".join([f"• {x}" for x in tiers["ELITE"][:10]])
-                + "\n\n"
-            )
+            msg += "💎 *ELITE*\n" + "\n".join([f"• {x}" for x in tiers["ELITE"][:10]]) + "\n\n"
         if tiers["GOLD"]:
-            msg += (
-                "🥇 *GOLD*\n"
-                + "\n".join([f"• {x}" for x in tiers["GOLD"][:10]])
-                + "\n\n"
-            )
+            msg += "🥇 *GOLD*\n" + "\n".join([f"• {x}" for x in tiers["GOLD"][:10]]) + "\n\n"
         if tiers["SILVER"]:
-            msg += (
-                "🥈 *SILVER*\n"
-                + "\n".join([f"• {x}" for x in tiers["SILVER"][:10]])
-                + "\n"
-            )
+            msg += "🥈 *SILVER*\n" + "\n".join([f"• {x}" for x in tiers["SILVER"][:10]]) + "\n"
 
         if not tiers["ELITE"] and not tiers["GOLD"] and not tiers["SILVER"]:
             msg += "⚪ Solo señales IRON detectadas."
@@ -417,9 +403,7 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
     if text.startswith("/force_clear"):
         parts = text.split(maxsplit=1)
         if len(parts) < 2:
-            send_telegram_msg(
-                "⚠️ Uso: /force_clear [SYMBOL] (ej: /force_clear BTC/USDT)"
-            )
+            send_telegram_msg("⚠️ Uso: /force_clear [SYMBOL] (ej: /force_clear BTC/USDT)")
             return True
 
         symbol = normalize_position_symbol(parts[1], default_quote="USDT", strict=True)
@@ -429,9 +413,7 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                 state = dict((bot.active_trades or {}).get(symbol) or {})
 
             if not state:
-                send_telegram_msg(
-                    f"ℹ️ {symbol}: no existe estado activo local para limpiar."
-                )
+                send_telegram_msg(f"ℹ️ {symbol}: no existe estado activo local para limpiar.")
                 return True
 
             entry_coid = str(state.get("entry_client_order_id") or "")

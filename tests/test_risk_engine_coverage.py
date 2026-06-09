@@ -1,17 +1,16 @@
-import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
-from datetime import datetime, timezone
-import sqlite3
-import tempfile
 import os
+import sqlite3
 
 # We need to mock Config before importing risk_engine
-import sys
+import tempfile
+import unittest
+from datetime import UTC, datetime
+from unittest.mock import MagicMock, patch
 
 
 class TestGetDailyPnlPct(unittest.TestCase):
     def setUp(self):
-        self.temp_db = tempfile.NamedTemporaryFile(suffix='.db', delete=False)
+        self.temp_db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
         self.db_path = self.temp_db.name
         self.temp_db.close()
 
@@ -35,26 +34,29 @@ class TestGetDailyPnlPct(unittest.TestCase):
 
     def test_returns_zero_when_balance_zero(self):
         from core.risk_engine import get_daily_pnl_pct
+
         pct, usd = get_daily_pnl_pct(self.db_path, 0.0)
         self.assertEqual(pct, 0.0)
         self.assertEqual(usd, 0.0)
 
     def test_returns_zero_when_balance_negative(self):
         from core.risk_engine import get_daily_pnl_pct
+
         pct, usd = get_daily_pnl_pct(self.db_path, -100.0)
         self.assertEqual(pct, 0.0)
 
     def test_calculates_pnl_correctly(self):
         from core.risk_engine import get_daily_pnl_pct
+
         conn = self._create_trades_table()
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         conn.executemany(
             "INSERT INTO trades (symbol, pnl, timestamp, is_shadow) VALUES (?, ?, ?, ?)",
             [
                 ("BTC/USDT", 10.0, f"{today} 10:00:00", 0),
                 ("ETH/USDT", 20.0, f"{today} 11:00:00", 0),
                 ("BTC/USDT", -5.0, f"{today} 12:00:00", 0),
-            ]
+            ],
         )
         conn.commit()
         conn.close()
@@ -65,14 +67,15 @@ class TestGetDailyPnlPct(unittest.TestCase):
 
     def test_ignores_shadow_trades(self):
         from core.risk_engine import get_daily_pnl_pct
+
         conn = self._create_trades_table()
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         conn.executemany(
             "INSERT INTO trades (symbol, pnl, timestamp, is_shadow) VALUES (?, ?, ?, ?)",
             [
                 ("BTC/USDT", 100.0, f"{today} 10:00:00", 0),
                 ("BTC/USDT", 50.0, f"{today} 11:00:00", 1),
-            ]
+            ],
         )
         conn.commit()
         conn.close()
@@ -82,12 +85,13 @@ class TestGetDailyPnlPct(unittest.TestCase):
 
     def test_ignores_other_days_trades(self):
         from core.risk_engine import get_daily_pnl_pct
+
         conn = self._create_trades_table()
         conn.executemany(
             "INSERT INTO trades (symbol, pnl, timestamp, is_shadow) VALUES (?, ?, ?, ?)",
             [
                 ("BTC/USDT", 100.0, "2025-01-01 10:00:00", 0),
-            ]
+            ],
         )
         conn.commit()
         conn.close()
@@ -98,6 +102,7 @@ class TestGetDailyPnlPct(unittest.TestCase):
     @patch("core.risk_engine.logging")
     def test_handles_db_error_gracefully(self, mock_logging):
         from core.risk_engine import get_daily_pnl_pct
+
         pct, usd = get_daily_pnl_pct("/nonexistent/path.db", 1000.0)
         self.assertIsNone(pct)
         self.assertIsNone(usd)
@@ -109,6 +114,7 @@ class TestRiskEngineDailyDrawdown(unittest.TestCase):
             with patch("core.risk_engine.HyperoptConfigLoader") as mock_hyperopt:
                 mock_hyperopt.is_enabled.return_value = False
                 from core.risk_engine import RiskEngine
+
                 self.engine = RiskEngine(brain=MagicMock())
 
     def test_check_daily_drawdown_fails_closed_when_unverified(self):
@@ -130,10 +136,11 @@ class TestRiskEngineDailyDrawdown(unittest.TestCase):
 
 class TestRiskEngineGetExitLevels(unittest.TestCase):
     def setUp(self):
-        with patch("core.risk_engine.CrashPredictor") as mock_crash:
+        with patch("core.risk_engine.CrashPredictor"):
             with patch("core.risk_engine.HyperoptConfigLoader") as mock_hyperopt:
                 mock_hyperopt.is_enabled.return_value = False
                 from core.risk_engine import RiskEngine
+
                 self.engine = RiskEngine(brain=MagicMock())
 
     def test_returns_invalid_entry_when_price_zero(self):
@@ -159,6 +166,7 @@ class TestRiskEngineGetExitLevels(unittest.TestCase):
 
         with patch("core.risk_engine.CrashPredictor"):
             from core.risk_engine import RiskEngine
+
             engine = RiskEngine(brain=MagicMock())
 
         sl, tp, label = engine.get_exit_levels(100.0, "BUY", 1.0, "UP")
@@ -180,6 +188,7 @@ class TestRiskEngineGetExitLevels(unittest.TestCase):
 
         with patch("core.risk_engine.CrashPredictor"):
             from core.risk_engine import RiskEngine
+
             engine = RiskEngine(brain=MagicMock())
 
         sl, tp, label = engine.get_exit_levels(100.0, "SELL", 1.0, "DOWN")
@@ -201,6 +210,7 @@ class TestRiskEngineGetExitLevels(unittest.TestCase):
 
         with patch("core.risk_engine.CrashPredictor"):
             from core.risk_engine import RiskEngine
+
             engine = RiskEngine(brain=MagicMock())
 
         sl, tp, label = engine.get_exit_levels(100.0, "BUY", 1.0, "UP", symbol="BTC/USDT")
@@ -220,10 +230,11 @@ class TestCalculatePositionSize(unittest.TestCase):
                     mock_config.MAX_RISK_USD = 1.0
                     mock_config.STOP_LOSS_ATR_MODIFIER = 1.0
                     from core.risk_engine import RiskEngine
+
                     self.engine = RiskEngine(brain=MagicMock())
 
     def test_returns_zero_when_capital_insufficient(self):
-        with patch.object(self.engine, 'hyperopt_enabled', False):
+        with patch.object(self.engine, "hyperopt_enabled", False):
             with patch("core.risk_engine.Config") as mock_config:
                 mock_config.MIN_NOTIONAL_VALUE = 100.0
                 mock_config.MAX_MARGIN_PERCENT = 1.0

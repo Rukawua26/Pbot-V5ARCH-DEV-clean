@@ -14,9 +14,7 @@ class BotSignalScanCycleTest(unittest.TestCase):
             update_radar=MagicMock(),
         )
         top_triage = [{"symbol": "BTC/USDT"}]
-        results = {
-            "BTC/USDT": {"data": None, "elapsed": -1, "error": "TIMEOUT"}
-        }
+        results = {"BTC/USDT": {"data": None, "elapsed": -1, "error": "TIMEOUT"}}
         signal_stats = {"BUY": 0, "SELL": 0, "NEUTRAL": 0, "REAL": 0, "SHADOW": 0, "VETO": 0}
 
         run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy=0.0)
@@ -35,9 +33,7 @@ class BotSignalScanCycleTest(unittest.TestCase):
             update_radar=MagicMock(),
         )
         top_triage = [{"symbol": "ETH/USDT"}]
-        results = {
-            "ETH/USDT": {"data": (None, None), "elapsed": 120, "error": None}
-        }
+        results = {"ETH/USDT": {"data": (None, None), "elapsed": 120, "error": None}}
         signal_stats = {"BUY": 0, "SELL": 0, "NEUTRAL": 0, "REAL": 0, "SHADOW": 0, "VETO": 0}
 
         run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy=0.0)

@@ -1,12 +1,11 @@
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pandas as pd
 
 from config import Config
 from core.strategy.regime_hmm import DynamicHMMRegime
-
 
 hmm_filter = DynamicHMMRegime(
     n_states=3,
@@ -28,8 +27,8 @@ def _snapshot_age_seconds(snapshot) -> float:
             return float("inf")
         parsed = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
+            parsed = parsed.replace(tzinfo=UTC)
+        return max(0.0, (datetime.now(UTC) - parsed).total_seconds())
     except Exception:
         return float("inf")
 
@@ -46,9 +45,7 @@ def _persist_hmm_snapshot_async(bot, snapshot) -> None:
     snapshot_ts = snapshot.get("ts")
     with _hmm_snapshot_persist_lock:
         now = time.monotonic()
-        min_interval = float(
-            getattr(Config, "MARKOV_SNAPSHOT_PERSIST_INTERVAL_SECONDS", 5 * 60)
-        )
+        min_interval = float(getattr(Config, "MARKOV_SNAPSHOT_PERSIST_INTERVAL_SECONDS", 5 * 60))
         if snapshot_ts == _last_hmm_snapshot_persist_ts:
             return
         if now - _last_hmm_snapshot_persist_monotonic < min_interval:
@@ -212,9 +209,7 @@ def _detect_market_regime_heuristic(bot, btc_data=None) -> str:
         if adx_values is None or len(adx_values) < 14:
             from tools.pandas_ta import adx
 
-            btc_data = adx(
-                btc_data["high"], btc_data["low"], btc_data["close"], length=14
-            )
+            btc_data = adx(btc_data["high"], btc_data["low"], btc_data["close"], length=14)
             adx_values = btc_data.get("ADX_14")
 
         if adx_values is None or len(adx_values) < 14:
@@ -274,9 +269,7 @@ def detect_market_regime(bot) -> str:
         regime, confidence = hmm_filter.predict_regime(btc_data)
         min_confidence = float(getattr(Config, "HMM_MIN_CONFIDENCE", 0.55))
         if regime == "UNKNOWN" or confidence < min_confidence:
-            bot.log(
-                f"⚠️ HMM regime fallback: regime={regime} confidence={confidence:.2f}"
-            )
+            bot.log(f"⚠️ HMM regime fallback: regime={regime} confidence={confidence:.2f}")
             regime = _detect_market_regime_heuristic(bot, btc_data)
             bot.market_regime = regime
             return regime

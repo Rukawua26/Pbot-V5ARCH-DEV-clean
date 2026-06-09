@@ -2,7 +2,6 @@ import asyncio
 import concurrent.futures
 import os
 import time
-from datetime import datetime
 
 import ccxt
 import pandas as pd
@@ -128,9 +127,7 @@ def run_triage_cycle(bot):
 
 
 def run_market_context_cycle(bot, tickers):
-    base_bal = (
-        bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
-    )
+    base_bal = bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
     pnl_real_hoy, _ = bot.brain.get_daily_real_pnl(base_bal)
 
     ws_btc_price = 0.0
@@ -178,10 +175,7 @@ def run_market_context_cycle(bot, tickers):
 
             ema_200, adx_14 = _resolve_btc_market_indicators(bot, btc_1h)
 
-            if (
-                not isinstance(bot.market_btc_price, (int, float))
-                or bot.market_btc_price <= 0
-            ):
+            if not isinstance(bot.market_btc_price, (int, float)) or bot.market_btc_price <= 0:
                 raise ValueError(f"market_btc_price inválido: {bot.market_btc_price}")
             if not isinstance(ema_200, (int, float)) or pd.isna(ema_200):
                 raise ValueError(f"ema_200 inválido: {ema_200}")
@@ -242,9 +236,7 @@ def prepare_top_triage(bot, triage_snapshot):
             {"tier": "IRON"},
         )
 
-    bot.log(
-        f"⚡ TRIAJE PARALELO: Disparando {len(top_triage)} hilos para datos frescos..."
-    )
+    bot.log(f"⚡ TRIAJE PARALELO: Disparando {len(top_triage)} hilos para datos frescos...")
     return top_triage
 
 
@@ -265,7 +257,7 @@ async def _fetch_triage_data_async(bot, top_triage):
                 )
                 await asyncio.sleep(0)
                 return sym_map, result, None
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 return sym_map, None, "TIMEOUT"
             except Exception as error:
                 return sym_map, None, error
@@ -339,9 +331,9 @@ def fetch_triage_data_parallel(bot, top_triage):
         thread_name_prefix="triage-fetch",
     ) as executor:
         future_to_sym = {
-            executor.submit(
-                bot._fetch_pair_data, item.get("symbol_raw", item["symbol"])
-            ): item["symbol"]
+            executor.submit(bot._fetch_pair_data, item.get("symbol_raw", item["symbol"])): item[
+                "symbol"
+            ]
             for item in top_triage
         }
         done, not_done = concurrent.futures.wait(
@@ -384,9 +376,7 @@ def finalize_scan_cycle(bot, signal_stats):
 
     suffix = bot.self_adjust_exigency()
     valid_signals = [
-        item
-        for item in bot.scanner_history
-        if "OK" in item["result"] or "SHADOW" in item["result"]
+        item for item in bot.scanner_history if "OK" in item["result"] or "SHADOW" in item["result"]
     ]
     if not valid_signals:
         if bot.current_sentiment[0] == "🔴 TENDENCIA BAJISTA":

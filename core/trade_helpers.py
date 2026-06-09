@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 import time
 from contextlib import nullcontext
-from typing import Any, Dict, Optional, Tuple
+from typing import Any
 
 from config import Config
 from core.execution_telemetry import append_execution_event
@@ -52,11 +52,11 @@ def _emergency_market_close(
     verify_flat: bool,
     persist_state: bool,
     halt_on_failure: bool,
-    trade: Optional[Dict] = None,
-    sl_error: Optional[str] = None,
+    trade: dict | None = None,
+    sl_error: str | None = None,
     append_event_fn=None,
     send_telegram_fn=None,
-) -> Tuple[bool, Dict]:
+) -> tuple[bool, dict]:
     started = time.perf_counter()
     close_ok = False
     last_close_error = ""
@@ -82,9 +82,7 @@ def _emergency_market_close(
                 close_ok = True
                 break
             last_close_error = "close order accepted but exchange position still open"
-            bot.log(
-                f"⚠️ EMERGENCY_CLOSE {symbol}: cierre no confirmado, exposición sigue abierta"
-            )
+            bot.log(f"⚠️ EMERGENCY_CLOSE {symbol}: cierre no confirmado, exposición sigue abierta")
         except Exception as close_error:
             last_close_error = str(close_error)
             bot.log(
@@ -140,9 +138,7 @@ def _emergency_market_close(
         with bot.lock:
             if symbol in bot.active_trades:
                 del bot.active_trades[symbol]
-        bot.log(
-            f"🧯 EMERGENCY CLOSE {symbol}: SL inválido por gap, cierre MARKET ejecutado"
-        )
+        bot.log(f"🧯 EMERGENCY CLOSE {symbol}: SL inválido por gap, cierre MARKET ejecutado")
 
     if not close_ok and halt_on_failure:
         bot.is_paused = True
@@ -182,9 +178,7 @@ def _emergency_market_close(
     return close_ok, result
 
 
-def _fail_safe_close_when_sl_missing(
-    bot, symbol: str, side: str, amount: float
-) -> bool:
+def _fail_safe_close_when_sl_missing(bot, symbol: str, side: str, amount: float) -> bool:
     close_ok, _result = _emergency_market_close(
         bot=bot,
         symbol=symbol,
@@ -197,7 +191,7 @@ def _fail_safe_close_when_sl_missing(
     return close_ok
 
 
-def _validate_entry_preconditions(bot, symbol: str, is_shadow: bool) -> Optional[str]:
+def _validate_entry_preconditions(bot, symbol: str, is_shadow: bool) -> str | None:
     existing_state = (getattr(bot, "active_trades", {}) or {}).get(symbol)
     decision = evaluate_entry_risk_decision(
         bot,
@@ -214,7 +208,7 @@ def _validate_entry_preconditions(bot, symbol: str, is_shadow: bool) -> Optional
     return None
 
 
-def _validate_symbol_entry(bot, symbol: str, is_shadow: bool) -> Optional[str]:
+def _validate_symbol_entry(bot, symbol: str, is_shadow: bool) -> str | None:
     symbol_base = symbol.split("/")[0]
     controls = bot._load_runtime_symbol_controls()
     if symbol_base in controls.get("blocked", set()):
@@ -224,9 +218,7 @@ def _validate_symbol_entry(bot, symbol: str, is_shadow: bool) -> Optional[str]:
     if not is_shadow:
         execution = getattr(bot, "execution", None)
         is_quarantined = getattr(execution, "is_symbol_quarantined", None)
-        get_remaining = getattr(
-            execution, "get_symbol_quarantine_remaining_seconds", None
-        )
+        get_remaining = getattr(execution, "get_symbol_quarantine_remaining_seconds", None)
         if callable(is_quarantined) and is_quarantined(symbol):
             remaining_s = int(get_remaining(symbol) if callable(get_remaining) else 0)
             bot.log(
@@ -238,11 +230,11 @@ def _validate_symbol_entry(bot, symbol: str, is_shadow: bool) -> Optional[str]:
 
 
 def _calculate_pnl_and_metrics(
-    trade: Dict[str, Any],
+    trade: dict[str, Any],
     exit_price: float,
     fees: float,
     side: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     amt = float(trade["amount"])
     pnl_core = _calculate_trade_pnl(
         side=side,
@@ -252,9 +244,7 @@ def _calculate_pnl_and_metrics(
         leverage=trade.get("leverage", 1),
         fee_usd=float(fees or 0.0),
         margin_used=trade.get("margin_used"),
-        percent_on_margin=bool(
-            trade.get("is_shadow", False) or trade.get("simulated_real", False)
-        ),
+        percent_on_margin=bool(trade.get("is_shadow", False) or trade.get("simulated_real", False)),
     )
     pnl_bruto_usd = pnl_core["gross_usd"]
     pnl_neto_usd = pnl_core["net_usd"]
@@ -297,7 +287,7 @@ def _calculate_trade_pnl(
     fee_rate: float | None = None,
     margin_used: float | None = None,
     percent_on_margin: bool = False,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     entry = float(entry_price or 0.0)
     exit_val = float(exit_price or 0.0)
     qty = float(amount or 0.0)
@@ -331,7 +321,7 @@ def _calculate_trade_pnl(
     }
 
 
-def _reserve_simulated_margin(bot, trade: Dict[str, Any]) -> tuple[bool, str]:
+def _reserve_simulated_margin(bot, trade: dict[str, Any]) -> tuple[bool, str]:
     margin_used = float(trade.get("margin_used") or 0.0)
     if margin_used <= 0.0:
         return True, "NO_MARGIN_REQUIRED"
@@ -340,14 +330,17 @@ def _reserve_simulated_margin(bot, trade: Dict[str, Any]) -> tuple[bool, str]:
     with ctx:
         available = float(getattr(bot, "available_balance", 0.0) or 0.0)
         if available + 1e-9 < margin_used:
-            return False, f"SIM_BALANCE_INSUFFICIENT available=${available:.2f} margin=${margin_used:.2f}"
+            return (
+                False,
+                f"SIM_BALANCE_INSUFFICIENT available=${available:.2f} margin=${margin_used:.2f}",
+            )
         bot.available_balance = available - margin_used
     trade["margin_reserved"] = True
     trade["margin_released"] = False
     return True, "RESERVED"
 
 
-def _release_simulated_margin(bot, trade: Dict[str, Any], pnl_usd: float) -> bool:
+def _release_simulated_margin(bot, trade: dict[str, Any], pnl_usd: float) -> bool:
     if not (trade.get("is_shadow", False) or trade.get("simulated_real", False)):
         return False
     if trade.get("margin_released", False):
@@ -358,7 +351,9 @@ def _release_simulated_margin(bot, trade: Dict[str, Any], pnl_usd: float) -> boo
     with ctx:
         bot.balance = float(getattr(bot, "balance", 0.0) or 0.0) + float(pnl_usd or 0.0)
         bot.available_balance = (
-            float(getattr(bot, "available_balance", 0.0) or 0.0) + margin_used + float(pnl_usd or 0.0)
+            float(getattr(bot, "available_balance", 0.0) or 0.0)
+            + margin_used
+            + float(pnl_usd or 0.0)
         )
     trade["margin_released"] = True
     return True
@@ -370,7 +365,7 @@ def _safe_log_signal_alert(bot, **kwargs) -> None:
     lock = getattr(bot, "db_lock", None)
     if not callable(method):
         return
-    with (lock or nullcontext()):
+    with lock or nullcontext():
         method(**kwargs)
 
 
@@ -380,25 +375,21 @@ def _safe_update_signal_alert_status(bot, entry_client_order_id, status) -> None
     lock = getattr(bot, "db_lock", None)
     if not callable(method):
         return
-    with (lock or nullcontext()):
+    with lock or nullcontext():
         method(entry_client_order_id, status)
 
 
 def _order_looks_filled(order: dict) -> bool:
     if not isinstance(order, dict):
         return False
-    status = str(
-        order.get("status") or (order.get("info") or {}).get("status") or ""
-    ).lower()
+    status = str(order.get("status") or (order.get("info") or {}).get("status") or "").lower()
     return status in {"closed", "filled"}
 
 
 def _exchange_position_is_flat(bot, symbol: str) -> bool:
     fetch_positions = getattr(getattr(bot, "execution", None), "fetch_positions", None)
     if not callable(fetch_positions):
-        raise RuntimeError(
-            "No se puede confirmar exposición cero: fetch_positions no disponible"
-        )
+        raise RuntimeError("No se puede confirmar exposición cero: fetch_positions no disponible")
 
     positions = fetch_positions() or []
     for pos in positions:
@@ -427,7 +418,7 @@ def _sanitize_context(bot, context):
 def _get_local_open_trade_counts(bot):
     """
     Conteo local de trades abiertos (solo para PAPER_MODE).
-    
+
     FALLBACK POLICY (conservadora):
     Si falla la lectura de active_trades o estados persistidos,
     retornamos los MAXIMOS permitidos. Esto es fail-closed intencional:

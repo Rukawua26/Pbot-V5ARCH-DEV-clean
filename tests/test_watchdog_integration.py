@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
 """Integration tests for watchdog system (heartbeat write + external supervisor)."""
 
-import os
 import json
+import os
 import time
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from core.watchdog import (
-    write_watchdog_heartbeat,
-    resolve_watchdog_heartbeat_path,
     DEFAULT_WATCHDOG_HEARTBEAT_PATH,
     FALLBACK_WATCHDOG_HEARTBEAT_PATH,
+    resolve_watchdog_heartbeat_path,
+    write_watchdog_heartbeat,
 )
 
 
@@ -56,7 +56,7 @@ class TestWatchdogHeartbeatWrite(unittest.TestCase):
     def test_write_creates_valid_json(self):
         write_watchdog_heartbeat(self.bot, path=self.tmp_path, min_interval_s=0)
         self.assertTrue(os.path.exists(self.tmp_path))
-        with open(self.tmp_path, "r", encoding="utf-8") as f:
+        with open(self.tmp_path, encoding="utf-8") as f:
             payload = json.load(f)
         self.assertEqual(payload["status"], "alive")
         self.assertIn("ts", payload)
@@ -93,6 +93,7 @@ class TestWatchdogSupervisor(unittest.TestCase):
 
     def test_read_missing_heartbeat_returns_zero(self):
         from tools.watchdog_supervisor import read_heartbeat_ts
+
         ts = read_heartbeat_ts(Path("/tmp/nonexistent_heartbeat_12345.json"))
         self.assertEqual(ts, 0.0)
 

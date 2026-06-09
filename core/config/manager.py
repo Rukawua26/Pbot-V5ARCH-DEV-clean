@@ -1,9 +1,19 @@
 from core.config.env_helpers import (
     _CONFIG_ENV_WARNINGS as _CONFIG_ENV_WARNINGS,
+)
+from core.config.env_helpers import (
     env_bool as _env_bool,
+)
+from core.config.env_helpers import (
     env_float as _env_float,
+)
+from core.config.env_helpers import (
     env_int as _env_int,
+)
+from core.config.env_helpers import (
     env_list as _env_list,
+)
+from core.config.env_helpers import (
     get_env_warnings,
 )
 from core.config.operational import OperationalConfig
@@ -20,9 +30,7 @@ class Config(OperationalConfig, StrategyConfig):
     MAX_SPREAD_THRESHOLD = _env_float("MAX_SPREAD_THRESHOLD", 0.008)
     MAX_SLIPPAGE = _env_float("MAX_SLIPPAGE", 0.001)
     VIRTUAL_FEE = _env_float("VIRTUAL_FEE", 0.001)
-    ENTRY_IOC_CONFIRM_TIMEOUT_SECONDS = _env_float(
-        "ENTRY_IOC_CONFIRM_TIMEOUT_SECONDS", 2.0
-    )
+    ENTRY_IOC_CONFIRM_TIMEOUT_SECONDS = _env_float("ENTRY_IOC_CONFIRM_TIMEOUT_SECONDS", 2.0)
     BTC_RISK_MAX_PRICE_AGE_SECONDS = _env_float("BTC_RISK_MAX_PRICE_AGE_SECONDS", 90.0)
     HALT_RECOVERY_MAX_ATTEMPTS = _env_int("HALT_RECOVERY_MAX_ATTEMPTS", 5)
 
@@ -65,7 +73,7 @@ class Config(OperationalConfig, StrategyConfig):
         },
         "FULL_INSTITUTIONAL": {
             # Todos los flags en True (estado actual)
-        }
+        },
     }
 
     # --- HMM/Markov regime probability controls ---
@@ -75,18 +83,12 @@ class Config(OperationalConfig, StrategyConfig):
     MARKOV_RANGE_STANDARD_WEIGHT = _env_float("MARKOV_RANGE_STANDARD_WEIGHT", 0.75)
     MARKOV_BULL_STRONG_WEIGHT = _env_float("MARKOV_BULL_STRONG_WEIGHT", 1.10)
     MARKOV_BEAR_STRONG_WEIGHT = _env_float("MARKOV_BEAR_STRONG_WEIGHT", 1.10)
-    MARKOV_SNAPSHOT_MAX_AGE_SECONDS = _env_float(
-        "MARKOV_SNAPSHOT_MAX_AGE_SECONDS", 2 * 60 * 60
-    )
-    MARKOV_SNAPSHOT_STALE_SECONDS = _env_float(
-        "MARKOV_SNAPSHOT_STALE_SECONDS", 6 * 60 * 60
-    )
+    MARKOV_SNAPSHOT_MAX_AGE_SECONDS = _env_float("MARKOV_SNAPSHOT_MAX_AGE_SECONDS", 2 * 60 * 60)
+    MARKOV_SNAPSHOT_STALE_SECONDS = _env_float("MARKOV_SNAPSHOT_STALE_SECONDS", 6 * 60 * 60)
     MARKOV_SNAPSHOT_PERSIST_INTERVAL_SECONDS = _env_float(
         "MARKOV_SNAPSHOT_PERSIST_INTERVAL_SECONDS", 5 * 60
     )
-    MARKOV_PREVETO_BEARISH_REVERSAL_MIN = _env_float(
-        "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0
-    )
+    MARKOV_PREVETO_BEARISH_REVERSAL_MIN = _env_float("MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0)
     BEAR_COUNTER_WEIGHT = _env_float("BEAR_COUNTER_WEIGHT", 0.70)
 
     # --- BEAR_TREND pair universe reduction ---
@@ -104,12 +106,8 @@ class Config(OperationalConfig, StrategyConfig):
     BREAKOUT_WATCH_ENABLED = _env_bool("BREAKOUT_WATCH_ENABLED", True)
     BREAKOUT_MIN_IA_PROB = _env_float("BREAKOUT_MIN_IA_PROB", 55.0)
     BREAKOUT_SHOCK_MIN_IA_PROB = _env_float("BREAKOUT_SHOCK_MIN_IA_PROB", 50.0)
-    BREAKOUT_WATCH_COHERENCE_ENABLED = _env_bool(
-        "BREAKOUT_WATCH_COHERENCE_ENABLED", True
-    )
-    BREAKOUT_COHERENCE_MIN_IA_PROB = _env_float(
-        "BREAKOUT_COHERENCE_MIN_IA_PROB", 50.0
-    )
+    BREAKOUT_WATCH_COHERENCE_ENABLED = _env_bool("BREAKOUT_WATCH_COHERENCE_ENABLED", True)
+    BREAKOUT_COHERENCE_MIN_IA_PROB = _env_float("BREAKOUT_COHERENCE_MIN_IA_PROB", 50.0)
     BREAKOUT_BUFFER_PCT = _env_float("BREAKOUT_BUFFER_PCT", 0.5)
     BREAKOUT_VOLUME_MULT = _env_float("BREAKOUT_VOLUME_MULT", 1.5)
     BREAKOUT_TIMEOUT_MINUTES = _env_int("BREAKOUT_TIMEOUT_MINUTES", 60)
@@ -256,7 +254,9 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append("RISK_PER_TRADE_PERCENT debe estar en (0, 5]")
         if int(cls.MAX_OPEN_TRADES) < 0 or int(cls.MAX_OPEN_TRADES) > 20:
             errors.append("MAX_OPEN_TRADES debe estar entre 0 y 20")
-        if int(cls.MAX_DIRECTIONAL_TRADES) < 0 or int(cls.MAX_DIRECTIONAL_TRADES) > int(cls.MAX_OPEN_TRADES):
+        if int(cls.MAX_DIRECTIONAL_TRADES) < 0 or int(cls.MAX_DIRECTIONAL_TRADES) > int(
+            cls.MAX_OPEN_TRADES
+        ):
             errors.append("MAX_DIRECTIONAL_TRADES debe estar entre 0 y MAX_OPEN_TRADES")
         if float(cls.SHADOW_MODE_MIN) >= float(cls.REAL_MODE_THRESHOLD):
             errors.append("SHADOW_MODE_MIN debe ser menor que REAL_MODE_THRESHOLD")
@@ -269,7 +269,9 @@ class Config(OperationalConfig, StrategyConfig):
         if int(cls.HALT_RECOVERY_MAX_ATTEMPTS) < 1:
             errors.append("HALT_RECOVERY_MAX_ATTEMPTS debe ser >= 1")
 
-        total_weight = cls.XGB_WEIGHT + cls.LGB_WEIGHT + cls.RF_WEIGHT + cls.GB_WEIGHT + cls.LR_WEIGHT
+        total_weight = (
+            cls.XGB_WEIGHT + cls.LGB_WEIGHT + cls.RF_WEIGHT + cls.GB_WEIGHT + cls.LR_WEIGHT
+        )
         if not (0.99 <= float(total_weight) <= 1.01):
             errors.append("La suma de pesos ML debe estar cerca de 1.0")
         return errors

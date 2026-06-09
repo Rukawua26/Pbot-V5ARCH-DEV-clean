@@ -32,11 +32,10 @@ Endpoint Weights (Futures):
 - GET /fapi/v1/premiumIndex (all): 10
 """
 
-import time
-import threading
 import logging
+import threading
+import time
 from collections import defaultdict
-from typing import Dict, Tuple, Optional
 
 logger = logging.getLogger("APIWeightTracker")
 
@@ -138,9 +137,7 @@ class BinanceWeightTracker:
         else:
             logger.info(f"ℹ️ {message}")
 
-    def track(
-        self, endpoint: str, weight: Optional[int] = None, category: str = "market"
-    ):
+    def track(self, endpoint: str, weight: int | None = None, category: str = "market"):
         """
         Track an API call with its weight.
 
@@ -170,9 +167,7 @@ class BinanceWeightTracker:
 
             # Clean old entries (older than 60 seconds)
             cutoff = now - 60
-            self._weight_log = [
-                (t, w, e, c) for t, w, e, c in self._weight_log if t > cutoff
-            ]
+            self._weight_log = [(t, w, e, c) for t, w, e, c in self._weight_log if t > cutoff]
 
             # Clean old order entries (older than 10 seconds)
             order_cutoff = now - 10
@@ -281,7 +276,7 @@ class BinanceWeightTracker:
         """Get current usage as percentage of limit"""
         return self.get_current_weight() / self.WEIGHT_LIMIT_PER_MINUTE * 100
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """Get comprehensive status report"""
         now = time.time()
 
@@ -358,9 +353,7 @@ class BinanceWeightTracker:
                 status["endpoints"].items(), key=lambda x: x[1]["weight"], reverse=True
             )[:5]
             for ep, data in sorted_endpoints:
-                lines.append(
-                    f"     {ep}: {data['count']} calls, {data['weight']} weight"
-                )
+                lines.append(f"     {ep}: {data['count']} calls, {data['weight']} weight")
 
         if status["categories"]:
             lines.append("   Categories:")

@@ -1,27 +1,22 @@
-import os
-import time
 import json
-import threading
-import pandas as pd
 import logging
-import ccxt
+import os
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional, Dict, List
+from importlib.util import find_spec
+
+import ccxt
+import pandas as pd
+
 from config import Config
 
 logger = logging.getLogger("SniperAI")
 
 # [v118] Directorio base del módulo para rutas absolutas de caché
-_BASE_DIR = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
-)  # raíz del proyecto
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # raíz del proyecto
 
-try:
-    import pyarrow
-
-    HAS_PARQUET = True
-except ImportError:
-    HAS_PARQUET = False
+HAS_PARQUET = find_spec("pyarrow") is not None
 
 
 class DataService:
@@ -46,9 +41,7 @@ class DataService:
             max_workers=1, thread_name_prefix="maturity-save"
         )
         # [v118] Rutas absolutas ancladas al directorio raíz del proyecto
-        self.maturity_file = os.path.join(
-            _BASE_DIR, "data_storage", "maturity_cache.json"
-        )
+        self.maturity_file = os.path.join(_BASE_DIR, "data_storage", "maturity_cache.json")
         self.cache_dir = os.path.join(_BASE_DIR, "data_storage", "candles")
         os.makedirs(self.cache_dir, exist_ok=True)
         self.load_maturity_cache()
@@ -74,9 +67,7 @@ class DataService:
             return
 
         files = [
-            f
-            for f in os.listdir(self.cache_dir)
-            if f.endswith(".parquet") or f.endswith(".pkl")
+            f for f in os.listdir(self.cache_dir) if f.endswith(".parquet") or f.endswith(".pkl")
         ]
         count = 0
         for f in files:
@@ -113,7 +104,6 @@ class DataService:
     def _write_cache_snapshot(self, snapshot):
         for key, df_to_save in snapshot.items():
             try:
-
                 # [v118] Sanitizar nombre de archivo (reemplazar / para evitar error de subdirectorio)
                 safe_key = key.replace("/", "_").replace(":", "_")
                 if HAS_PARQUET:
@@ -151,11 +141,13 @@ class DataService:
         start_t = time.perf_counter()
         if os.path.exists(self.maturity_file):
             try:
-                with open(self.maturity_file, "r") as f:
+                with open(self.maturity_file) as f:
                     self.maturity_cache = json.load(f)
                 self._last_maturity_hash = hash(json.dumps(self.maturity_cache, sort_keys=True))
                 elapsed = (time.perf_counter() - start_t) * 1000
-                logger.info(f"💾 Maturity cache cargado en {elapsed:.2f}ms ({len(self.maturity_cache)} pares)")
+                logger.info(
+                    f"💾 Maturity cache cargado en {elapsed:.2f}ms ({len(self.maturity_cache)} pares)"
+                )
             except Exception:
                 self.maturity_cache = {}
 
@@ -183,14 +175,12 @@ class DataService:
         tf_ms = tf_seconds * 1000
         since_ms = now_ms - (int(days) * 24 * 60 * 60 * 1000)
 
-        all_rows: List[List[float]] = []
+        all_rows: list[list[float]] = []
         cursor = since_ms
         safety_counter = 0
         max_iterations = 200
 
-        logger.info(
-            f"📥 Descargando histórico {symbol} {timeframe} ({days} días) desde Binance..."
-        )
+        logger.info(f"📥 Descargando histórico {symbol} {timeframe} ({days} días) desde Binance...")
 
         while cursor < now_ms and safety_counter < max_iterations:
             batch = self.exchange.fetch_ohlcv(
@@ -216,13 +206,9 @@ class DataService:
             time.sleep(0.05)
 
         if not all_rows:
-            raise RuntimeError(
-                f"No se pudieron descargar velas para {symbol} {timeframe}"
-            )
+            raise RuntimeError(f"No se pudieron descargar velas para {symbol} {timeframe}")
 
-        df = pd.DataFrame(
-            all_rows, columns=["time", "open", "high", "low", "close", "volume"]
-        )
+        df = pd.DataFrame(all_rows, columns=["time", "open", "high", "low", "close", "volume"])
         df = self._clean_df(df)
         df = df[(df["time"] >= since_ms) & (df["time"] <= now_ms)].copy()
 
@@ -244,8 +230,8 @@ class DataService:
         self,
         symbol: str,
         days: int = 60,
-        timeframes: Optional[List[str]] = None,
-    ) -> Dict[str, pd.DataFrame]:
+        timeframes: list[str] | None = None,
+    ) -> dict[str, pd.DataFrame]:
         """Descarga histórico multiescala y lo guarda en parquet.
 
         Por defecto descarga 15m y 1h para setup swing.
@@ -253,11 +239,9 @@ class DataService:
         if timeframes is None:
             timeframes = ["15m", "1h"]
 
-        out: Dict[str, pd.DataFrame] = {}
+        out: dict[str, pd.DataFrame] = {}
         for tf in timeframes:
-            out[tf] = self.download_historical_data(
-                symbol=symbol, timeframe=tf, days=days
-            )
+            out[tf] = self.download_historical_data(symbol=symbol, timeframe=tf, days=days)
         return out
 
     def save_maturity_cache(self):
@@ -278,8 +262,10 @@ class DataService:
             self._last_maturity_hash = current_hash
             self._maturity_last_save_ts = time.time()
             elapsed = (time.perf_counter() - start_t) * 1000
-            logger.info(f"💾 Maturity cache actualizado: {elapsed:.2f}ms | Items: {len(self.maturity_cache)}")
-        except (IOError, OSError) as e:
+            logger.info(
+                f"💾 Maturity cache actualizado: {elapsed:.2f}ms | Items: {len(self.maturity_cache)}"
+            )
+        except OSError as e:
             logger.warning(f"⚠️ Error guardando maturity cache: {e}")
 
     def _snapshot_maturity_cache_for_save(self) -> dict:
@@ -301,7 +287,7 @@ class DataService:
             logger.info(
                 f"💾 Maturity cache actualizado async: {elapsed:.2f}ms | Items: {len(snapshot)}"
             )
-        except (IOError, OSError) as e:
+        except OSError as e:
             logger.warning(f"⚠️ Error guardando maturity cache async: {e}")
 
     def save_maturity_cache_async(self, force: bool = False) -> bool:
@@ -347,11 +333,12 @@ class DataService:
         self,
         symbol: str,
         timeframe: str,
-        pairs_to_scan: Optional[List[str]] = None,
+        pairs_to_scan: list[str] | None = None,
         fast_mode: bool = False,
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         cache_key = f"{symbol}_{timeframe}"
-        since, limit = None, Config.CANDLE_FETCH_LIMIT
+        since: int | None = None
+        limit: int | None = Config.CANDLE_FETCH_LIMIT
         expected_cols = ["time", "open", "high", "low", "close", "volume"]
 
         _CACHE_TTL = {"15m": 90, "1h": 330, "4h": 3600}
@@ -379,16 +366,12 @@ class DataService:
         retries = 1 if fast_mode else 2
         for i in range(retries):
             try:
-                ohlcv = self.exchange.fetch_ohlcv(
-                    symbol, timeframe, since=since, limit=limit
-                )
+                ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, since=since, limit=limit)
                 self._track_api_weight("fetch_ohlcv", 1, "market")
                 break
             except (ccxt.NetworkError, ccxt.ExchangeError) as e:
                 if i == retries - 1:
-                    logger.error(
-                        f"🚫 Error fatal fetch {symbol} ({timeframe}): {e}"
-                    )
+                    logger.error(f"🚫 Error fatal fetch {symbol} ({timeframe}): {e}")
                     return prev_df
                 time.sleep(0.15 if fast_mode else (i + 1) ** 2)
 
@@ -404,9 +387,7 @@ class DataService:
                 return prev_df
 
         combined = (
-            pd.concat([prev_df, new_df], ignore_index=True)
-            if prev_df is not None
-            else new_df
+            pd.concat([prev_df, new_df], ignore_index=True) if prev_df is not None else new_df
         )
         updated = self._clean_df(combined).tail(Config.CANDLE_FETCH_LIMIT)
         updated = updated[expected_cols].copy()
@@ -417,15 +398,13 @@ class DataService:
         # Gestión de memoria del caché
         if len(self.data_cache) > 50 and pairs_to_scan:
             symbols_to_keep = set(pairs_to_scan[:30])
-            keys_to_delete = [
-                k for k in self.data_cache if k.split("_")[0] not in symbols_to_keep
-            ]
+            keys_to_delete = [k for k in self.data_cache if k.split("_")[0] not in symbols_to_keep]
             for k in keys_to_delete[:20]:
                 del self.data_cache[k]
 
         return updated
 
-    def sanitize_context(self, context: Optional[Dict]) -> Dict:
+    def sanitize_context(self, context: dict | None) -> dict:
         """Elimina objetos no serializables (DataFrames) del contexto para guardar en DB."""
         if not context:
             return {}

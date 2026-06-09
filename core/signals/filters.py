@@ -1,3 +1,5 @@
+from datetime import UTC
+
 from config import Config
 from core.cooldown_state import is_symbol_in_cooldown
 from core.execution_telemetry import append_execution_event
@@ -17,15 +19,15 @@ def _normalize_filter_reason(reason):
 
 def _snapshot_age_seconds(snapshot):
     try:
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         ts_raw = snapshot.get("ts") if isinstance(snapshot, dict) else None
         if not ts_raw:
             return float("inf")
         parsed = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
-        return max(0.0, (datetime.now(timezone.utc) - parsed).total_seconds())
+            parsed = parsed.replace(tzinfo=UTC)
+        return max(0.0, (datetime.now(UTC) - parsed).total_seconds())
     except Exception:
         return float("inf")
 
@@ -45,9 +47,13 @@ def _get_markov_snapshot_mode(snapshot):
 
 def _signal_markov_probability(snapshot, audit_signal):
     if audit_signal == "BUY":
-        return float(snapshot.get("bullish_breakout_prob", snapshot.get("breakout_prob", 50.0)) or 0.0)
+        return float(
+            snapshot.get("bullish_breakout_prob", snapshot.get("breakout_prob", 50.0)) or 0.0
+        )
     if audit_signal == "SELL":
-        return float(snapshot.get("bearish_reversal_prob", snapshot.get("breakout_prob", 50.0)) or 0.0)
+        return float(
+            snapshot.get("bearish_reversal_prob", snapshot.get("breakout_prob", 50.0)) or 0.0
+        )
     return float(snapshot.get("breakout_prob", 50.0) or 50.0)
 
 
@@ -208,9 +214,7 @@ def _evaluate_bootstrap_heuristic(audit_signal, ctx):
     ema = float(ctx.get("ema", close) or close)
 
     hits = []
-    if (audit_signal == "BUY" and close >= ema) or (
-        audit_signal == "SELL" and close <= ema
-    ):
+    if (audit_signal == "BUY" and close >= ema) or (audit_signal == "SELL" and close <= ema):
         hits.append("EMA_ALIGN")
     if adx >= 18.0:
         hits.append("ADX_OK")
@@ -392,19 +396,11 @@ def _apply_entry_filters_and_adjust_prob(
         )
 
     # [BEAR_TREND PREVETO] Veto directo si hay alta probabilidad de reversión alcista
-    if (
-        filter_passed
-        and audit_signal == "BUY"
-        and btc_regime == "BEAR_TREND"
-    ):
-        bearish_reversal_min = float(
-            getattr(Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0)
-        )
+    if filter_passed and audit_signal == "BUY" and btc_regime == "BEAR_TREND":
+        bearish_reversal_min = float(getattr(Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0))
         hmm_data = ctx.get("hmm_data") if isinstance(ctx, dict) else None
         if isinstance(hmm_data, dict) and hmm_data.get("is_ready"):
-            reversal_prob = float(
-                hmm_data.get("bearish_reversal_prob", 0.0) or 0.0
-            )
+            reversal_prob = float(hmm_data.get("bearish_reversal_prob", 0.0) or 0.0)
             if reversal_prob >= bearish_reversal_min:
                 filter_passed = False
                 filter_reason = (
@@ -436,9 +432,7 @@ def _apply_entry_filters_and_adjust_prob(
                     price_prev = float(df_main["close"].iloc[-5])
                     if price_prev > 0:
                         delta_price_pct = (price_now - price_prev) / price_prev
-                oi_verdict = validate_signal_with_oi(
-                    audit_signal, delta_price_pct, oi_delta_pct
-                )
+                oi_verdict = validate_signal_with_oi(audit_signal, delta_price_pct, oi_delta_pct)
                 if isinstance(ctx, dict):
                     ctx["oi_verdict"] = oi_verdict
                 if oi_verdict == "VETO":
@@ -461,8 +455,7 @@ def _apply_entry_filters_and_adjust_prob(
                     )
                 elif oi_verdict == "CONFIRMED":
                     bot.log(
-                        f"✅ {symbol}: OI confirma {audit_signal} "
-                        f"(OI Δ=+{oi_delta_pct * 100:.2f}%)"
+                        f"✅ {symbol}: OI confirma {audit_signal} (OI Δ=+{oi_delta_pct * 100:.2f}%)"
                     )
         except Exception as oi_err:
             bot.log(f"⚠️ {symbol}: OI filter error (ignorado): {oi_err}")
@@ -520,9 +513,7 @@ def _apply_entry_filters_and_adjust_prob(
                         f"shock={float(shock_level):.6f} dist={shock_dist_pct:.2f}%"
                     )
             filter_passed = False
-            filter_reason = (
-                f"SHOCK DEMASIADO CERCA ({shock_dist_pct:.2f}% < {min_shock_dist:.2f}%)"
-            )
+            filter_reason = f"SHOCK DEMASIADO CERCA ({shock_dist_pct:.2f}% < {min_shock_dist:.2f}%)"
 
     # [MTF FILTER] 1h mantiene ownership; 15m/5m solo confirman o vetan entrada.
     if filter_passed and audit_signal in ["BUY", "SELL"]:
@@ -543,9 +534,7 @@ def _apply_entry_filters_and_adjust_prob(
     breakout_ready = False
     breakout_info = None
     if not range_veto and bool(getattr(Config, "BREAKOUT_WATCH_ENABLED", True)):
-        breakout_ready, breakout_info = bot.breakout_agent.evaluate_breakout(
-            symbol, df_main
-        )
+        breakout_ready, breakout_info = bot.breakout_agent.evaluate_breakout(symbol, df_main)
         if breakout_ready and breakout_info is not None:
             bot.log(
                 f"🚀 BREAKOUT_READY {symbol} side={breakout_info['side']} "
@@ -575,9 +564,7 @@ def _apply_entry_filters_and_adjust_prob(
 
     # Loguear pesos
     if day_weight > 1.1 or hour_weight > 1.1:
-        bot.log(
-            f"⚡ {symbol}: Día x{day_weight:.2f}, Hora x{hour_weight:.2f} - MEJOR MOMENTO!"
-        )
+        bot.log(f"⚡ {symbol}: Día x{day_weight:.2f}, Hora x{hour_weight:.2f} - MEJOR MOMENTO!")
 
     # Aplicar pesos de día/hora.
     day_weight = ctx.get("day_weight", 1.0)
@@ -607,9 +594,7 @@ def _apply_entry_filters_and_adjust_prob(
         prob_final = min(original_prob * final_weight, 100)
 
     if final_weight != 1.0:
-        bot.log(
-            f"⚖️ {symbol}: Prob {original_prob:.1f} → {prob_final:.1f} (x{final_weight:.2f})"
-        )
+        bot.log(f"⚖️ {symbol}: Prob {original_prob:.1f} → {prob_final:.1f} (x{final_weight:.2f})")
 
     if bool(getattr(bot, "bootstrap_heuristic_mode", False)):
         bootstrap = _evaluate_bootstrap_heuristic(audit_signal, ctx)
@@ -681,18 +666,14 @@ def _plan_execution_mode(
         and bool(ctx.get("breakout_ready", False))
         and "SHOCK DEMASIADO CERCA" in str(filter_reason)
         and prob_final
-        >= max(
-            SHADOW_MIN_THRESHOLD, float(getattr(Config, "BREAKOUT_MIN_IA_PROB", 60.0))
-        )
+        >= max(SHADOW_MIN_THRESHOLD, float(getattr(Config, "BREAKOUT_MIN_IA_PROB", 60.0)))
     ):
         breakout_shadow_override = True
         is_shadow_exec = True
         should_execute = True
         bot.breakout_overrides_today += 1
         audit_verdict = f"🧪 BREAKOUT SHADOW READY (IA {prob_final:.1f}%)"
-        bot.log(
-            f"🧨 BREAKOUT OVERRIDE SHADOW: {symbol} [{audit_signal}] IA={prob_final:.1f}%"
-        )
+        bot.log(f"🧨 BREAKOUT OVERRIDE SHADOW: {symbol} [{audit_signal}] IA={prob_final:.1f}%")
 
     if bool(getattr(Config, "DIRECTIONAL_COHERENCE_FILTER", True)):
         sentiment_label = str(bot.current_sentiment[0])
@@ -720,9 +701,7 @@ def _plan_execution_mode(
                         trend=str(ctx.get("trend", "RANGO")) if ctx else "RANGO",
                         metadata={
                             "source": "COHERENCE_VETO",
-                            "shock_dist_pct": ctx.get("shock_dist_pct")
-                            if ctx
-                            else None,
+                            "shock_dist_pct": ctx.get("shock_dist_pct") if ctx else None,
                             "regime": bot._get_market_regime(),
                             "sentiment": sentiment_label,
                             "reason": filter_reason,
@@ -757,9 +736,7 @@ def _plan_execution_mode(
                         trend=str(ctx.get("trend", "RANGO")) if ctx else "RANGO",
                         metadata={
                             "source": "COHERENCE_VETO",
-                            "shock_dist_pct": ctx.get("shock_dist_pct")
-                            if ctx
-                            else None,
+                            "shock_dist_pct": ctx.get("shock_dist_pct") if ctx else None,
                             "regime": bot._get_market_regime(),
                             "sentiment": sentiment_label,
                             "reason": filter_reason,
@@ -803,16 +780,8 @@ def _plan_execution_mode(
             should_execute = True
             bot.log(f"🧪 DISPARO SHADOW: {symbol} confianza {prob_final:.1f}%")
 
-    if (
-        not should_execute
-        and audit_signal != "NEUTRAL"
-        and prob_final >= SHADOW_MIN_THRESHOLD
-    ):
-        if (
-            "SCOUT" in audit_verdict
-            or "OK" in audit_verdict
-            or "CONCESIÓN" in audit_verdict
-        ):
+    if not should_execute and audit_signal != "NEUTRAL" and prob_final >= SHADOW_MIN_THRESHOLD:
+        if "SCOUT" in audit_verdict or "OK" in audit_verdict or "CONCESIÓN" in audit_verdict:
             is_shadow_exec = True
             should_execute = True
             bot.log(f"🔍 DEGRADACION A SHADOW: {symbol} (Veredicto: {audit_verdict})")

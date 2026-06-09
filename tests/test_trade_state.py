@@ -46,11 +46,13 @@ class TradeStateTest(unittest.TestCase):
     def test_closing_statuses_cover_partial_fill_close_path(self):
         self.assertEqual(
             closing_statuses(),
-            frozenset({
-                TradeStatus.CLOSING_INITIATED.value,
-                TradeStatus.PARTIAL_FILL.value,
-                TradeStatus.PARTIAL_FILL_PENDING.value,
-            }),
+            frozenset(
+                {
+                    TradeStatus.CLOSING_INITIATED.value,
+                    TradeStatus.PARTIAL_FILL.value,
+                    TradeStatus.PARTIAL_FILL_PENDING.value,
+                }
+            ),
         )
 
 

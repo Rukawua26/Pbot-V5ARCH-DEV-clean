@@ -1,5 +1,5 @@
-import unittest
 import threading
+import unittest
 from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -58,7 +58,7 @@ class RegressionFlowsTest(unittest.TestCase):
     @patch("core.bot_app.run_execute_order")
     def test_facade_execute_order_delegates(self, mocked_exec):
         mocked_exec.return_value = "OK"
-        bot = _FacadeBot()
+        bot = _FacadeBot.__new__(_FacadeBot)
 
         result = bot.execute_order("BTC/USDT", "BUY", 100.0, 1.0)
 
@@ -67,7 +67,7 @@ class RegressionFlowsTest(unittest.TestCase):
 
     @patch("core.bot_app.tm_close_trade")
     def test_facade_close_trade_delegates(self, mocked_close):
-        bot = _FacadeBot()
+        bot = _FacadeBot.__new__(_FacadeBot)
 
         bot.close_trade("BTC/USDT", "TEST", 100.0)
 
@@ -141,9 +141,7 @@ class TradeManagerHelpersTest(unittest.TestCase):
 
         mock_exec = MagicMock()
         mock_exec.is_symbol_quarantined = MagicMock(return_value=True)
-        mock_exec.get_symbol_quarantine_remaining_seconds = MagicMock(
-            return_value=300
-        )
+        mock_exec.get_symbol_quarantine_remaining_seconds = MagicMock(return_value=300)
         bot = SimpleNamespace(execution=mock_exec, log=MagicMock())
         bot._load_runtime_symbol_controls = MagicMock(
             return_value={"blocked": set(), "reduced": set()}
@@ -192,9 +190,7 @@ class GuardianHelpersTest(unittest.TestCase):
             "BTC/USDT": 50000.0,
             "ETH/USDT": 3000.0,
         }
-        mock_bot.execution.fetch_all_prices = MagicMock(
-            side_effect=Exception("fail")
-        )
+        mock_bot.execution.fetch_all_prices = MagicMock(side_effect=Exception("fail"))
         mock_bot.price_lock = nullcontext()
 
         price_map = _fetch_prices_with_fallback(mock_bot)
@@ -268,8 +264,9 @@ class ExecutionServiceHelpersTest(unittest.TestCase):
 
 class RuntimeSafetyCriticalRegressionTest(unittest.TestCase):
     def test_recover_halt_checks_open_orders(self):
+        from unittest.mock import MagicMock
+
         from core.reconciliation import recover_halt_if_exchange_consistent
-        from unittest.mock import MagicMock, patch
 
         mock_exec = MagicMock()
         mock_exec.fetch_positions.return_value = []

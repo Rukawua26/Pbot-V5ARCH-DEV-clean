@@ -1,6 +1,5 @@
 import logging
-from datetime import datetime, timezone
-from typing import Dict, Optional, Tuple
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
@@ -30,9 +29,9 @@ class DynamicHMMRegime:
                 random_state=42,
             )
         self.scaler = StandardScaler()
-        self.state_map: Dict[int, str] = {}
+        self.state_map: dict[float, str] = {}
         self.is_ready = False
-        self.last_error: Optional[str] = None
+        self.last_error: str | None = None
 
     def dependency_available(self) -> bool:
         return self.model is not None
@@ -48,7 +47,7 @@ class DynamicHMMRegime:
         df_copy["dir_smooth"] = df_copy["log_return"].ewm(span=14).mean()
         return df_copy.dropna()[["log_return", "volatility", "dir_smooth"]]
 
-    def _fit_features(self, df: pd.DataFrame) -> Tuple[np.ndarray, pd.DataFrame]:
+    def _fit_features(self, df: pd.DataFrame) -> tuple[np.ndarray, pd.DataFrame]:
         feature_frame = self._build_feature_frame(df)
         if feature_frame.empty:
             return np.array([]), feature_frame
@@ -62,14 +61,12 @@ class DynamicHMMRegime:
 
     def _map_hidden_states(
         self, feature_frame: pd.DataFrame, hidden_states: np.ndarray
-    ) -> Dict[int, str]:
+    ) -> dict[float, str]:
         state_stats = []
         for state_id in range(self.n_states):
             mask = hidden_states == state_id
             if np.sum(mask) == 0:
-                state_stats.append(
-                    {"id": state_id, "return": 0.0, "vol": 0.0, "dir": 0.0}
-                )
+                state_stats.append({"id": state_id, "return": 0.0, "vol": 0.0, "dir": 0.0})
                 continue
 
             state_data = feature_frame.iloc[mask]
@@ -84,7 +81,7 @@ class DynamicHMMRegime:
 
         if len(state_stats) != 3:
             ordered = sorted(state_stats, key=lambda item: item["return"])
-            return {item["id"]: "RANGE" for item in ordered}
+            return {float(item["id"]): "RANGE" for item in ordered}
 
         max_abs_return = max(abs(item["return"]) for item in state_stats) or 1.0
         max_abs_dir = max(abs(item["dir"]) for item in state_stats) or 1.0
@@ -102,9 +99,9 @@ class DynamicHMMRegime:
         directional.sort(key=lambda item: item["return"])
 
         return {
-            directional[0]["id"]: "BEAR_TREND",
-            range_state["id"]: "RANGE",
-            directional[-1]["id"]: "BULL_TREND",
+            float(directional[0]["id"]): "BEAR_TREND",
+            float(range_state["id"]): "RANGE",
+            float(directional[-1]["id"]): "BULL_TREND",
         }
 
     def dynamic_retrain(self, df_history: pd.DataFrame) -> bool:
@@ -135,7 +132,7 @@ class DynamicHMMRegime:
             logger.error(f"Fallo grave en HMM retraining: {error}")
             return False
 
-    def predict_regime(self, df_recent: pd.DataFrame) -> Tuple[str, float]:
+    def predict_regime(self, df_recent: pd.DataFrame) -> tuple[str, float]:
         if not self.is_ready or self.model is None:
             return "UNKNOWN", 0.0
 
@@ -154,10 +151,10 @@ class DynamicHMMRegime:
             logger.error(f"Fallo grave en HMM prediction: {error}")
             return "UNKNOWN", 0.0
 
-    def predict_markov_snapshot(self, df_recent: pd.DataFrame) -> Dict[str, object]:
+    def predict_markov_snapshot(self, df_recent: pd.DataFrame) -> dict[str, object]:
         """Return a non-blocking, read-only friendly snapshot of HMM transition odds."""
-        empty_snapshot: Dict[str, object] = {
-            "ts": datetime.now(timezone.utc).isoformat(),
+        empty_snapshot: dict[str, object] = {
+            "ts": datetime.now(UTC).isoformat(),
             "source": "HMM",
             "state": "UNKNOWN",
             "confidence": 0.0,
@@ -189,8 +186,8 @@ class DynamicHMMRegime:
             state = self.state_map.get(state_id, "UNKNOWN")
             confidence = float(current_probs[state_id])
 
-            state_probs: Dict[str, float] = {}
-            transition_probs: Dict[str, float] = {}
+            state_probs: dict[str, float] = {}
+            transition_probs: dict[str, float] = {}
             for hidden_id, label in self.state_map.items():
                 idx = int(hidden_id)
                 state_probs[label] = state_probs.get(label, 0.0) + float(current_probs[idx])
@@ -201,7 +198,7 @@ class DynamicHMMRegime:
             range_prob = max(0.0, min(100.0, transition_probs.get("RANGE", 0.0) * 100.0))
 
             return {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "source": "HMM",
                 "state": state,
                 "confidence": confidence,

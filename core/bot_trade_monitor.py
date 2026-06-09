@@ -43,9 +43,7 @@ def _record_confidence_floor_event(
         leverage=trade.get("leverage", 1),
         fee_rate=Config.VIRTUAL_FEE,
         margin_used=trade.get("margin_used"),
-        percent_on_margin=bool(
-            trade.get("is_shadow", False) or trade.get("simulated_real", False)
-        ),
+        percent_on_margin=bool(trade.get("is_shadow", False) or trade.get("simulated_real", False)),
     )
     gross_usd = pnl_core["gross_usd"]
     gross_pct = pnl_core["gross_pct"]
@@ -62,7 +60,7 @@ def _record_confidence_floor_event(
     defer_increment = 1 if defer_exit else 0
 
     db_lock = getattr(bot, "db_lock", None)
-    with (db_lock or nullcontext()):
+    with db_lock or nullcontext():
         audit_id = bot.brain.upsert_confidence_exit_audit(
             {
                 "entry_client_order_id": trade.get("entry_client_order_id"),
@@ -185,11 +183,13 @@ def monitor_open_trades(bot):
             if is_degraded:
                 entry_conf = trade.get("entry_confidence", 0)
                 current_price = float(df_main["close"].iloc[-1])
-                defer_exit, defer_reason = bot.risk_engine.should_defer_confidence_exit_for_fee_noise(
-                    trade,
-                    current_price,
-                    elapsed_mins,
-                    deg_reason,
+                defer_exit, defer_reason = (
+                    bot.risk_engine.should_defer_confidence_exit_for_fee_noise(
+                        trade,
+                        current_price,
+                        elapsed_mins,
+                        deg_reason,
+                    )
                 )
                 _record_confidence_floor_event(
                     bot,
@@ -203,9 +203,7 @@ def monitor_open_trades(bot):
                     defer_reason,
                 )
                 if defer_exit:
-                    bot.log(
-                        f"🪙 FEE_NOISE_GUARD ({symbol}): deferido smart-exit | {defer_reason}"
-                    )
+                    bot.log(f"🪙 FEE_NOISE_GUARD ({symbol}): deferido smart-exit | {defer_reason}")
                     continue
                 bot.log(
                     f"🚨 DEGRADED EXIT ({symbol}): {deg_reason} | EntryConf: {entry_conf:.1f} -> ExitConf: {prob_final:.1f}"
@@ -230,8 +228,6 @@ def monitor_open_trades(bot):
             # Solo loguear errores importantes, no spam
             err_str = str(error)
             if "symbol" in err_str.lower() or "not found" in err_str.lower():
-                bot.log(
-                    f"⚠️ Error monitoreando {symbol}: Símbolo no disponible en Binance"
-                )
+                bot.log(f"⚠️ Error monitoreando {symbol}: Símbolo no disponible en Binance")
             else:
                 bot.log(f"⚠️ Error monitoreando {symbol}: {error}")

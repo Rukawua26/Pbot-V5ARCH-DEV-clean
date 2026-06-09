@@ -3,15 +3,15 @@ import unittest
 import pandas as pd
 
 from tools.fidelity_audit import (
-    _apply_shock_vetoes,
     _apply_market_breadth_vetoes,
     _apply_mtf_vetoes,
+    _apply_shock_vetoes,
     _apply_side_specific_vetoes,
     _filter_reason_veto_candles,
     _market_breadth_fear_candles,
     _mtf_veto_candles,
-    apply_runtime_confidence_gate,
     align_runtime_to_proxy,
+    apply_runtime_confidence_gate,
     extract_runtime_decisions,
     summarize_fidelity,
 )
@@ -120,7 +120,20 @@ class FidelityAuditTest(unittest.TestCase):
             {
                 "time": times,
                 "open": [100.0] * 12,
-                "high": [100.05, 100.08, 100.1, 100.2, 100.1, 100.08, 100.05, 100.0, 100.0, 100.0, 100.0, 100.0],
+                "high": [
+                    100.05,
+                    100.08,
+                    100.1,
+                    100.2,
+                    100.1,
+                    100.08,
+                    100.05,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                    100.0,
+                ],
                 "low": [99.0] * 12,
                 "close": [100.0] * 12,
                 "volume": [10.0] * 12,

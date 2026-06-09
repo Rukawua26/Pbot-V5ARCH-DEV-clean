@@ -3,15 +3,12 @@ import os
 
 from core.time_utils import monotonic_now, utc_now
 
-
 DEFAULT_WATCHDOG_HEARTBEAT_PATH = "/dev/shm/sniper_ai_heartbeat.json"
 FALLBACK_WATCHDOG_HEARTBEAT_PATH = "/tmp/sniper_ai_heartbeat.json"
 
 
 def resolve_watchdog_heartbeat_path(path: str | None = None) -> str:
-    preferred = (
-        path or os.getenv("WATCHDOG_HEARTBEAT_PATH") or DEFAULT_WATCHDOG_HEARTBEAT_PATH
-    )
+    preferred = path or os.getenv("WATCHDOG_HEARTBEAT_PATH") or DEFAULT_WATCHDOG_HEARTBEAT_PATH
     target_dir = os.path.dirname(preferred) or "."
     if os.path.isdir(target_dir):
         return preferred

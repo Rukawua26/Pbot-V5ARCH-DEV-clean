@@ -1,9 +1,10 @@
-from typing import Dict, Any
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from core.strategy.base_agent import BaseAgent
-from core.strategy.utils import StrategyUtils
+
 from core.config.hyperopt_loader import HyperoptConfigLoader
+from core.strategy.base_agent import BaseAgent
 
 
 class SRAgent(BaseAgent):
@@ -83,7 +84,7 @@ class SRAgent(BaseAgent):
         except Exception:
             return 1.0
 
-    def vote(self, context: Dict[str, Any]) -> float:
+    def vote(self, context: dict[str, Any]) -> float:
         df = context.get("df")
         z_score = context.get("z_score", 0.0)
         symbol = context.get("symbol", "")

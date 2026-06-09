@@ -28,19 +28,13 @@ def update_radar(
     mode = decision["mode"]
 
     # El Fuego (🔥) es la validación final del consenso para dinero REAL
-    fuego_status = (
-        "✅" if mode == "REAL" and prob_ia >= Config.REAL_CONFIDENCE_MIN else "❌"
-    )
+    fuego_status = "✅" if mode == "REAL" and prob_ia >= Config.REAL_CONFIDENCE_MIN else "❌"
 
-    shadow_min_pct = float(
-        getattr(Config, "SHADOW_MODE_MIN", Config.SHADOW_PROB_MIN * 100)
-    )
+    shadow_min_pct = float(getattr(Config, "SHADOW_MODE_MIN", Config.SHADOW_PROB_MIN * 100))
 
     # El Tubo (🧪) indica si el bot está aprendiendo de esta moneda (Real o Shadow)
     tubo_status = (
-        "✅"
-        if mode in ["REAL", "SHADOW"] and prob_ia >= (shadow_min_pct / 100.0)
-        else "❌"
+        "✅" if mode in ["REAL", "SHADOW"] and prob_ia >= (shadow_min_pct / 100.0) else "❌"
     )
 
     # Perfil Táctico
@@ -60,13 +54,9 @@ def update_radar(
     slock = getattr(bot, "scanner_lock", None)
     if slock:
         with slock:
-            bot.scanner_history = [
-                item for item in bot.scanner_history if item["symbol"] != symbol
-            ]
+            bot.scanner_history = [item for item in bot.scanner_history if item["symbol"] != symbol]
     else:
-        bot.scanner_history = [
-            item for item in bot.scanner_history if item["symbol"] != symbol
-        ]
+        bot.scanner_history = [item for item in bot.scanner_history if item["symbol"] != symbol]
 
     # Limpieza de redundancia visual (Solicitud Usuario)
     # Quitamos "SHADOW" o "REAL" del texto ya que existe columna de MODO

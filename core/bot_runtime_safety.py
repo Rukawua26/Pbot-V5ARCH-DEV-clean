@@ -3,9 +3,7 @@ from core.risk_policy import activate_runtime_protection
 
 
 def check_safety_and_goals(bot, current_pnl=None):
-    base_bal = (
-        bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
-    )
+    base_bal = bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
     _ = base_bal
 
     if current_pnl is None:

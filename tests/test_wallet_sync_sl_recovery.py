@@ -55,9 +55,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
 
         sync_wallet(bot)
 
-        self.assertEqual(
-            bot.active_trades["BTC/USDT"].get("sl_exchange_order_id"), "sl-123"
-        )
+        self.assertEqual(bot.active_trades["BTC/USDT"].get("sl_exchange_order_id"), "sl-123")
         bot.execution.place_hard_sl.assert_called_once()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
@@ -99,9 +97,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
 
         sync_wallet(bot)
 
-        self.assertEqual(
-            bot.active_trades["ETH/USDT"].get("sl_exchange_order_id"), "existing-sl"
-        )
+        self.assertEqual(bot.active_trades["ETH/USDT"].get("sl_exchange_order_id"), "existing-sl")
         bot.execution.place_hard_sl.assert_not_called()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
@@ -155,9 +151,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
         bot.integrity_lock_active = False
         bot.halt_system_active = False
         bot.execution = SimpleNamespace(
-            fetch_open_orders=MagicMock(
-                return_value=[{"id": "entry-1", "clientOrderId": "cid-1"}]
-            ),
+            fetch_open_orders=MagicMock(return_value=[{"id": "entry-1", "clientOrderId": "cid-1"}]),
             cancel_order=MagicMock(side_effect=RuntimeError("cancel down")),
         )
         trade = {
@@ -226,9 +220,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
         sync_wallet(bot)
 
         self.assertIn("SOL/USDT", bot.active_trades)
-        self.assertEqual(
-            bot.active_trades["SOL/USDT"].get("status"), "EMERGENCY_CLOSE_PENDING"
-        )
+        self.assertEqual(bot.active_trades["SOL/USDT"].get("status"), "EMERGENCY_CLOSE_PENDING")
         self.assertTrue(bot.is_paused)
         self.assertTrue(bot.integrity_lock_active)
         self.assertTrue(getattr(bot, "halt_system_active", False))
@@ -369,9 +361,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                     "clientOrderId": "cid-entry",
                 }
             ],
-            cancel_order=MagicMock(
-                return_value={"id": "entry-ord-1", "status": "canceled"}
-            ),
+            cancel_order=MagicMock(return_value={"id": "entry-ord-1", "status": "canceled"}),
             place_hard_sl=MagicMock(return_value={"id": "sl-1"}),
         )
 

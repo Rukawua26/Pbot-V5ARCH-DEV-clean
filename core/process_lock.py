@@ -4,12 +4,12 @@ import sys
 try:
     import fcntl  # POSIX
 except ImportError:  # pragma: no cover - Windows
-    fcntl = None
+    fcntl = None  # type: ignore[assignment]
 
 try:
     import msvcrt  # Windows
 except ImportError:  # pragma: no cover - POSIX
-    msvcrt = None
+    msvcrt = None  # type: ignore[assignment]
 
 _single_instance_lock = None
 

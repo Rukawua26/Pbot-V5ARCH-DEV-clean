@@ -107,7 +107,9 @@ class ShadowReadinessGateTests(unittest.TestCase):
             {"ts": "invalid", "event": "UNKNOWN"},
         ]
 
-        filtered = filter_rows_since_ts(rows, __import__("datetime").datetime.fromisoformat("2026-01-01T12:00:00+00:00"))
+        filtered = filter_rows_since_ts(
+            rows, __import__("datetime").datetime.fromisoformat("2026-01-01T12:00:00+00:00")
+        )
 
         self.assertEqual([row["event"] for row in filtered], ["NEW", "UNKNOWN"])
 

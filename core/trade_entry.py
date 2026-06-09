@@ -1,45 +1,45 @@
 import time
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional
+from datetime import timedelta
+from typing import Any
 
+import core.trade_helpers as _trade_helpers
 from config import Config
 from core.cooldown_state import is_symbol_in_cooldown, set_symbol_cooldown
-from core.risk.correlation_risk import compute_correlation_reduction
-from core.regime_tuning import get_sl_multiplier, get_tp_multiplier, record_trade as record_regime_trade
 from core.execution_telemetry import append_execution_event
-from core.postmortem import label_exit_reason
-from core.trade_state import TradeStatus, closing_statuses, open_trade_statuses
-import core.trade_helpers as _trade_helpers
+from core.kanban_sync import async_crear_tarjeta
+from core.reconciliation import (
+    allocate_signal_timestamp,
+    generate_order_ids,
+)
+from core.regime_tuning import get_sl_multiplier, get_tp_multiplier
+from core.risk.correlation_risk import compute_correlation_reduction
+from core.risk_policy import evaluate_runtime_entry_decision, record_risk_decision
+from core.symbol_utils import normalize_position_symbol  # noqa: F401 - compatibility patch target
+from core.time_utils import utc_now, utc_now_iso
 from core.trade_helpers import (
-    _calculate_pnl_and_metrics,
     _calculate_margin_used,
     _clamp_leverage_1_to_10,
-    _exchange_position_is_flat as _helper_exchange_position_is_flat,
     _fail_safe_close_when_sl_missing,
     _get_local_open_trade_counts,
-    _module_available,
-    _order_looks_filled,
     _release_simulated_margin,
     _reserve_simulated_margin,
     _safe_log_signal_alert,
     _safe_update_signal_alert_status,
     _sanitize_context,
-    _validate_entry_preconditions as _helper_validate_entry_preconditions,
     _validate_symbol_entry,
 )
-from core.reconciliation import (
-    allocate_signal_timestamp,
-    generate_order_ids,
+from core.trade_helpers import (
+    _exchange_position_is_flat as _helper_exchange_position_is_flat,
 )
-from core.risk_policy import evaluate_runtime_entry_decision, record_risk_decision
-from core.symbol_utils import normalize_position_symbol
-from core.time_utils import parse_datetime_utc, utc_now, utc_now_iso
+from core.trade_helpers import (
+    _validate_entry_preconditions as _helper_validate_entry_preconditions,
+)
+from core.trade_state import TradeStatus
 from tools.learning import shadow_logger
-from tools.notifier import Priority, send_telegram_msg, send_telegram_photo
-from core.kanban_sync import async_crear_tarjeta
+from tools.notifier import Priority, send_telegram_msg
 
 
-def _validate_entry_preconditions(bot, symbol: str, is_shadow: bool) -> Optional[str]:
+def _validate_entry_preconditions(bot, symbol: str, is_shadow: bool) -> str | None:
     _trade_helpers.shadow_logger = shadow_logger
     return _helper_validate_entry_preconditions(bot, symbol, is_shadow)
 
@@ -56,7 +56,7 @@ def execute_order(
     atr: float,
     is_shadow: bool = False,
     vol: float = 0,
-    context: Optional[Dict[str, Any]] = None,
+    context: dict[str, Any] | None = None,
     ob_status: str = "\u269a",
     override_usd_size: float = 0.0,
 ) -> str:
@@ -70,7 +70,9 @@ def execute_order(
 
     deduper = getattr(bot, "intent_deduper", None)
     if deduper is not None and not deduper.check_and_register(symbol, side, signal_ts):
-        bot.log(f"\U0001f501 DUPLICATE_INTENT {symbol} {side}: signal repetido en la ventana de dedup")
+        bot.log(
+            f"\U0001f501 DUPLICATE_INTENT {symbol} {side}: signal repetido en la ventana de dedup"
+        )
         return "DUPLICATE_INTENT"
 
     instance_id = getattr(bot, "instance_uuid", "default")
@@ -85,6 +87,10 @@ def execute_order(
     controls = bot._load_runtime_symbol_controls()
 
     execution_mode = "SHADOW" if is_shadow else ("PAPER" if Config.PAPER_MODE else "REAL")
+
+    def _discard_pending_signal(reason: str) -> str:
+        _safe_update_signal_alert_status(bot, entry_client_order_id, "DISCARDED")
+        return reason
 
     if is_shadow:
         shadow_cd = int(getattr(Config, "SIGNAL_COOLDOWN_SHADOW_SECONDS", 60) or 60)
@@ -117,10 +123,6 @@ def execute_order(
         features=_sanitize_context(bot, context),
     )
 
-    def _discard_pending_signal(reason: str) -> str:
-        _safe_update_signal_alert_status(bot, entry_client_order_id, "DISCARDED")
-        return reason
-
     atr_pct = context.get("atr_pct", 0) if context else 0.02
     min_notional = Config.MIN_NOTIONAL_VALUE
     confidence_score = context.get("prob_final", 0.0) if context else 0.0
@@ -133,9 +135,10 @@ def execute_order(
         )
         return _discard_pending_signal("INSUFFICIENT_BALANCE_MIN_NOTIONAL")
 
-    if bool(getattr(Config, "REQUIRE_GHOST_MODEL_FOR_TRADING", True)) and getattr(
-        bot, "ghost_model", None
-    ) is None:
+    if (
+        bool(getattr(Config, "REQUIRE_GHOST_MODEL_FOR_TRADING", True))
+        and getattr(bot, "ghost_model", None) is None
+    ):
         bot.log(
             f"\U0001f6d1 GHOST_MODEL_MISSING: bloqueando nueva entrada {symbol} hasta restaurar modelo IA."
         )
@@ -159,9 +162,7 @@ def execute_order(
 
     atr_pct = context.get("atr_pct", 0) if context else 0.02
     if atr_pct * 100 > Config.NATR_THRESHOLD:
-        bot.log(
-            f"⚠️ VOLATILIDAD ALTA: {symbol} NATR {atr_pct * 100:.1f}%. Degradando a SHADOW."
-        )
+        bot.log(f"⚠️ VOLATILIDAD ALTA: {symbol} NATR {atr_pct * 100:.1f}%. Degradando a SHADOW.")
         is_shadow = True
         degradation_reason = "HIGH_VOLATILITY"
         if not req_shadow:
@@ -228,29 +229,26 @@ def execute_order(
             similar = bot.brain.find_similar_contexts(clean_snapshot, limit=5)
             if similar:
                 winners = [s for s in similar if s.get("is_winner")]
-                losers = [s for s in similar if not s.get("is_winner")]
                 total_sim = len(similar)
-                n_winners = len(winners)
-                n_losers = total_sim - n_winners
-                avg_pnl = sum(
-                    s.get("pnl_percent", 0.0) or 0.0 for s in similar
-                ) / total_sim
+            n_winners = len(winners)
+            n_losers = total_sim - n_winners
+            avg_pnl = sum(s.get("pnl_percent", 0.0) or 0.0 for s in similar) / total_sim
 
-                if is_shadow:
-                    if n_winners >= 3 and avg_pnl > 1.0:
-                        similarity_boost = min(5.0, avg_pnl * 0.5)
-                        similarity_verdict = "BULLISH"
-                    elif n_losers >= n_winners and avg_pnl < -1.0:
-                        similarity_boost = max(-10.0, avg_pnl * 2)
-                        similarity_verdict = "BEARISH"
-                    else:
-                        similarity_verdict = "MIXED"
+            if is_shadow:
+                if n_winners >= 3 and avg_pnl > 1.0:
+                    similarity_boost = min(5.0, avg_pnl * 0.5)
+                    similarity_verdict = "BULLISH"
+                elif n_losers >= n_winners and avg_pnl < -1.0:
+                    similarity_boost = max(-10.0, avg_pnl * 2)
+                    similarity_verdict = "BEARISH"
+                else:
+                    similarity_verdict = "MIXED"
 
-                bot.log(
-                    f"🧠 SIMILARITY {symbol} {side}: "
-                    f"{n_winners}/{total_sim} winners "
-                    f"(avg PnL {avg_pnl:+.2f}%) → {similarity_verdict} ({similarity_boost:+.1f}%)"
-                )
+            bot.log(
+                f"🧠 SIMILARITY {symbol} {side}: "
+                f"{n_winners}/{total_sim} winners "
+                f"(avg PnL {avg_pnl:+.2f}%) → {similarity_verdict} ({similarity_boost:+.1f}%)"
+            )
 
         except Exception as ctx_error:
             bot.log(f"⚠️ Error en similarity search: {ctx_error}")
@@ -304,9 +302,7 @@ def execute_order(
         )
 
     open_symbols = list(bot.active_trades.keys()) if hasattr(bot, "active_trades") else []
-    corr_mult, corr_details = compute_correlation_reduction(
-        bot, symbol, open_symbols
-    )
+    corr_mult, corr_details = compute_correlation_reduction(bot, symbol, open_symbols)
     if corr_mult < 1.0 and corr_details:
         calculated_position_size *= corr_mult
         amount = calculated_position_size / price if price > 0 else amount
@@ -368,9 +364,7 @@ def execute_order(
         elapsed_global = time.time() - last_open_ts
         if elapsed_global < global_cd:
             remaining = int(global_cd - elapsed_global)
-            bot.log(
-                f"\u23f3 GLOBAL_COOLDOWN activo ({remaining}s restantes): {symbol} bloqueado"
-            )
+            bot.log(f"\u23f3 GLOBAL_COOLDOWN activo ({remaining}s restantes): {symbol} bloqueado")
             return _discard_pending_signal("GLOBAL_COOLDOWN")
 
     with bot.lock:
@@ -426,11 +420,7 @@ def execute_order(
             if num_real >= Config.MAX_OPEN_TRADES:
                 bot.log(f"\u23f3 LÍMITE REAL ALCANZADO ({num_real}): {symbol} ignorado.")
                 return _discard_pending_signal("MAX_REAL_TRADES")
-            t_side = sum(
-                1
-                for t in actives
-                if t["side"] == side and not t.get("is_shadow", False)
-            )
+            t_side = sum(1 for t in actives if t["side"] == side and not t.get("is_shadow", False))
             if t_side >= Config.MAX_DIRECTIONAL_TRADES:
                 if num_shadow < Config.MAX_SHADOW_TRADES:
                     bot.log(
@@ -603,9 +593,7 @@ def execute_order(
             "margin_used": margin_used,
         }
         if is_shadow or (Config.PAPER_MODE and not is_shadow):
-            reserve_ok, reserve_reason = _reserve_simulated_margin(
-                bot, simulated_margin_state
-            )
+            reserve_ok, reserve_reason = _reserve_simulated_margin(bot, simulated_margin_state)
             if not reserve_ok:
                 bot.log(f"🚫 SIM_MARGIN_BLOCK {symbol}: {reserve_reason}")
                 _safe_update_signal_alert_status(bot, entry_client_order_id, "VETOED")
@@ -632,9 +620,7 @@ def execute_order(
                 requested_amount = float(amount)
                 filled_amount = float(order.get("filled", requested_amount) or 0.0)
                 remaining_amount = max(0.0, requested_amount - filled_amount)
-                avg_fill_price = float(
-                    order.get("average") or order.get("price") or price
-                )
+                avg_fill_price = float(order.get("average") or order.get("price") or price)
                 if filled_amount <= 0:
                     bot.log(f"❌ FALLO DE EJECUCIÓN: {symbol} sin fills confirmados")
                     _safe_update_signal_alert_status(bot, entry_client_order_id, "REJECTED")
@@ -693,9 +679,7 @@ def execute_order(
                 )
 
                 if not sl_order:
-                    sl_error = str(
-                        getattr(bot.execution, "last_hard_sl_error", "") or ""
-                    )
+                    sl_error = str(getattr(bot.execution, "last_hard_sl_error", "") or "")
                     bot.log(
                         f"\u2622\ufe0f HARD_SL_ATTACH_FAILED {symbol}: entrada cerrada por fail-safe para evitar posición desnuda. error={sl_error[:180]}"
                     )
@@ -710,9 +694,7 @@ def execute_order(
                         },
                     )
 
-                    closed = _fail_safe_close_when_sl_missing(
-                        bot, symbol, side, filled_amount
-                    )
+                    closed = _fail_safe_close_when_sl_missing(bot, symbol, side, filled_amount)
                     if not closed:
                         bot.is_paused = True
                         bot.integrity_lock_active = True
@@ -765,8 +747,7 @@ def execute_order(
             else:
                 bot.log(f"❌ FALLO DE EJECUCIÓN: {symbol}")
                 reject_reason = str(
-                    getattr(bot.execution, "last_entry_reject_error", "")
-                    or "EXECUTION_FAILED"
+                    getattr(bot.execution, "last_entry_reject_error", "") or "EXECUTION_FAILED"
                 )[:220]
                 append_execution_event(
                     bot,
@@ -782,9 +763,9 @@ def execute_order(
                 pending_state["status"] = TradeStatus.ENTRY_ACK_UNKNOWN.value
                 pending_state["entry_reject_reason"] = reject_reason
                 pending_state["intent_last_check_at_utc"] = utc_now_iso()
-                pending_state["intent_check_attempts"] = int(
-                    pending_state.get("intent_check_attempts", 0) or 0
-                ) + 1
+                pending_state["intent_check_attempts"] = (
+                    int(pending_state.get("intent_check_attempts", 0) or 0) + 1
+                )
                 with bot.lock:
                     bot.active_trades[symbol] = pending_state
                 with bot.db_lock:
@@ -875,18 +856,12 @@ def execute_order(
                 "entry": float(avg_fill_price if not is_shadow else price),
                 "pnl": 0.0,
                 "amount": float(filled_amount if not is_shadow else amount),
-                "requested_amount": float(
-                    requested_amount if not is_shadow else amount
-                ),
+                "requested_amount": float(requested_amount if not is_shadow else amount),
                 "remaining_amount": float(remaining_amount if not is_shadow else 0.0),
                 "notional_usd": float(final_usd),
                 "margin_used": float(margin_used),
-                "margin_reserved": bool(
-                    simulated_margin_state.get("margin_reserved", False)
-                ),
-                "margin_released": bool(
-                    simulated_margin_state.get("margin_released", False)
-                ),
+                "margin_reserved": bool(simulated_margin_state.get("margin_reserved", False)),
+                "margin_released": bool(simulated_margin_state.get("margin_released", False)),
                 "sl": sl_val,
                 "tp": tp_val,
                 "trailing_active": False,
@@ -908,12 +883,8 @@ def execute_order(
                 "entry_client_order_id": entry_client_order_id,
                 "sl_client_order_id": sl_client_order_id,
                 "tp_client_order_id": tp_client_order_id,
-                "entry_exchange_order_id": (order or {}).get("id")
-                if not is_shadow
-                else None,
-                "sl_exchange_order_id": (sl_order or {}).get("id")
-                if not is_shadow
-                else None,
+                "entry_exchange_order_id": (order or {}).get("id") if not is_shadow else None,
+                "sl_exchange_order_id": (sl_order or {}).get("id") if not is_shadow else None,
                 "tp_exchange_order_id": None,
                 "status": TradeStatus.PARTIAL_FILL_PENDING.value
                 if (not is_shadow and remaining_amount > 0.0)
@@ -970,13 +941,9 @@ def execute_order(
                     bot.active_trades[symbol].update(trade_state)
 
             cooldown_minutes = (
-                Config.SHADOW_COOLDOWN_MINUTES
-                if is_shadow
-                else Config.TRADE_COOLDOWN_MINUTES
+                Config.SHADOW_COOLDOWN_MINUTES if is_shadow else Config.TRADE_COOLDOWN_MINUTES
             )
-            set_symbol_cooldown(
-                bot, symbol, utc_now() + timedelta(minutes=cooldown_minutes)
-            )
+            set_symbol_cooldown(bot, symbol, utc_now() + timedelta(minutes=cooldown_minutes))
 
             if not req_shadow and is_shadow:
                 return f"OK_DEGRADED: {degradation_reason}"

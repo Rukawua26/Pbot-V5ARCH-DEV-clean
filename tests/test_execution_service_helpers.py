@@ -1,6 +1,7 @@
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
-from core.execution_service import _with_exit_state, _parse_order_float, OrderLookupError
+from unittest.mock import patch
+
+from core.execution_service import OrderLookupError, _parse_order_float, _with_exit_state
 
 
 class TestWithExitState(unittest.TestCase):

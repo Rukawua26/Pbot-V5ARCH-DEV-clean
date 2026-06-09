@@ -11,9 +11,7 @@ class BotSecurityRuntimeTest(unittest.TestCase):
     @patch("core.bot_io_loops.telegram_get_json")
     @patch("core.bot_io_loops.Config.TELEGRAM_CHAT_ID", "123")
     @patch("core.bot_io_loops.Config.TELEGRAM_TOKEN", "token")
-    def test_telegram_listener_ignores_unauthorized_chat(
-        self, mocked_updates, _mocked_sleep
-    ):
+    def test_telegram_listener_ignores_unauthorized_chat(self, mocked_updates, _mocked_sleep):
         bot = SimpleNamespace(is_running=True, handle_command=MagicMock(), log=MagicMock())
 
         def _updates(*_args, **_kwargs):
@@ -39,9 +37,7 @@ class BotSecurityRuntimeTest(unittest.TestCase):
     @patch("core.bot_io_loops.telegram_get_json")
     @patch("core.bot_io_loops.Config.TELEGRAM_CHAT_ID", "123")
     @patch("core.bot_io_loops.Config.TELEGRAM_TOKEN", "token")
-    def test_telegram_listener_accepts_authorized_chat(
-        self, mocked_updates, _mocked_sleep
-    ):
+    def test_telegram_listener_accepts_authorized_chat(self, mocked_updates, _mocked_sleep):
         bot = SimpleNamespace(is_running=True, handle_command=MagicMock(), log=MagicMock())
 
         def _handle(text):
@@ -176,9 +172,7 @@ class BotSecurityRuntimeTest(unittest.TestCase):
     @patch("core.bot_connection.Config.USE_TESTNET", False)
     @patch("core.bot_connection.Config.PAPER_MODE", False)
     @patch("core.bot_connection.ccxt.binance")
-    def test_connect_to_binance_aborts_when_position_mode_detection_fails(
-        self, mocked_binance
-    ):
+    def test_connect_to_binance_aborts_when_position_mode_detection_fails(self, mocked_binance):
         exchange = MagicMock()
         mocked_binance.return_value = exchange
 
@@ -249,9 +243,7 @@ class BotSecurityRuntimeTest(unittest.TestCase):
     @patch("core.bot_connection.Config.USE_TESTNET", True)
     @patch("core.bot_connection.Config.PAPER_MODE", False)
     @patch("core.bot_connection.ccxt.binance")
-    def test_connect_to_binance_fails_clearly_when_sandbox_activation_breaks(
-        self, mocked_binance
-    ):
+    def test_connect_to_binance_fails_clearly_when_sandbox_activation_breaks(self, mocked_binance):
         exchange = MagicMock()
         exchange.set_sandbox_mode.side_effect = RuntimeError("unsupported")
         mocked_binance.return_value = exchange

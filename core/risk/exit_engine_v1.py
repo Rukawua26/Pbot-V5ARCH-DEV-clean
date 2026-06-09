@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any
 
 from config import Config
 from core.time_utils import parse_datetime_utc, utc_now
@@ -52,7 +52,7 @@ class ExitEngineV1:
         mins = max(0.0, (utc_now() - open_time).total_seconds() / 60.0)
         return int(mins // max(1, timeframe_minutes))
 
-    def check_time_decay_exit(self, trade: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def check_time_decay_exit(self, trade: dict[str, Any]) -> dict[str, Any] | None:
         pnl_pct = float(trade.get("pnl", 0.0))
         bars = self._bars_elapsed(trade.get("open_time"), timeframe_minutes=60)
 
@@ -70,8 +70,8 @@ class ExitEngineV1:
         return None
 
     def check_structural_invalidation_exit(
-        self, trade: Dict[str, Any], current_price: float, current_atr: float
-    ) -> Optional[Dict[str, Any]]:
+        self, trade: dict[str, Any], current_price: float, current_atr: float
+    ) -> dict[str, Any] | None:
         # Solo aplica para operaciones originadas en breakout.
         if not bool(trade.get("breakout_origin", False)):
             return None
@@ -120,8 +120,8 @@ class ExitEngineV1:
         return None
 
     def check_atr_trailing_exit(
-        self, trade: Dict[str, Any], current_atr: float
-    ) -> Optional[Dict[str, Any]]:
+        self, trade: dict[str, Any], current_atr: float
+    ) -> dict[str, Any] | None:
         pnl = float(trade.get("pnl", 0.0))
         peak = float(trade.get("peak_pnl", pnl))
         entry = float(trade.get("entry", 0.0) or 0.0)
@@ -156,8 +156,8 @@ class ExitEngineV1:
         return None
 
     def check_breakeven_guard(
-        self, trade: Dict[str, Any], current_atr: float
-    ) -> Optional[Dict[str, Any]]:
+        self, trade: dict[str, Any], current_atr: float
+    ) -> dict[str, Any] | None:
         entry = float(trade.get("entry", 0.0) or 0.0)
         pnl = float(trade.get("pnl", 0.0) or 0.0)
         side = str(trade.get("side", "BUY"))
@@ -168,9 +168,7 @@ class ExitEngineV1:
 
         trigger_pct = float(self.breakeven_trigger_pct)
         if current_atr > 0:
-            atr_trigger_pct = (
-                (current_atr / entry) * 100.0 * lev * self.breakeven_atr_mult
-            )
+            atr_trigger_pct = (current_atr / entry) * 100.0 * lev * self.breakeven_atr_mult
             trigger_pct = max(trigger_pct, atr_trigger_pct)
 
         if pnl < trigger_pct:
@@ -207,8 +205,8 @@ class ExitEngineV1:
         return None
 
     def check_flat_volatility_exit(
-        self, trade: Dict[str, Any], current_price: float, current_atr: float
-    ) -> Optional[Dict[str, Any]]:
+        self, trade: dict[str, Any], current_price: float, current_atr: float
+    ) -> dict[str, Any] | None:
         entry = float(trade.get("entry", 0.0) or 0.0)
         if entry <= 0 or current_atr <= 0:
             return None
@@ -236,9 +234,12 @@ class ExitEngineV1:
         return None
 
     def evaluate_exit(
-        self, trade: Dict[str, Any], current_price: float, current_atr: float,
-        threshold_factor: float = None,
-    ) -> Dict[str, Any]:
+        self,
+        trade: dict[str, Any],
+        current_price: float,
+        current_atr: float,
+        threshold_factor: float | None = None,
+    ) -> dict[str, Any]:
         if threshold_factor is None:
             threshold_factor = (
                 Config.SMART_EXIT_THRESHOLD_SHADOW
@@ -246,9 +247,7 @@ class ExitEngineV1:
                 else Config.SMART_EXIT_THRESHOLD_REAL
             )
         # Prioridad: invalidación estructural -> trailing ATR -> flat volatility -> time decay
-        result = self.check_structural_invalidation_exit(
-            trade, current_price, current_atr
-        )
+        result = self.check_structural_invalidation_exit(trade, current_price, current_atr)
         if result:
             return result
 

@@ -1,16 +1,12 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import numpy as np
 import pandas as pd
 
 from config import Config
 
 
-def _pearson_correlation(
-    prices_a: list[float], prices_b: list[float]
-) -> float:
+def _pearson_correlation(prices_a: list[float], prices_b: list[float]) -> float:
     if len(prices_a) < 5 or len(prices_b) < 5:
         return 0.0
     min_len = min(len(prices_a), len(prices_b))
@@ -24,7 +20,7 @@ def _pearson_correlation(
 
 def _get_close_series(
     data_service, symbol: str, min_candles: int, window: int
-) -> Optional[list[float]]:
+) -> list[float] | None:
     try:
         df = data_service.fetch_and_update_data(symbol, "1h", fast_mode=True)
         if not isinstance(df, pd.DataFrame) or df.empty or "close" not in df.columns:
@@ -57,9 +53,7 @@ def compute_correlation_reduction(
     if data_service is None:
         return 1.0, []
 
-    candidate_closes = _get_close_series(
-        data_service, candidate_symbol, min_candles, window
-    )
+    candidate_closes = _get_close_series(data_service, candidate_symbol, min_candles, window)
     if candidate_closes is None:
         return 1.0, []
 

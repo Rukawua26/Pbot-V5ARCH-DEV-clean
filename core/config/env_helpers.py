@@ -1,6 +1,5 @@
 import os
 
-
 _CONFIG_ENV_WARNINGS: list[str] = []
 
 

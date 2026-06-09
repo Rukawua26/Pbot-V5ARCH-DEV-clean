@@ -1,18 +1,18 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from datetime import UTC, datetime
 from types import SimpleNamespace
-from datetime import datetime, timezone
+from unittest.mock import patch
 
-from core.signals.filters import (
-    _normalize_filter_reason,
-    _snapshot_age_seconds,
-    _get_markov_snapshot_mode,
-    _signal_markov_probability,
-    _evaluate_bootstrap_heuristic,
-    _is_shadow_learning_runtime,
-    _resolve_btc_regime_adjustment,
-)
 from config import Config
+from core.signals.filters import (
+    _evaluate_bootstrap_heuristic,
+    _get_markov_snapshot_mode,
+    _is_shadow_learning_runtime,
+    _normalize_filter_reason,
+    _resolve_btc_regime_adjustment,
+    _signal_markov_probability,
+    _snapshot_age_seconds,
+)
 
 
 class TestNormalizeFilterReason(unittest.TestCase):
@@ -44,8 +44,8 @@ class TestSnapshotAgeSeconds(unittest.TestCase):
 
     @patch("datetime.datetime")
     def test_recent_ts_returns_small_age(self, mock_dt):
-        mock_dt.now.return_value = datetime(2025, 1, 15, 12, 0, 5, tzinfo=timezone.utc)
-        mock_dt.fromisoformat.return_value = datetime(2025, 1, 15, 12, 0, 0, tzinfo=timezone.utc)
+        mock_dt.now.return_value = datetime(2025, 1, 15, 12, 0, 5, tzinfo=UTC)
+        mock_dt.fromisoformat.return_value = datetime(2025, 1, 15, 12, 0, 0, tzinfo=UTC)
         age = _snapshot_age_seconds({"ts": "2025-01-15T12:00:00Z"})
         self.assertAlmostEqual(age, 5.0)
 
@@ -63,7 +63,9 @@ class TestGetMarkovSnapshotMode(unittest.TestCase):
 
     @patch("core.signals.filters._snapshot_age_seconds", return_value=5 * 60 * 60)
     def test_stale_when_between_max_and_stale(self, _):
-        self.assertEqual(_get_markov_snapshot_mode({"is_ready": True, "ts": "x"}), "stale_penalty_only")
+        self.assertEqual(
+            _get_markov_snapshot_mode({"is_ready": True, "ts": "x"}), "stale_penalty_only"
+        )
 
     @patch("core.signals.filters._snapshot_age_seconds", return_value=7 * 60 * 60)
     def test_expired_when_past_stale(self, _):
@@ -103,7 +105,14 @@ class TestEvaluateBootstrapHeuristic(unittest.TestCase):
         self.assertEqual(r["heuristic_confidence"], 0.0)
 
     def test_buy_all_hits(self):
-        ctx = {"rsi": 60.0, "adx": 25.0, "vol_rel": 1.5, "atr_pct": 0.03, "close": 110.0, "ema": 100.0}
+        ctx = {
+            "rsi": 60.0,
+            "adx": 25.0,
+            "vol_rel": 1.5,
+            "atr_pct": 0.03,
+            "close": 110.0,
+            "ema": 100.0,
+        }
         r = _evaluate_bootstrap_heuristic("BUY", ctx)
         self.assertIn("EMA_ALIGN", r["heuristic_hits"])
         self.assertIn("ADX_OK", r["heuristic_hits"])
@@ -121,15 +130,24 @@ class TestEvaluateBootstrapHeuristic(unittest.TestCase):
         self.assertFalse(r["bootstrap_ready_real"])
 
     def test_sell_ema_align(self):
-        ctx = {"rsi": 40.0, "adx": 20.0, "vol_rel": 1.2, "atr_pct": 0.02, "close": 90.0, "ema": 100.0}
+        ctx = {
+            "rsi": 40.0,
+            "adx": 20.0,
+            "vol_rel": 1.2,
+            "atr_pct": 0.02,
+            "close": 90.0,
+            "ema": 100.0,
+        }
         r = _evaluate_bootstrap_heuristic("SELL", ctx)
         self.assertIn("EMA_ALIGN", r["heuristic_hits"])
 
 
 class TestIsShadowLearningRuntime(unittest.TestCase):
     def test_paper_shadow_mode_returns_true(self):
-        with patch.object(Config, "PAPER_MODE", True), \
-             patch.object(Config, "EXECUTION_BACKEND", "shadow_live"):
+        with (
+            patch.object(Config, "PAPER_MODE", True),
+            patch.object(Config, "EXECUTION_BACKEND", "shadow_live"),
+        ):
             bot = SimpleNamespace(execution_mode="shadow")
             self.assertTrue(_is_shadow_learning_runtime(bot))
 
@@ -139,8 +157,10 @@ class TestIsShadowLearningRuntime(unittest.TestCase):
             self.assertFalse(_is_shadow_learning_runtime(bot))
 
     def test_shadow_live_backend_returns_true(self):
-        with patch.object(Config, "PAPER_MODE", True), \
-             patch.object(Config, "EXECUTION_BACKEND", "shadow_live"):
+        with (
+            patch.object(Config, "PAPER_MODE", True),
+            patch.object(Config, "EXECUTION_BACKEND", "shadow_live"),
+        ):
             bot = SimpleNamespace(execution_mode="live")
             self.assertTrue(_is_shadow_learning_runtime(bot))
 
@@ -169,16 +189,20 @@ class TestResolveBtcRegimeAdjustment(unittest.TestCase):
             self.assertEqual(r, "BEAR_COUNTER")
 
     def test_range_penalty(self):
-        with patch.object(Config, "HMM_RANGE_PENALTY", 0.5), \
-             patch.object(Config, "HMM_RANGE_VETO", False):
+        with (
+            patch.object(Config, "HMM_RANGE_PENALTY", 0.5),
+            patch.object(Config, "HMM_RANGE_VETO", False),
+        ):
             w, r, v = _resolve_btc_regime_adjustment("BUY", "RANGE")
             self.assertEqual(w, 0.5)
             self.assertEqual(r, "RANGE_PENALTY")
             self.assertFalse(v)
 
     def test_range_veto(self):
-        with patch.object(Config, "HMM_RANGE_PENALTY", 0.5), \
-             patch.object(Config, "HMM_RANGE_VETO", True):
+        with (
+            patch.object(Config, "HMM_RANGE_PENALTY", 0.5),
+            patch.object(Config, "HMM_RANGE_VETO", True),
+        ):
             w, r, v = _resolve_btc_regime_adjustment("BUY", "RANGE")
             self.assertEqual(w, 0.0)
             self.assertEqual(r, "RANGE_VETO")

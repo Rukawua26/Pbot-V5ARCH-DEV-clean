@@ -11,14 +11,16 @@ def _candles(rows=80):
     price = 100.0
     for idx in range(rows):
         price += 0.2 if idx % 7 else -0.1
-        data.append({
-            "time": base + pd.Timedelta(hours=idx),
-            "open": price - 0.1,
-            "high": price + 0.8,
-            "low": price - 0.8,
-            "close": price,
-            "volume": 1000.0 + idx,
-        })
+        data.append(
+            {
+                "time": base + pd.Timedelta(hours=idx),
+                "open": price - 0.1,
+                "high": price + 0.8,
+                "low": price - 0.8,
+                "close": price,
+                "volume": 1000.0 + idx,
+            }
+        )
     return pd.DataFrame(data)
 
 

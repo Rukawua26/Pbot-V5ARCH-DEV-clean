@@ -1,5 +1,4 @@
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,13 +6,11 @@ from unittest.mock import MagicMock, patch
 
 from config import Config
 from core.regime_tuning import (
-    _load_stats,
-    _save_stats,
     _STATS_PATH,
     get_sl_multiplier,
+    get_stats_summary,
     get_tp_multiplier,
     record_trade,
-    get_stats_summary,
 )
 
 
@@ -26,10 +23,12 @@ class RegimeTuningTests(unittest.TestCase):
 
     def tearDown(self):
         import shutil
+
         shutil.rmtree(self.tmp_dir, ignore_errors=True)
 
     def _set_stats_path(self, path: Path):
         import core.regime_tuning as rt
+
         rt._STATS_PATH = path
         # Reset module-level cache if any
 
@@ -80,8 +79,9 @@ class RegimeTuningTests(unittest.TestCase):
         self._set_stats_path(tmp)
         record_trade("BULL_TREND", 1.0)
         record_trade("BULL_TREND", 1.0)
-        with patch.object(Config, "REGIME_TUNING_ENABLED", True), patch.object(
-            Config, "REGIME_TUNING_MIN_TRADES", 5
+        with (
+            patch.object(Config, "REGIME_TUNING_ENABLED", True),
+            patch.object(Config, "REGIME_TUNING_MIN_TRADES", 5),
         ):
             mult = get_sl_multiplier(self.bot, "BULL_TREND")
         self.assertEqual(mult, 1.0)
@@ -94,9 +94,11 @@ class RegimeTuningTests(unittest.TestCase):
             record_trade("RANGE", -1.0)
         for _ in range(2):
             record_trade("RANGE", 1.0)
-        with patch.object(Config, "REGIME_TUNING_ENABLED", True), patch.object(
-            Config, "REGIME_TUNING_MIN_TRADES", 5
-        ), patch.object(Config, "REGIME_TUNING_SL_RANGE_MIN", 0.60):
+        with (
+            patch.object(Config, "REGIME_TUNING_ENABLED", True),
+            patch.object(Config, "REGIME_TUNING_MIN_TRADES", 5),
+            patch.object(Config, "REGIME_TUNING_SL_RANGE_MIN", 0.60),
+        ):
             mult = get_sl_multiplier(self.bot, "RANGE")
         self.assertLess(mult, 0.7)
 
@@ -108,9 +110,11 @@ class RegimeTuningTests(unittest.TestCase):
             record_trade("BULL_TREND", -1.0)
         for _ in range(7):
             record_trade("BULL_TREND", 1.0)
-        with patch.object(Config, "REGIME_TUNING_ENABLED", True), patch.object(
-            Config, "REGIME_TUNING_MIN_TRADES", 5
-        ), patch.object(Config, "REGIME_TUNING_SL_RANGE_MAX", 1.20):
+        with (
+            patch.object(Config, "REGIME_TUNING_ENABLED", True),
+            patch.object(Config, "REGIME_TUNING_MIN_TRADES", 5),
+            patch.object(Config, "REGIME_TUNING_SL_RANGE_MAX", 1.20),
+        ):
             mult = get_sl_multiplier(self.bot, "BULL_TREND")
         self.assertGreater(mult, 1.15)
 
@@ -119,8 +123,9 @@ class RegimeTuningTests(unittest.TestCase):
         self._set_stats_path(tmp)
         for _ in range(6):
             record_trade("BULL_TREND", 1.0)
-        with patch.object(Config, "REGIME_TUNING_ENABLED", True), patch.object(
-            Config, "REGIME_TUNING_MIN_TRADES", 5
+        with (
+            patch.object(Config, "REGIME_TUNING_ENABLED", True),
+            patch.object(Config, "REGIME_TUNING_MIN_TRADES", 5),
         ):
             mult = get_tp_multiplier(self.bot, "BULL_TREND")
         self.assertGreater(mult, 1.1)
@@ -181,9 +186,10 @@ class RegimeTuningRiskEngineIntegrationTests(unittest.TestCase):
         engine = RiskEngine(brain)
         engine.hyperopt_enabled = False
 
-        with patch.object(
-            Strategy, "get_stop_loss", return_value=95.0
-        ), patch.object(Strategy, "get_take_profit", return_value=110.0):
+        with (
+            patch.object(Strategy, "get_stop_loss", return_value=95.0),
+            patch.object(Strategy, "get_take_profit", return_value=110.0),
+        ):
             sl, tp, mode = engine.get_exit_levels(
                 entry_price=100.0,
                 side="BUY",

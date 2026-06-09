@@ -11,9 +11,7 @@ def check_ml_models_health(bot, ml_monitor_available):
     try:
         results = bot.ml_monitor.check_all_health()
         unhealthy = [
-            name
-            for name, value in results.items()
-            if value.get("health_status") == "unhealthy"
+            name for name, value in results.items() if value.get("health_status") == "unhealthy"
         ]
         if unhealthy:
             message = f"⚠️ Modelos ML en mal estado: {unhealthy}"
@@ -91,9 +89,7 @@ def check_ml_models_health(bot, ml_monitor_available):
             if perf_metrics:
                 metrics = perf_metrics.calculate_metrics()
                 if metrics.get("accuracy", 1.0) < Config.ML_HEALTH_MIN_ACCURACY:
-                    bot.log(
-                        f"🛑 VETO ML: Accuracy baja ({metrics.get('accuracy', 0) * 100:.1f}%)"
-                    )
+                    bot.log(f"🛑 VETO ML: Accuracy baja ({metrics.get('accuracy', 0) * 100:.1f}%)")
                     is_healthy = False
 
         return is_healthy

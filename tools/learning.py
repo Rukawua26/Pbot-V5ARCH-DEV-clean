@@ -33,7 +33,7 @@ from core.shadow_logger import (
 try:
     from config import Config
 except ImportError:
-    Config = None
+    Config = None  # type: ignore[assignment, misc]
 
 import time
 

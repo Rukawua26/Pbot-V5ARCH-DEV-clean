@@ -131,8 +131,9 @@ class DashboardIpcTest(unittest.TestCase):
     def test_dashboard_startup_reuses_existing_localhost_server(self):
         bot = _DummyBot()
 
-        with patch.object(dashboard, "_dashboard_thread", None), patch.object(
-            dashboard, "_is_port_open", return_value=True
+        with (
+            patch.object(dashboard, "_dashboard_thread", None),
+            patch.object(dashboard, "_is_port_open", return_value=True),
         ):
             handle = dashboard.start_dashboard(bot)
 
@@ -144,8 +145,9 @@ class DashboardIpcTest(unittest.TestCase):
     def test_dashboard_startup_can_be_disabled_by_env(self):
         bot = _DummyBot()
 
-        with patch.dict(os.environ, {"SNIPER_DASHBOARD_AUTOSTART": "false"}), patch.object(
-            dashboard, "_dashboard_thread", None
+        with (
+            patch.dict(os.environ, {"SNIPER_DASHBOARD_AUTOSTART": "false"}),
+            patch.object(dashboard, "_dashboard_thread", None),
         ):
             handle = dashboard.start_dashboard(bot)
 

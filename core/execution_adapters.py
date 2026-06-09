@@ -3,7 +3,6 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from typing import Optional
 
 
 class ShadowExecutionAdapter:
@@ -21,9 +20,9 @@ class ShadowExecutionAdapter:
         price_out_of_range_rate: float = 0.05,
         min_partial_ratio: float = 0.3,
         simulated_balance_provider=None,
-        random_source: Optional[random.Random] = None,
+        random_source: random.Random | None = None,
         sleep_fn=time.sleep,
-        executor: Optional[ThreadPoolExecutor] = None,
+        executor: ThreadPoolExecutor | None = None,
     ):
         self._live = live_execution
         self.exchange = live_execution.exchange
@@ -34,12 +33,8 @@ class ShadowExecutionAdapter:
         self._max_latency_ms = max(self._min_latency_ms, int(max_latency_ms))
         self._reject_rate = max(0.0, min(1.0, float(reject_rate)))
         self._partial_fill_rate = max(0.0, min(1.0, float(partial_fill_rate)))
-        self._partial_fill_complete_rate = max(
-            0.0, min(1.0, float(partial_fill_complete_rate))
-        )
-        self._price_out_of_range_rate = max(
-            0.0, min(1.0, float(price_out_of_range_rate))
-        )
+        self._partial_fill_complete_rate = max(0.0, min(1.0, float(partial_fill_complete_rate)))
+        self._price_out_of_range_rate = max(0.0, min(1.0, float(price_out_of_range_rate)))
         self._min_partial_ratio = max(0.05, min(0.95, float(min_partial_ratio)))
         self._rng = random_source or random.Random()
         self._simulated_balance_provider = simulated_balance_provider
@@ -48,7 +43,7 @@ class ShadowExecutionAdapter:
             max_workers=4, thread_name_prefix="shadow-exec"
         )
         self._lock = threading.RLock()
-        self._orders_by_id = {}
+        self._orders_by_id: dict[str, dict] = {}
 
     def fetch_ticker(self, symbol: str) -> dict:
         return self._live.fetch_ticker(symbol)
@@ -69,12 +64,16 @@ class ShadowExecutionAdapter:
         return self._live.fetch_order_book(symbol, limit)
 
     def fetch_positions(self):
-        raise NotImplementedError("Shadow adapter does not support fetch_positions — no real positions in shadow mode")
+        raise NotImplementedError(
+            "Shadow adapter does not support fetch_positions — no real positions in shadow mode"
+        )
 
     def get_balance(self) -> float:
         if callable(self._simulated_balance_provider):
             return float(self._simulated_balance_provider())
-        raise NotImplementedError("Shadow adapter does not support get_balance without a simulated balance provider")
+        raise NotImplementedError(
+            "Shadow adapter does not support get_balance without a simulated balance provider"
+        )
 
     def fetch_balance(self):
         balance = self.get_balance()
@@ -84,7 +83,9 @@ class ShadowExecutionAdapter:
         self._simulated_balance_provider = provider
 
     def set_leverage(self, leverage: int, symbol: str):
-        raise NotImplementedError("Shadow adapter does not support set_leverage — no real leverage in shadow mode")
+        raise NotImplementedError(
+            "Shadow adapter does not support set_leverage — no real leverage in shadow mode"
+        )
 
     def set_weight_tracker(self, tracker):
         self._live.set_weight_tracker(tracker)
@@ -102,7 +103,7 @@ class ShadowExecutionAdapter:
         side: str,
         amount: float,
         price: float,
-        client_order_id: Optional[str],
+        client_order_id: str | None,
         force_partial: bool = False,
         latency_ms: int = 0,
     ):
@@ -209,7 +210,7 @@ class ShadowExecutionAdapter:
         amount: float,
         price: float,
         slippage_pct: float = 0.1,
-        client_order_id: Optional[str] = None,
+        client_order_id: str | None = None,
     ):
         self.last_entry_reject_error = ""
         if self._reject():
@@ -220,9 +221,7 @@ class ShadowExecutionAdapter:
                 )
             return None
 
-        market_price = float(
-            (self._live.fetch_ticker(symbol) or {}).get("last") or price
-        )
+        market_price = float((self._live.fetch_ticker(symbol) or {}).get("last") or price)
         shock = 0.0
         if self._rng.random() < self._price_out_of_range_rate:
             shock = self._rng.uniform(0.003, 0.01)
@@ -250,7 +249,7 @@ class ShadowExecutionAdapter:
 
         return dict(order)
 
-    def fetch_open_orders(self, symbol: Optional[str] = None):
+    def fetch_open_orders(self, symbol: str | None = None):
         with self._lock:
             self._advance_orders_locked()
             orders = []
@@ -279,7 +278,7 @@ class ShadowExecutionAdapter:
         side: str,
         amount: float,
         stop_price: float,
-        client_order_id: Optional[str] = None,
+        client_order_id: str | None = None,
     ):
         ticker = self._live.fetch_ticker(symbol)
         market_price = float(ticker.get("last") or 0.0)
@@ -359,7 +358,7 @@ def build_execution_gateway(config, execution_service_cls):
     execution = execution_service_cls(config.BINANCE_API_KEY, config.BINANCE_API_SECRET)
 
     if bool(getattr(config, "USE_TESTNET", False)):
-        execution.exchange.options['disableFuturesSandboxWarning'] = True
+        execution.exchange.options["disableFuturesSandboxWarning"] = True
         try:
             execution.exchange.set_sandbox_mode(True)
         except Exception as error:
@@ -369,25 +368,19 @@ def build_execution_gateway(config, execution_service_cls):
     backend = str(getattr(config, "EXECUTION_BACKEND", "live") or "live").lower()
     if backend == "shadow_live":
         if not bool(getattr(config, "PAPER_MODE", True)):
-            raise RuntimeError(
-                "EXECUTION_BACKEND=shadow_live no está permitido en modo REAL"
-            )
+            raise RuntimeError("EXECUTION_BACKEND=shadow_live no está permitido en modo REAL")
         return ShadowExecutionAdapter(
             execution,
             min_latency_ms=int(getattr(config, "SHADOW_SIM_LATENCY_MIN_MS", 200)),
             max_latency_ms=int(getattr(config, "SHADOW_SIM_LATENCY_MAX_MS", 500)),
             reject_rate=float(getattr(config, "SHADOW_SIM_REJECT_RATE", 0.03)),
-            partial_fill_rate=float(
-                getattr(config, "SHADOW_SIM_PARTIAL_FILL_RATE", 0.25)
-            ),
+            partial_fill_rate=float(getattr(config, "SHADOW_SIM_PARTIAL_FILL_RATE", 0.25)),
             partial_fill_complete_rate=float(
                 getattr(config, "SHADOW_SIM_PARTIAL_COMPLETE_RATE", 0.5)
             ),
             price_out_of_range_rate=float(
                 getattr(config, "SHADOW_SIM_PRICE_OUT_OF_RANGE_RATE", 0.05)
             ),
-            min_partial_ratio=float(
-                getattr(config, "SHADOW_SIM_MIN_PARTIAL_RATIO", 0.3)
-            ),
+            min_partial_ratio=float(getattr(config, "SHADOW_SIM_MIN_PARTIAL_RATIO", 0.3)),
         )
     return execution

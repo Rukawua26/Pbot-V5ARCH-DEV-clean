@@ -1,13 +1,13 @@
 import unittest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from threading import RLock
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from core.reconciliation import (
     generate_client_order_id,
-    recover_halt_if_exchange_consistent,
     reconcile_bootstrap_state,
+    recover_halt_if_exchange_consistent,
 )
 
 
@@ -21,6 +21,7 @@ class ReconciliationTest(unittest.TestCase):
 
     def test_integrity_lock_is_enabled_when_balance_diff_is_high(self):
         from config import Config as RealConfig
+
         original_paper_mode = RealConfig.PAPER_MODE
 
         try:
@@ -33,7 +34,9 @@ class ReconciliationTest(unittest.TestCase):
             bot.is_paused = False
             bot.integrity_lock_active = False
             bot.log = MagicMock()
-            bot.execution = SimpleNamespace(fetch_positions=lambda: [], fetch_open_orders=lambda: [])
+            bot.execution = SimpleNamespace(
+                fetch_positions=lambda: [], fetch_open_orders=lambda: []
+            )
             bot.get_current_balance = lambda: 80.0
             bot.brain = SimpleNamespace(
                 save_active_trade_state=MagicMock(),
@@ -42,6 +45,7 @@ class ReconciliationTest(unittest.TestCase):
             )
 
             from core.reconciliation import reconcile_bootstrap_state
+
             reconcile_bootstrap_state(bot)
 
             self.assertTrue(bot.integrity_lock_active, "integrity_lock_active should be True")
@@ -135,7 +139,7 @@ class ReconciliationTest(unittest.TestCase):
 
     @patch("core.reconciliation.send_telegram_msg")
     def test_marks_lost_when_no_position_and_no_open_order(self, mocked_tg):
-        stale_ts = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
+        stale_ts = (datetime.now(UTC) - timedelta(seconds=180)).isoformat()
         # Generar ID con nuevo formato
         missing_coid = generate_client_order_id("BTC/USDT", "BUY", 1712222222.123, "missing")
 
@@ -174,13 +178,11 @@ class ReconciliationTest(unittest.TestCase):
         self.assertNotIn("BTC/USDT", bot.active_trades)
         bot.brain.save_error_snapshot.assert_called_once()
         bot.brain.delete_active_trade_state.assert_called_once_with("BTC/USDT")
-        self.assertEqual(
-            bot.brain.save_error_snapshot.call_args[0][1], "INTENT_EXPIRED"
-        )
+        self.assertEqual(bot.brain.save_error_snapshot.call_args[0][1], "INTENT_EXPIRED")
         mocked_tg.assert_called_once()
 
     def test_keeps_recent_pending_send_when_exchange_still_has_no_order(self):
-        fresh_ts = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+        fresh_ts = (datetime.now(UTC) - timedelta(seconds=10)).isoformat()
         # Generar ID con nuevo formato
         fresh_coid = generate_client_order_id("BTC/USDT", "BUY", 1712222222.123, "fresh")
 
@@ -223,7 +225,7 @@ class ReconciliationTest(unittest.TestCase):
         bot.brain.save_error_snapshot.assert_not_called()
 
     def test_keeps_stale_pending_when_order_lookup_fails_transiently(self):
-        stale_ts = (datetime.now(timezone.utc) - timedelta(seconds=180)).isoformat()
+        stale_ts = (datetime.now(UTC) - timedelta(seconds=180)).isoformat()
         entry_coid = generate_client_order_id("BTC/USDT", "BUY", 1712222222.123, "lookup")
 
         bot = SimpleNamespace()
@@ -366,9 +368,7 @@ class ReconciliationTest(unittest.TestCase):
         bot.is_paused = False
         bot.integrity_lock_active = False
         bot.log = MagicMock()
-        bot.execution = SimpleNamespace(
-            fetch_positions=MagicMock(side_effect=RuntimeError("down"))
-        )
+        bot.execution = SimpleNamespace(fetch_positions=MagicMock(side_effect=RuntimeError("down")))
         bot.get_current_balance = lambda: 100.0
         bot.brain = SimpleNamespace(
             save_active_trade_state=MagicMock(),
@@ -439,8 +439,9 @@ class OrphanAdoptionTest(unittest.TestCase):
     @patch("core.reconciliation.send_telegram_msg")
     def test_orphan_rejected_below_min_size(self, mocked_tg):
         from core.config.operational import OperationalConfig
-        original_min = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MIN_SIZE_USD', 10.0)
-        original_max = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MAX_SIZE_USD', 10000.0)
+
+        original_min = getattr(OperationalConfig, "ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
+        original_max = getattr(OperationalConfig, "ORPHAN_ADOPTION_MAX_SIZE_USD", 10000.0)
         OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD = 10.0
         OperationalConfig.ORPHAN_ADOPTION_MAX_SIZE_USD = 10000.0
 
@@ -483,8 +484,9 @@ class OrphanAdoptionTest(unittest.TestCase):
     @patch("core.reconciliation.send_telegram_msg")
     def test_orphan_rejected_above_max_size(self, mocked_tg):
         from core.config.operational import OperationalConfig
-        original_min = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MIN_SIZE_USD', 10.0)
-        original_max = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MAX_SIZE_USD', 10000.0)
+
+        original_min = getattr(OperationalConfig, "ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
+        original_max = getattr(OperationalConfig, "ORPHAN_ADOPTION_MAX_SIZE_USD", 10000.0)
         OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD = 10.0
         OperationalConfig.ORPHAN_ADOPTION_MAX_SIZE_USD = 10000.0
 
@@ -527,8 +529,9 @@ class OrphanAdoptionTest(unittest.TestCase):
     @patch("core.reconciliation.send_telegram_msg")
     def test_orphan_adopted_with_dynamic_sl(self, mocked_tg):
         from core.config.operational import OperationalConfig
-        original_min = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MIN_SIZE_USD', 10.0)
-        original_max = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MAX_SIZE_USD', 10000.0)
+
+        original_min = getattr(OperationalConfig, "ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
+        original_max = getattr(OperationalConfig, "ORPHAN_ADOPTION_MAX_SIZE_USD", 10000.0)
         OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD = 10.0
         OperationalConfig.ORPHAN_ADOPTION_MAX_SIZE_USD = 10000.0
 
@@ -575,8 +578,9 @@ class OrphanAdoptionTest(unittest.TestCase):
     @patch("core.reconciliation.send_telegram_msg")
     def test_orphan_without_hard_sl_halts_runtime(self, mocked_tg):
         from core.config.operational import OperationalConfig
-        original_min = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MIN_SIZE_USD', 10.0)
-        original_max = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MAX_SIZE_USD', 10000.0)
+
+        original_min = getattr(OperationalConfig, "ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
+        original_max = getattr(OperationalConfig, "ORPHAN_ADOPTION_MAX_SIZE_USD", 10000.0)
         OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD = 10.0
         OperationalConfig.ORPHAN_ADOPTION_MAX_SIZE_USD = 10000.0
 
@@ -613,9 +617,7 @@ class OrphanAdoptionTest(unittest.TestCase):
             reconcile_bootstrap_state(bot)
 
             self.assertIn("ETH/USDT", bot.active_trades)
-            self.assertEqual(
-                bot.active_trades["ETH/USDT"].get("status"), "ADOPTED_UNPROTECTED"
-            )
+            self.assertEqual(bot.active_trades["ETH/USDT"].get("status"), "ADOPTED_UNPROTECTED")
             self.assertTrue(bot.is_paused)
             self.assertTrue(bot.integrity_lock_active)
             self.assertTrue(bot.halt_system_active)
@@ -627,8 +629,9 @@ class OrphanAdoptionTest(unittest.TestCase):
     @patch("core.reconciliation.send_telegram_msg")
     def test_orphan_fallback_to_fixed_percentage_when_ticker_fails(self, mocked_tg):
         from core.config.operational import OperationalConfig
-        original_min = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MIN_SIZE_USD', 10.0)
-        original_max = getattr(OperationalConfig, 'ORPHAN_ADOPTION_MAX_SIZE_USD', 10000.0)
+
+        original_min = getattr(OperationalConfig, "ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
+        original_max = getattr(OperationalConfig, "ORPHAN_ADOPTION_MAX_SIZE_USD", 10000.0)
         OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD = 10.0
         OperationalConfig.ORPHAN_ADOPTION_MAX_SIZE_USD = 10000.0
 
@@ -758,9 +761,7 @@ class HaltRecoveryTest(unittest.TestCase):
         self.assertTrue(bot.halt_system_active)
 
     def test_recover_halt_blocks_when_local_real_trade_exists(self):
-        bot = self._bot(
-            active_trades={"BTC/USDT": {"symbol": "BTC/USDT", "is_shadow": False}}
-        )
+        bot = self._bot(active_trades={"BTC/USDT": {"symbol": "BTC/USDT", "is_shadow": False}})
 
         ok, msg = recover_halt_if_exchange_consistent(bot, required_snapshots=1)
 
@@ -769,15 +770,14 @@ class HaltRecoveryTest(unittest.TestCase):
         self.assertTrue(bot.halt_system_active)
 
     def test_recover_halt_blocks_when_exchange_position_exists(self):
-        bot = self._bot(
-            positions=[{"symbol": "ETH/USDT:USDT", "contracts": 0.5, "side": "long"}]
-        )
+        bot = self._bot(positions=[{"symbol": "ETH/USDT:USDT", "contracts": 0.5, "side": "long"}])
 
         ok, msg = recover_halt_if_exchange_consistent(bot, required_snapshots=1)
 
         self.assertFalse(ok)
         self.assertIn("EXCHANGE_EXPOSURE", msg)
         self.assertTrue(bot.integrity_lock_active)
+
 
 if __name__ == "__main__":
     unittest.main()

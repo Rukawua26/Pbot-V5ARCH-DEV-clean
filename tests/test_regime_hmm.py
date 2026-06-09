@@ -1,17 +1,17 @@
-import unittest
 import threading
-from datetime import datetime, timedelta, timezone
+import unittest
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
 
-from core.strategy.regime_hmm import DynamicHMMRegime
-from core.strategy.orchestrator import StrategyOrchestrator
 import core.bot_market_state as market_state
 from core.signals import analyze as signal_analyze
 from core.signals import filters
+from core.strategy.orchestrator import StrategyOrchestrator
+from core.strategy.regime_hmm import DynamicHMMRegime
 
 
 class DynamicHMMRegimeTests(unittest.TestCase):
@@ -37,7 +37,9 @@ class DynamicHMMRegimeTests(unittest.TestCase):
             self.skipTest("hmmlearn is installed in this environment")
 
         self.assertFalse(regime.dynamic_retrain(pd.DataFrame({"close": [1.0] * 120})))
-        self.assertEqual(regime.predict_regime(pd.DataFrame({"close": [1.0] * 120})), ("UNKNOWN", 0.0))
+        self.assertEqual(
+            regime.predict_regime(pd.DataFrame({"close": [1.0] * 120})), ("UNKNOWN", 0.0)
+        )
 
     def test_markov_snapshot_exposes_transition_probabilities(self):
         class FakeModel:
@@ -227,7 +229,7 @@ class MarketStateHMMFallbackTests(unittest.TestCase):
             dynamic_retrain=lambda *_: True,
             predict_regime=lambda *_: ("BULL_TREND", 0.90),
             predict_markov_snapshot=lambda *_: {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "is_ready": True,
                 "state": "BULL_TREND",
                 "bullish_breakout_prob": 80.0,
@@ -252,7 +254,7 @@ class MarketStateHMMFallbackTests(unittest.TestCase):
             }
         )
         snapshot = {
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
             "is_ready": True,
             "state": "RANGE",
             "bullish_breakout_prob": 82.0,
@@ -425,7 +427,12 @@ class RegimeRangeFilterTests(unittest.TestCase):
                         with patch.object(
                             filters.Strategy,
                             "check_entry_filters",
-                            return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
+                            return_value=(
+                                True,
+                                "OK",
+                                "CALM",
+                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            ),
                         ):
                             prob_final, filter_passed, filter_reason, updated_ctx = (
                                 filters._apply_entry_filters_and_adjust_prob(
@@ -543,7 +550,7 @@ class RegimeRangeFilterTests(unittest.TestCase):
             "trend": "RANGO",
             "tier": "IRON",
             "hmm_data": {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "is_ready": True,
                 "state": "RANGE",
                 "bullish_breakout_prob": 82.0,
@@ -559,7 +566,12 @@ class RegimeRangeFilterTests(unittest.TestCase):
                         with patch.object(
                             filters.Strategy,
                             "check_entry_filters",
-                            return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
+                            return_value=(
+                                True,
+                                "OK",
+                                "CALM",
+                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            ),
                         ):
                             prob_final, filter_passed, filter_reason, updated_ctx = (
                                 filters._apply_entry_filters_and_adjust_prob(
@@ -594,7 +606,7 @@ class RegimeRangeFilterTests(unittest.TestCase):
             "trend": "RANGO",
             "tier": "IRON",
             "hmm_data": {
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "is_ready": True,
                 "state": "RANGE",
                 "bullish_breakout_prob": 20.0,
@@ -609,7 +621,12 @@ class RegimeRangeFilterTests(unittest.TestCase):
                         with patch.object(
                             filters.Strategy,
                             "check_entry_filters",
-                            return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
+                            return_value=(
+                                True,
+                                "OK",
+                                "CALM",
+                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            ),
                         ):
                             prob_final, filter_passed, filter_reason, updated_ctx = (
                                 filters._apply_entry_filters_and_adjust_prob(
@@ -631,7 +648,7 @@ class RegimeRangeFilterTests(unittest.TestCase):
         self.assertEqual(bot.markov_decision_stats["range_dead_zone_penalty"], 1)
 
     def test_stale_markov_snapshot_can_penalize_but_not_boost(self):
-        stale_ts = (datetime.now(timezone.utc) - timedelta(hours=3)).isoformat()
+        stale_ts = (datetime.now(UTC) - timedelta(hours=3)).isoformat()
         ctx = {
             "rsi": 55.0,
             "adx": 22.0,
@@ -772,7 +789,7 @@ class RegimePreVetoTests(unittest.TestCase):
     def test_pre_veto_range_allows_real_analysis_when_markov_not_bearish_extreme(self):
         bot = self._build_bot("RANGE")
         bot.hmm_markov_snapshot = {
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
             "is_ready": True,
             "state": "RANGE",
             "bearish_reversal_prob": 35.0,
@@ -797,7 +814,7 @@ class RegimePreVetoTests(unittest.TestCase):
     def test_pre_veto_range_blocks_real_when_markov_bearish_extreme(self):
         bot = self._build_bot("RANGE")
         bot.hmm_markov_snapshot = {
-            "ts": datetime.now(timezone.utc).isoformat(),
+            "ts": datetime.now(UTC).isoformat(),
             "is_ready": True,
             "state": "RANGE",
             "bearish_reversal_prob": 90.0,
@@ -806,7 +823,9 @@ class RegimePreVetoTests(unittest.TestCase):
 
         with patch.object(signal_analyze.Config, "HMM_RANGE_VETO", True):
             with patch.object(signal_analyze.Config, "PAPER_MODE", False):
-                with patch.object(signal_analyze.Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0):
+                with patch.object(
+                    signal_analyze.Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0
+                ):
                     with patch.object(signal_analyze.Strategy, "analyze") as analyze_mock:
                         result = signal_analyze._analyze_symbol_candidate(
                             bot, "TEST/USDT", "TEST/USDT", df, df, elapsed=12
@@ -858,12 +877,8 @@ class HMMOrchestratorWeightsTests(unittest.TestCase):
     def test_orchestrator_uses_hmm_directional_regimes_directly(self):
         orchestrator = StrategyOrchestrator()
 
-        bull_weights = orchestrator.get_adaptive_weights(
-            "BULL_TREND", adx=30.0, rsi=55.0
-        )
-        bear_weights = orchestrator.get_adaptive_weights(
-            "BEAR_TREND", adx=30.0, rsi=45.0
-        )
+        bull_weights = orchestrator.get_adaptive_weights("BULL_TREND", adx=30.0, rsi=55.0)
+        bear_weights = orchestrator.get_adaptive_weights("BEAR_TREND", adx=30.0, rsi=45.0)
 
         self.assertGreater(bull_weights["MT"], bull_weights["SR"])
         self.assertGreater(bear_weights["MT"], bear_weights["SR"])

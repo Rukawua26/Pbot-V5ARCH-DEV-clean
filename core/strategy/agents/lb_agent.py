@@ -1,11 +1,12 @@
-from typing import Dict, Any
 from core.strategy.base_agent import BaseAgent
 
 try:
     from advanced_ensemble import OrderBookAnalyzer
+
     OB_AVAILABLE = True
 except ImportError:
     OB_AVAILABLE = False
+
 
 class LBAgent(BaseAgent):
     """
@@ -17,7 +18,7 @@ class LBAgent(BaseAgent):
 
     def __init__(self, weight: float = 1.0):
         super().__init__(name="LB", weight=weight)
-        self._vol_history = {} # [AUDIT FIX V118-L4] Anti-Spoofing Memoria Temporal
+        self._vol_history = {}  # [AUDIT FIX V118-L4] Anti-Spoofing Memoria Temporal
 
     def vote(self, context: dict) -> float:
         order_book = context.get("order_book")
@@ -25,7 +26,8 @@ class LBAgent(BaseAgent):
         side = context.get("side", "BUY")
         symbol = context.get("symbol", "UNKNOWN")
 
-        if not order_book: return 50.0
+        if not order_book:
+            return 50.0
 
         # 1. Desequilibrio de Libro
         ob_score = 0.5
@@ -54,7 +56,7 @@ class LBAgent(BaseAgent):
         # Si el contexto provee tick_count y tick_count_avg, verificamos que el muro
         # de ballena sea acompañado por operaciones reales y no sea un flash-wall.
         tick_count = context.get("tick_count", 0)
-        tick_avg   = context.get("tick_count_avg", 0)
+        tick_avg = context.get("tick_count_avg", 0)
         if tick_count > 0 and tick_avg > 0:
             if tick_count < tick_avg * 1.2:
                 # Muro sin flujo real → probable spoofing, abstención conservadora
@@ -63,6 +65,7 @@ class LBAgent(BaseAgent):
         score = ob_score * 100
 
         # Ajuste final por potencia de la ballena sólida.
-        if avg_vol > 3.0: score = min(score + 20, 95.0) if score > 50 else max(score - 20, 5.0)
+        if avg_vol > 3.0:
+            score = min(score + 20, 95.0) if score > 50 else max(score - 20, 5.0)
 
         return min(max(score, 0), 100)

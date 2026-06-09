@@ -22,8 +22,8 @@ class AsyncShadowLogger:
     """
 
     def __init__(self, brain_db_path: str = DEFAULT_DB_PATH):
-        self.buffer = []
-        self.queue = Queue()
+        self.buffer: list[dict] = []
+        self.queue: Queue[dict] = Queue()
         self.db_path = brain_db_path
         self.lock = threading.Lock()
         self.FLUSH_INTERVAL = 15  # segundos
@@ -96,9 +96,7 @@ class AsyncShadowLogger:
                     return
                 except Exception as error:
                     last_error = error
-                    print(
-                        f"⚠️ [SHADOW] Intento {attempt}/3 fallido al escribir en DB: {error}"
-                    )
+                    print(f"⚠️ [SHADOW] Intento {attempt}/3 fallido al escribir en DB: {error}")
                     if attempt < 3:
                         time.sleep(2**attempt)  # 2s, 4s de espera entre intentos
 
@@ -145,13 +143,14 @@ class LazyShadowLogger:
 
     def __init__(self, brain_db_path: str = DEFAULT_DB_PATH):
         self.db_path = brain_db_path
-        self._instance = None
+        self._instance: AsyncShadowLogger | None = None
         self._lock = threading.Lock()
 
     def _get(self) -> AsyncShadowLogger:
         with self._lock:
             if self._instance is None:
                 self._instance = AsyncShadowLogger(self.db_path)
+            assert self._instance is not None
             return self._instance
 
     def log(self, entry: dict):

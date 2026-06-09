@@ -1,6 +1,6 @@
 import unittest
 
-from core.config.manager import Config, _CONFIG_ENV_WARNINGS, _env_bool, _env_float, _env_int
+from core.config.manager import _CONFIG_ENV_WARNINGS, Config, _env_bool, _env_float, _env_int
 from core.config.operational import OperationalConfig
 from core.config.strategy import StrategyConfig
 

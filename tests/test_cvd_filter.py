@@ -98,8 +98,9 @@ class CVDFilterTests(unittest.TestCase):
         bot = self._bot_with_cvd({"total_volume": 100, "imbalance": 0.9})
         ctx = {}
 
-        with patch.object(Config, "CVD_FILTER_ENABLED", True), patch.object(
-            Config, "CVD_MIN_QUOTE_VOLUME", 1000.0
+        with (
+            patch.object(Config, "CVD_FILTER_ENABLED", True),
+            patch.object(Config, "CVD_MIN_QUOTE_VOLUME", 1000.0),
         ):
             prob, passed, reason = apply_cvd_filter(bot, "BTC/USDT", "BUY", 80.0, ctx)
 
@@ -111,10 +112,12 @@ class CVDFilterTests(unittest.TestCase):
         bot = self._bot_with_cvd({"total_volume": 5000, "imbalance": 0.3})
         ctx = {}
 
-        with patch.object(Config, "CVD_FILTER_ENABLED", True), patch.object(
-            Config, "CVD_MIN_QUOTE_VOLUME", 1000.0
-        ), patch.object(Config, "CVD_ALIGNED_WEIGHT", 1.05
-        ), patch("core.signals.cvd_filter.append_execution_event"):
+        with (
+            patch.object(Config, "CVD_FILTER_ENABLED", True),
+            patch.object(Config, "CVD_MIN_QUOTE_VOLUME", 1000.0),
+            patch.object(Config, "CVD_ALIGNED_WEIGHT", 1.05),
+            patch("core.signals.cvd_filter.append_execution_event"),
+        ):
             prob, passed, reason = apply_cvd_filter(bot, "BTC/USDT", "BUY", 80.0, ctx)
 
         self.assertEqual(prob, 84.0)
@@ -127,10 +130,12 @@ class CVDFilterTests(unittest.TestCase):
         bot = self._bot_with_cvd({"total_volume": 5000, "imbalance": -0.3})
         ctx = {}
 
-        with patch.object(Config, "CVD_FILTER_ENABLED", True), patch.object(
-            Config, "CVD_MIN_QUOTE_VOLUME", 1000.0
-        ), patch.object(Config, "CVD_CONFLICT_WEIGHT", 0.85
-        ), patch("core.signals.cvd_filter.append_execution_event"):
+        with (
+            patch.object(Config, "CVD_FILTER_ENABLED", True),
+            patch.object(Config, "CVD_MIN_QUOTE_VOLUME", 1000.0),
+            patch.object(Config, "CVD_CONFLICT_WEIGHT", 0.85),
+            patch("core.signals.cvd_filter.append_execution_event"),
+        ):
             prob, passed, reason = apply_cvd_filter(bot, "BTC/USDT", "BUY", 80.0, ctx)
 
         self.assertEqual(prob, 68.0)
@@ -142,9 +147,11 @@ class CVDFilterTests(unittest.TestCase):
         bot = self._bot_with_cvd({"total_volume": 5000, "imbalance": 0.01})
         ctx = {}
 
-        with patch.object(Config, "CVD_FILTER_ENABLED", True), patch.object(
-            Config, "CVD_MIN_QUOTE_VOLUME", 1000.0
-        ), patch("core.signals.cvd_filter.append_execution_event"):
+        with (
+            patch.object(Config, "CVD_FILTER_ENABLED", True),
+            patch.object(Config, "CVD_MIN_QUOTE_VOLUME", 1000.0),
+            patch("core.signals.cvd_filter.append_execution_event"),
+        ):
             prob, passed, reason = apply_cvd_filter(bot, "BTC/USDT", "BUY", 80.0, ctx)
 
         self.assertEqual(prob, 80.0)

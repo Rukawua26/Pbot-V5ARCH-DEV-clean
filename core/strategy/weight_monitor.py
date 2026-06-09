@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import deque
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from config import Config
 from core.execution_telemetry import append_execution_event
@@ -21,14 +21,13 @@ class AgentWeightMonitor:
 
     def __init__(self, brain_instance):
         self.brain = brain_instance
-        self.history: Dict[str, deque] = {
-            agent: deque(maxlen=Config.AGENT_MONITOR_WINDOW)
-            for agent in ["MT", "SR", "G"]
+        self.history: dict[str, deque] = {
+            agent: deque(maxlen=Config.AGENT_MONITOR_WINDOW) for agent in ["MT", "SR", "G"]
         }
-        self.last_alerted: Dict[str, float] = {}
+        self.last_alerted: dict[str, float] = {}
         self.evaluation_count = 0
 
-    def evaluate(self) -> List[Dict[str, Any]]:
+    def evaluate(self) -> list[dict[str, Any]]:
         """
         Evalúa el rendimiento actual de cada agente contra su historial.
         Retorna una lista de reportes de degradación (vacíos si todo ok).
@@ -37,7 +36,7 @@ class AgentWeightMonitor:
             return []
 
         perf = self.brain.get_agent_performance(primary_ids=["MT", "SR", "G"])
-        reports: List[Dict[str, Any]] = []
+        reports: list[dict[str, Any]] = []
 
         for agent in ["MT", "SR", "G"]:
             current = perf.get(agent, 100.0)
@@ -56,18 +55,20 @@ class AgentWeightMonitor:
                 last = self.last_alerted.get(agent, 0.0)
                 if abs(current - last) > 5.0:
                     self.last_alerted[agent] = current
-                    reports.append({
-                        "agent": agent,
-                        "current_score": round(current, 1),
-                        "prior_avg": round(prior_avg, 1),
-                        "drop_pct": round(pct_drop, 1),
-                        "history": [round(x, 1) for x in self.history[agent]],
-                    })
+                    reports.append(
+                        {
+                            "agent": agent,
+                            "current_score": round(current, 1),
+                            "prior_avg": round(prior_avg, 1),
+                            "drop_pct": round(pct_drop, 1),
+                            "history": [round(x, 1) for x in self.history[agent]],
+                        }
+                    )
 
         self.evaluation_count += 1
         return reports
 
-    def alert_if_degraded(self, reports: List[Dict[str, Any]]) -> None:
+    def alert_if_degraded(self, reports: list[dict[str, Any]]) -> None:
         """
         Envía alerta Telegram por cada reporte de degradación.
         """
@@ -83,7 +84,7 @@ class AgentWeightMonitor:
             except Exception as e:
                 logger.error(f"Failed to send degradation alert: {e}")
 
-    def run_check(self, bot=None) -> List[Dict[str, Any]]:
+    def run_check(self, bot=None) -> list[dict[str, Any]]:
         """
         Conveniencia: ejecuta evaluación y alerta en un solo paso.
         Retorna los reportes para logging.

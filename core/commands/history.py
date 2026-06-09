@@ -33,9 +33,7 @@ def _handle_history_commands(bot, text: str) -> bool:
     if text == "/performance_trends":
         trends = bot.brain.get_stats_by_trend()
         if not trends:
-            send_telegram_msg(
-                "📭 Aún no hay suficientes datos con snapshots para este análisis."
-            )
+            send_telegram_msg("📭 Aún no hay suficientes datos con snapshots para este análisis.")
             return True
 
         msg = "📊 *EFICIENCIA POR TIPO DE MERCADO*\n━━━━━━━━━━━━━━━━━━━━\n"
@@ -62,12 +60,8 @@ def _handle_history_commands(bot, text: str) -> bool:
         shadows = [trade for trade in trades if trade.get("is_shadow")]
 
         c_today = len(shadows)
-        wins_list = [
-            trade["pnl_percent"] for trade in shadows if trade["pnl_percent"] > 0
-        ]
-        losses_list = [
-            trade["pnl_percent"] for trade in shadows if trade["pnl_percent"] <= 0
-        ]
+        wins_list = [trade["pnl_percent"] for trade in shadows if trade["pnl_percent"] > 0]
+        losses_list = [trade["pnl_percent"] for trade in shadows if trade["pnl_percent"] <= 0]
 
         w_today = len(wins_list)
         l_today = len(losses_list)
@@ -160,9 +154,7 @@ def _handle_history_commands(bot, text: str) -> bool:
         symbol = parts[1].upper() if len(parts) > 1 else None
 
         if not symbol:
-            send_telegram_msg(
-                "⚠️ Uso: /trade_detail [SÍMBOLO]\nEj: /trade_detail BTC/USDT"
-            )
+            send_telegram_msg("⚠️ Uso: /trade_detail [SÍMBOLO]\nEj: /trade_detail BTC/USDT")
             return True
 
         found = None
@@ -202,9 +194,7 @@ def _handle_history_commands(bot, text: str) -> bool:
         if votos:
             msg += "🗳️ *VOTOS DE AGENTES:*\n"
             agent_names = {"MT": "📈 Tend", "SR": "🧱 Estr", "G": "👻 IA"}
-            for agent_id, vote in sorted(
-                votos.items(), key=lambda x: x[1], reverse=True
-            ):
+            for agent_id, vote in sorted(votos.items(), key=lambda x: x[1], reverse=True):
                 name = agent_names.get(agent_id, agent_id)
                 bar = "█" * int(vote / 10) + "░" * (10 - int(vote / 10))
                 msg += f"{name}: {bar} {vote:.0f}%\n"
@@ -283,9 +273,7 @@ def _handle_history_commands(bot, text: str) -> bool:
                     f"• BTC Delta: {btc_delta:.2f}%\n\n"
                 )
             except Exception as error:
-                bot.log(
-                    f"⚠️ No se pudo parsear market_snapshot en trade {trade_id}: {error}"
-                )
+                bot.log(f"⚠️ No se pudo parsear market_snapshot en trade {trade_id}: {error}")
 
         similar = bot.brain.get_similar_trades(rsi, adx, limit=3)
         if similar:

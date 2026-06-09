@@ -57,9 +57,7 @@ def prioritize_targets(bot):
         bot._last_sort_time = time.time()
 
         # Log de confirmación
-        top_3 = [
-            f"{symbol} ({get_vol(symbol):.1f}%)" for symbol in bot.pairs_to_scan[:3]
-        ]
+        top_3 = [f"{symbol} ({get_vol(symbol):.1f}%)" for symbol in bot.pairs_to_scan[:3]]
         bot.log(f"🔥 Top Volatilidad: {', '.join(top_3)}")
     except Exception as error:
         bot.log(f"⚠️ Error en Escaneo Dinámico: {error}")

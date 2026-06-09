@@ -75,9 +75,7 @@ class GracefulShutdownTest(unittest.TestCase):
         self.assertEqual(float(trade.get("remaining_amount") or 0.0), 0.0)
 
     def test_trade_manager_rejects_new_entries_during_shutdown(self):
-        bot = SimpleNamespace(
-            stop_requested=True, shutdown_in_progress=True, log=lambda *_a: None
-        )
+        bot = SimpleNamespace(stop_requested=True, shutdown_in_progress=True, log=lambda *_a: None)
         result = execute_order(
             bot,
             symbol="BTC/USDT",

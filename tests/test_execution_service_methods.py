@@ -1,7 +1,9 @@
 import unittest
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
+
 import ccxt
-from core.execution_service import ExecutionService, _with_exit_state
+
+from core.execution_service import ExecutionService
 
 
 class TestExecutionServiceInit(unittest.TestCase):
@@ -11,13 +13,15 @@ class TestExecutionServiceInit(unittest.TestCase):
         mock_binance.return_value = mock_exchange
 
         service = ExecutionService("key123", "secret456")
-        mock_binance.assert_called_once_with({
-            "apiKey": "key123",
-            "secret": "secret456",
-            "enableRateLimit": True,
-            "adjustForTimeDifference": True,
-            "options": {"defaultType": "future"},
-        })
+        mock_binance.assert_called_once_with(
+            {
+                "apiKey": "key123",
+                "secret": "secret456",
+                "enableRateLimit": True,
+                "adjustForTimeDifference": True,
+                "options": {"defaultType": "future"},
+            }
+        )
         self.assertEqual(service.logger.name, "Execution")
         self.assertIsNotNone(service._exchange_call_lock)
 
@@ -151,9 +155,7 @@ class TestGetNoPriceMarketExitCount(unittest.TestCase):
 
     def test_returns_count_when_data_exists(self):
         service = ExecutionService.__new__(ExecutionService)
-        service._no_price_exit_daily_metrics = {
-            "2026-05-06": {"BTC/USDT": 3}
-        }
+        service._no_price_exit_daily_metrics = {"2026-05-06": {"BTC/USDT": 3}}
         result = service.get_no_price_market_exit_count("BTC/USDT", "2026-05-06")
         self.assertEqual(result, 3)
 
@@ -176,10 +178,9 @@ class TestCallExchange(unittest.TestCase):
         service.exchange = MagicMock()
         service.logger = MagicMock()
 
-        mock_fn = MagicMock(side_effect=[
-            ccxt.RateLimitExceeded("rate limit"),
-            "success_after_retry"
-        ])
+        mock_fn = MagicMock(
+            side_effect=[ccxt.RateLimitExceeded("rate limit"), "success_after_retry"]
+        )
         result = service._call_exchange("test_op", mock_fn, retries=2)
         self.assertEqual(result, "success_after_retry")
 

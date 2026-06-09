@@ -1,5 +1,7 @@
-from typing import Dict, Any
+from typing import Any
+
 from core.strategy.base_agent import BaseAgent
+
 
 class CorrelationAgent(BaseAgent):
     """
@@ -10,7 +12,7 @@ class CorrelationAgent(BaseAgent):
     def __init__(self, weight: float = 1.0):
         super().__init__(name="C", weight=weight)
 
-    def vote(self, context: Dict[str, Any]) -> float:
+    def vote(self, context: dict[str, Any]) -> float:
         side = context.get("side", context.get("signal", "BUY"))
         btc_delta_tf = context.get("btc_delta_tf", 0.0)
 
@@ -25,5 +27,5 @@ class CorrelationAgent(BaseAgent):
                 score += 15
             elif btc_delta_tf > 0.5:
                 score -= 20
-        
+
         return min(max(score, 0), 100.0)

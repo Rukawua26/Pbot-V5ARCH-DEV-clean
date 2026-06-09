@@ -17,7 +17,11 @@ def _synthetic_candles(months: int = 6, rows_per_month: int = 80) -> pd.DataFram
     base = pd.Timestamp("2025-01-01T00:00:00Z")
     price = 100.0
     for idx in range(months * rows_per_month):
-        ts = base + pd.Timedelta(days=idx // rows_per_month * 31) + pd.Timedelta(hours=idx % rows_per_month)
+        ts = (
+            base
+            + pd.Timedelta(days=idx // rows_per_month * 31)
+            + pd.Timedelta(hours=idx % rows_per_month)
+        )
         drift = math.sin(idx / 9.0) * 0.45 + (0.08 if (idx // rows_per_month) % 2 == 0 else -0.04)
         open_price = price
         close = max(1.0, open_price + drift)

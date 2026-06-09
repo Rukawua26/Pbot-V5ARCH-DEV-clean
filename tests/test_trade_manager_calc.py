@@ -1,5 +1,6 @@
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
+
 from core.trade_manager import _calculate_pnl_and_metrics
 
 
@@ -70,6 +71,7 @@ class TestCalculatePnlAndMetrics(unittest.TestCase):
 class TestSafeLogSignalAlert(unittest.TestCase):
     def test_calls_brain_method_when_available(self):
         from core.trade_manager import _safe_log_signal_alert
+
         bot = MagicMock()
         bot.brain = MagicMock()
         bot.brain.log_signal_alert = MagicMock()
@@ -80,6 +82,7 @@ class TestSafeLogSignalAlert(unittest.TestCase):
 
     def test_does_nothing_when_brain_missing(self):
         from core.trade_manager import _safe_log_signal_alert
+
         bot = MagicMock()
         bot.brain = None
 
@@ -88,6 +91,7 @@ class TestSafeLogSignalAlert(unittest.TestCase):
 
     def test_does_nothing_when_method_not_callable(self):
         from core.trade_manager import _safe_log_signal_alert
+
         bot = MagicMock()
         bot.brain = MagicMock()
         bot.brain.log_signal_alert = "not_callable"
@@ -100,6 +104,7 @@ class TestSafeLogSignalAlert(unittest.TestCase):
 class TestSafeUpdateSignalAlertStatus(unittest.TestCase):
     def test_calls_brain_method_when_available(self):
         from core.trade_manager import _safe_update_signal_alert_status
+
         bot = MagicMock()
         bot.brain = MagicMock()
         bot.brain.update_signal_alert_status = MagicMock()
@@ -110,6 +115,7 @@ class TestSafeUpdateSignalAlertStatus(unittest.TestCase):
 
     def test_does_nothing_when_method_not_callable(self):
         from core.trade_manager import _safe_update_signal_alert_status
+
         bot = MagicMock()
         bot.brain = MagicMock()
         bot.brain.update_signal_alert_status = "not_callable"

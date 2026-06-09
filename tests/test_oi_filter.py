@@ -1,8 +1,13 @@
 """Tests para el filtro de Open Interest Delta v118.3."""
 
 import unittest
-from unittest.mock import patch
-from core.signals.oi_filter import validate_signal_with_oi, _oi_cache, _update_oi_cache, _get_cached_oi
+
+from core.signals.oi_filter import (
+    _get_cached_oi,
+    _oi_cache,
+    _update_oi_cache,
+    validate_signal_with_oi,
+)
 
 
 class OIValidationTests(unittest.TestCase):

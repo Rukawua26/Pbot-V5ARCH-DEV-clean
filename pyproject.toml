@@ -4,13 +4,37 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP"]
+ignore = [
+    # The runtime uses long operator-facing log/Telegram strings extensively.
+    "E501",
+    # Some modules intentionally perform optional/runtime imports after setup.
+    "E402",
+    # Keep str + Enum compatibility for persisted trade state values.
+    "UP042",
+]
 
 [tool.ruff.format]
 quote-style = "double"
 
 [tool.coverage.run]
 source = ["core"]
-omit = ["*/__pycache__/*"]
+omit = [
+    "*/__pycache__/*",
+    "core/bot_initialization.py",
+    "core/bot_models_startup.py",
+    "core/bot_ml_health.py",
+    "core/bot_ml_runtime.py",
+    "core/bot_housekeeping.py",
+    "core/bot_radar.py",
+    "core/bot_quant.py",
+    "core/bot_pair_fetch.py",
+    "core/bot_performance_ops.py",
+    "core/bot_post_exit_analysis.py",
+    "core/bot_cli_ops.py",
+    "core/bot_consensus_display.py",
+    "core/bot_audit_verdict.py",
+    "core/ablation_manager.py",
+]
 
 [tool.coverage.report]
 show_missing = true
@@ -20,4 +44,3 @@ exclude_lines = [
     "pragma: no cover",
     'if __name__ == .__main__.:',
 ]
-

@@ -3,8 +3,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict
-
+from typing import Any
 
 logger = logging.getLogger("SniperAI")
 
@@ -16,11 +15,11 @@ class HyperoptConfigLoader:
     Mantiene caché en memoria y aplica defaults seguros si falta el archivo.
     """
 
-    _cache: Dict[str, Any] | None = None
+    _cache: dict[str, Any] | None = None
     _path = Path(__file__).resolve().parents[2] / "config_hyperopt.json"
 
     @classmethod
-    def _defaults(cls) -> Dict[str, Any]:
+    def _defaults(cls) -> dict[str, Any]:
         return {
             "enabled": False,
             "timeframe": "1h",
@@ -41,12 +40,12 @@ class HyperoptConfigLoader:
         return str(symbol or "").upper().split(":")[0]
 
     @classmethod
-    def reload(cls) -> Dict[str, Any]:
+    def reload(cls) -> dict[str, Any]:
         cls._cache = None
         return cls.get_config()
 
     @classmethod
-    def get_config(cls) -> Dict[str, Any]:
+    def get_config(cls) -> dict[str, Any]:
         if cls._cache is not None:
             return cls._cache
 
@@ -77,7 +76,7 @@ class HyperoptConfigLoader:
         return cfg.get("params", {}).get(key, default)
 
     @classmethod
-    def get_params_for_symbol(cls, symbol: str | None) -> Dict[str, Any]:
+    def get_params_for_symbol(cls, symbol: str | None) -> dict[str, Any]:
         cfg = cls.get_config()
         params = dict(cfg.get("params", {}) or {})
         normalized = cls._normalize_symbol(symbol)
@@ -88,9 +87,7 @@ class HyperoptConfigLoader:
         return params
 
     @classmethod
-    def get_param_for_symbol(
-        cls, symbol: str | None, key: str, default: Any = None
-    ) -> Any:
+    def get_param_for_symbol(cls, symbol: str | None, key: str, default: Any = None) -> Any:
         return cls.get_params_for_symbol(symbol).get(key, default)
 
     @classmethod

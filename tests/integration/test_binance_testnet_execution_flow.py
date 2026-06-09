@@ -67,7 +67,7 @@ class BinanceTestnetExecutionFlowTest(unittest.TestCase):
             raise unittest.SkipTest("BINANCE_TESTNET_ORDER_AMOUNT must be positive")
 
         cls.execution = ExecutionService(api_key, api_secret)
-        cls.execution.exchange.options['disableFuturesSandboxWarning'] = True
+        cls.execution.exchange.options["disableFuturesSandboxWarning"] = True
         cls.execution.exchange.set_sandbox_mode(True)
         cls.execution.exchange.load_time_difference()
         cls.execution.exchange.load_markets()

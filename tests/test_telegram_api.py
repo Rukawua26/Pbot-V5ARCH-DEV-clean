@@ -1,7 +1,12 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.telegram_api import telegram_api_url, sanitize_telegram_error, telegram_get_json, telegram_post
+from core.telegram_api import (
+    sanitize_telegram_error,
+    telegram_api_url,
+    telegram_get_json,
+    telegram_post,
+)
 
 
 class TestTelegramApiUrl(unittest.TestCase):

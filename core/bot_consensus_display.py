@@ -4,9 +4,7 @@ def render_consensus_telemetry(bot, symbol, p_final, modo, votos, regime=None):
         return
 
     icon = "🔥 REAL" if modo == "REAL" else "🧪 SHADOW"
-    regime_icon = (
-        f" | 🌪️ {regime}" if regime == "CHAOS" else (f" | 🌊 {regime}" if regime else "")
-    )
+    regime_icon = f" | 🌪️ {regime}" if regime == "CHAOS" else (f" | 🌊 {regime}" if regime else "")
 
     def get_icon(score):
         if score >= 70:

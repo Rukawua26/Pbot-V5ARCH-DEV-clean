@@ -1,29 +1,30 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import cast
 
 from core.types import CCXTOrder
 
 
-def _with_exit_state(order: Optional[dict], exit_state: str) -> Optional[dict]:
+def _with_exit_state(order: CCXTOrder | dict | None, exit_state: str) -> CCXTOrder | None:
     if not isinstance(order, dict):
         return order
     enriched = dict(order)
     enriched["exit_state"] = exit_state
-    return enriched
+    return cast(CCXTOrder, enriched)
 
 
-def _parse_order_float(order: Optional[dict], *keys: str) -> Optional[float]:
+def _parse_order_float(order: CCXTOrder | dict | None, *keys: str) -> float | None:
     if not isinstance(order, dict):
         return None
     for key in keys:
         value = order.get(key)
         if value is None:
-            info = order.get("info") if isinstance(order.get("info"), dict) else {}
+            info_val = order.get("info")
+            info = info_val if isinstance(info_val, dict) else {}
             value = info.get(key)
         try:
             if value is not None:
-                return float(value)
+                return float(value)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             continue
     return None
@@ -36,16 +37,14 @@ def _execute_chase_limit_steps(
     amount: float,
     current_price: float,
     params: dict,
-) -> Optional[CCXTOrder]:
+) -> CCXTOrder | None:
     chase_steps = [0.98, 0.97, 0.96, 0.95]
     timeout_per_step = 2
 
     last_order = None
     for step_idx, step_mult in enumerate(chase_steps):
         limit_price = (
-            current_price * step_mult
-            if exit_side == "sell"
-            else current_price * (2 - step_mult)
+            current_price * step_mult if exit_side == "sell" else current_price * (2 - step_mult)
         )
         try:
             limit_price = execution_service.exchange.price_to_precision(symbol, limit_price)
@@ -71,8 +70,7 @@ def _execute_chase_limit_steps(
                 return _with_exit_state(order, "FILLED")
 
             execution_service.logger.warning(
-                f"⏳ Chase step {step_idx + 1} timeout {symbol} @ {limit_price}, "
-                f"persiguiendo..."
+                f"⏳ Chase step {step_idx + 1} timeout {symbol} @ {limit_price}, persiguiendo..."
             )
             if step_idx < len(chase_steps) - 1:
                 try:
@@ -88,12 +86,15 @@ def _execute_chase_limit_steps(
                         f"Verificando estado antes de continuar..."
                     )
                     try:
-                        open_orders = execution_service._call_exchange_account(
-                            "chase_verify_open_orders",
-                            lambda: execution_service.exchange.fetch_open_orders(symbol),
-                            retries=1,
-                            timeout_s=10.0,
-                        ) or []
+                        open_orders = (
+                            execution_service._call_exchange_account(
+                                "chase_verify_open_orders",
+                                lambda: execution_service.exchange.fetch_open_orders(symbol),
+                                retries=1,
+                                timeout_s=10.0,
+                            )
+                            or []
+                        )
                         still_open = any(
                             o.get("id") == order.get("id")
                             for o in open_orders

@@ -1,7 +1,7 @@
-import unittest
 import json
 import tempfile
-from datetime import datetime, timezone
+import unittest
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 from types import SimpleNamespace
@@ -24,7 +24,7 @@ class OpsForceClearTest(unittest.TestCase):
             market_btc_price_source="WS_TICKER",
             market_btc_price_ts=10.0,
             hmm_markov_snapshot={
-                "ts": datetime.now(timezone.utc).isoformat(),
+                "ts": datetime.now(UTC).isoformat(),
                 "state": "RANGE",
                 "bullish_breakout_prob": 82.0,
                 "bearish_reversal_prob": 12.0,
@@ -56,15 +56,13 @@ class OpsForceClearTest(unittest.TestCase):
     def test_sre_intent_reports_ratio(self, mocked_tg):
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "execution_events.jsonl"
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             rows = [
                 {"ts": now, "event": "ENTRY_ORDER_ACK", "payload": {}},
                 {"ts": now, "event": "ENTRY_ORDER_ACK", "payload": {}},
                 {"ts": now, "event": "INTENT_EXPIRED", "payload": {}},
             ]
-            log_path.write_text(
-                "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
-            )
+            log_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
 
             bot = SimpleNamespace(
                 weight_tracker=SimpleNamespace(
@@ -105,9 +103,7 @@ class OpsForceClearTest(unittest.TestCase):
             brain=SimpleNamespace(delete_active_trade_state=MagicMock()),
         )
 
-        handled = _handle_training_and_maintenance_commands(
-            bot, "/force_clear BTC/USDT"
-        )
+        handled = _handle_training_and_maintenance_commands(bot, "/force_clear BTC/USDT")
 
         self.assertTrue(handled)
         self.assertNotIn("BTC/USDT", bot.active_trades)
@@ -115,9 +111,7 @@ class OpsForceClearTest(unittest.TestCase):
         mocked_tg.assert_called()
 
     @patch("core.commands.ops.send_telegram_msg")
-    def test_force_clear_does_not_remove_state_when_exchange_has_position(
-        self, mocked_tg
-    ):
+    def test_force_clear_does_not_remove_state_when_exchange_has_position(self, mocked_tg):
         bot = SimpleNamespace(
             lock=RLock(),
             db_lock=RLock(),
@@ -136,9 +130,7 @@ class OpsForceClearTest(unittest.TestCase):
             brain=SimpleNamespace(delete_active_trade_state=MagicMock()),
         )
 
-        handled = _handle_training_and_maintenance_commands(
-            bot, "/force_clear BTC/USDT"
-        )
+        handled = _handle_training_and_maintenance_commands(bot, "/force_clear BTC/USDT")
 
         self.assertTrue(handled)
         self.assertIn("BTC/USDT", bot.active_trades)

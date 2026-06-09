@@ -52,7 +52,7 @@ jobs:
 
       - name: Ruff lint (core + tests)
         run: |
-          ruff check core/ tests/ --select E,F,I,W,UP
+          ruff check core/ tests/
 
       - name: Ruff format check
         run: |

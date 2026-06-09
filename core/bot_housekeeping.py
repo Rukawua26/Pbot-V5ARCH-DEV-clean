@@ -11,9 +11,7 @@ def run_periodic_housekeeping(bot, now, last_report_time, last_coach_time, last_
         bot.log("📊 Enviando reporte diario 23:00...")
         from reporter import generate_mobile_report
 
-        send_telegram_msg(
-            "📅 *REPORTE DE CIERRE DIARIO*\n" + generate_mobile_report(bot.balance)
-        )
+        send_telegram_msg("📅 *REPORTE DE CIERRE DIARIO*\n" + generate_mobile_report(bot.balance))
         bot.day_report_sent = True
     if now.hour == 0:
         bot.day_report_sent = False

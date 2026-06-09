@@ -1,6 +1,7 @@
-from typing import Dict, Any
-import pandas as pd
+from typing import Any
+
 from core.strategy.base_agent import BaseAgent
+
 
 class VisualAgent(BaseAgent):
     """
@@ -11,10 +12,10 @@ class VisualAgent(BaseAgent):
     def __init__(self, weight: float = 1.0):
         super().__init__(name="V", weight=weight)
 
-    def vote(self, context: Dict[str, Any]) -> float:
+    def vote(self, context: dict[str, Any]) -> float:
         df = context.get("df")
         side = context.get("side", "BUY")
-        
+
         if df is None or len(df) < 3:
             return 50.0
 
@@ -47,5 +48,5 @@ class VisualAgent(BaseAgent):
 
         except Exception:
             pass
-            
+
         return min(max(score, 0), 100)

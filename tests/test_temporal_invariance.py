@@ -18,9 +18,7 @@ class TemporalInvarianceTest(unittest.TestCase):
                 patch("core.watchdog.monotonic_now", return_value=100.0),
                 patch("core.watchdog.utc_now") as mock_utc,
             ):
-                mock_utc.return_value = datetime.fromisoformat(
-                    "2026-01-01T00:00:00+00:00"
-                )
+                mock_utc.return_value = datetime.fromisoformat("2026-01-01T00:00:00+00:00")
                 write_watchdog_heartbeat(bot, path=heartbeat_path, min_interval_s=15.0)
 
             first_mtime = os.path.getmtime(heartbeat_path)
@@ -29,9 +27,7 @@ class TemporalInvarianceTest(unittest.TestCase):
                 patch("core.watchdog.monotonic_now", return_value=105.0),
                 patch("core.watchdog.utc_now") as mock_utc,
             ):
-                mock_utc.return_value = datetime.fromisoformat(
-                    "2036-01-01T00:00:00+00:00"
-                )
+                mock_utc.return_value = datetime.fromisoformat("2036-01-01T00:00:00+00:00")
                 write_watchdog_heartbeat(bot, path=heartbeat_path, min_interval_s=15.0)
 
             second_mtime = os.path.getmtime(heartbeat_path)

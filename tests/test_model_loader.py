@@ -1,5 +1,5 @@
-import pickle
 import hashlib
+import pickle
 import tempfile
 import unittest
 from pathlib import Path

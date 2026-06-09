@@ -1,4 +1,5 @@
 """Snapshot de estado del bot para dashboard externo. Zero acoplamiento al bot."""
+
 import json
 import logging
 import os
@@ -71,9 +72,7 @@ def _write_state_snapshot(bot):
         daily_pnl_usd = 0.0
         daily_initial_balance = float(getattr(bot, "daily_initial_balance", 0.0) or 0.0)
         if bal > 0 and daily_initial_balance > 0:
-            daily_pnl_pct = round(
-                ((bal - daily_initial_balance) / daily_initial_balance) * 100, 2
-            )
+            daily_pnl_pct = round(((bal - daily_initial_balance) / daily_initial_balance) * 100, 2)
             daily_pnl_usd = round(bal - daily_initial_balance, 2)
         snapshot = {
             "ts": ts,

@@ -12,7 +12,9 @@ def _cvd_direction(imbalance: float, threshold: float) -> str:
     return "NEUTRAL"
 
 
-def apply_cvd_filter(bot, symbol: str, signal: str, prob_final: float, ctx: dict) -> tuple[float, bool, str]:
+def apply_cvd_filter(
+    bot, symbol: str, signal: str, prob_final: float, ctx: dict
+) -> tuple[float, bool, str]:
     """Adjust confidence using rolling CVD from aggTrade aggressor flow.
 
     This is intentionally conservative: CVD never hard-vetoes on its own. It

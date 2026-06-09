@@ -2,7 +2,6 @@ import json
 
 import numpy as np
 
-
 DEFAULT_RAG_SCORES = {k: 50.0 for k in ["T", "V", "C", "L", "S"]}
 
 
@@ -69,9 +68,7 @@ def init_rag_cache(brain, max_trades: int) -> None:
 
         if matrix_data:
             brain.rag_cache_matrix = np.array(matrix_data)
-            print(
-                f"🧠 RAG Vector Cache inicializado: {len(brain.rag_cache_meta)} vectores en RAM."
-            )
+            print(f"🧠 RAG Vector Cache inicializado: {len(brain.rag_cache_meta)} vectores en RAM.")
     except Exception as error:
         print(f"⚠️ Error cargando RAG Cache: {error}")
 

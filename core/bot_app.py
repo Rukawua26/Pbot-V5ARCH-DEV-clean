@@ -2,19 +2,18 @@
 SNIPER AI v118 - Aplicacion principal del bot.
 """
 
-import traceback
 import asyncio
-import time
-import threading
-import sys
-from functools import lru_cache
 import importlib.util
-import signal
-from typing import Any, Dict
 import logging
-from logging.handlers import RotatingFileHandler
-
+import signal
+import sys
+import threading
+import time
+import traceback
 import warnings
+from functools import lru_cache
+from logging.handlers import RotatingFileHandler
+from typing import Any
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
@@ -23,7 +22,7 @@ try:
 
     HAS_WEIGHT_TRACKER = True
 except ImportError:
-    BinanceWeightTracker = None
+    BinanceWeightTracker = None  # type: ignore[assignment, misc]
     HAS_WEIGHT_TRACKER = False
 
 try:
@@ -32,79 +31,22 @@ except ImportError:
     tf = None
 
 from config import Config
-from tools.ui import UI
-from tools.learning import Brain, shadow_logger
-from tools.notifier import send_telegram_msg
-from tools.ws_manager import BinanceWebSocket
-from core.command_router import handle_basic_command
-from core.process_lock import acquire_single_instance_lock
-from core.bot_runtime_monitor import (
-    append_runtime_metric,
-    get_rss_mb,
-    run_runtime_monitor_loop,
+from core.bot_audit_verdict import get_audit_verdict as resolve_audit_verdict
+from core.bot_balance_ops import (
+    get_current_balance as fetch_current_balance,
 )
-from core.bot_market_state import detect_market_regime, warmup_hmm_regime
-from core.bot_telemetry import collect_telemetry
-from core.bot_ml_health import check_ml_models_health
-from core.bot_wallet_sync import sync_wallet as run_wallet_sync
-from core.bot_scorecard import (
-    maybe_send_daily_exit_scorecard,
-    send_daily_exit_scorecard,
+from core.bot_balance_ops import (
+    handle_reset_pnl as run_handle_reset_pnl,
 )
-from core.bot_connection import connect_to_binance
-from core.bot_models_startup import init_models_and_startup_tasks
-from core.bot_trade_monitor import monitor_open_trades as run_monitor_open_trades
-from core.bot_initialization import (
-    init_realtime_and_monitoring,
-    init_runtime_state,
-)
-from core.bot_symbol_controls import (
-    get_cached_btc_data,
-    get_cached_funding_rate,
-    load_runtime_symbol_controls,
-    refresh_symbol_controls_if_due,
-)
-from core.bot_runtime_safety import check_safety_and_goals as evaluate_safety_and_goals
-from core.bot_pair_fetch import fetch_pair_data as run_fetch_pair_data
-from core.bot_io_loops import (
-    perform_post_mortem,
-    telegram_listener,
-    websocket_monitor,
+from core.bot_balance_ops import (
+    start_silent_sync as run_start_silent_sync,
 )
 from core.bot_cli_ops import prioritize_targets, terminal_command_listener
-from core.bot_core_setup import init_core_services_and_engines
-from core.bot_ml_runtime import check_recent_mfe_health, init_ml_monitoring
-from core.bot_maintenance import backup_database_placeholder, check_for_evolution
+from core.bot_connection import connect_to_binance
 from core.bot_consensus_display import (
     render_consensus_telemetry as show_consensus_telemetry,
 )
-from core.bot_post_exit_analysis import calc_post_exit_drift, load_local_candles
-from core.bot_weekly_ops import check_weekly_maintenance_utc, check_weekly_schedule
-from core.bot_balance_ops import (
-    get_current_balance as fetch_current_balance,
-    handle_reset_pnl as run_handle_reset_pnl,
-    start_silent_sync as run_start_silent_sync,
-)
-from core.bot_performance_ops import (
-    get_ob_efficiency_report as build_ob_efficiency_report,
-    perform_healthcheck as run_healthcheck,
-    update_dynamic_risk as run_update_dynamic_risk,
-)
-from core.bot_runtime_ops import (
-    check_instinctive_safety as run_check_instinctive_safety,
-    close_all_positions_emergency,
-    heartbeat_loop,
-)
-from core.bot_misc_ops import (
-    get_vol_24h as resolve_vol_24h,
-    handle_command as dispatch_command,
-    load_ai_restrictions,
-    self_adjust_exigency as adjust_exigency,
-)
-from core.bot_shutdown import request_graceful_shutdown
-from core.state_snapshot import start_state_snapshot_loop as run_start_state_snapshot_loop
-from core.execution_runtime_state import persist_execution_runtime_state
-from core.bot_guardian import run_guardian_loop
+from core.bot_core_setup import init_core_services_and_engines
 from core.bot_cycles import (
     fetch_triage_data_parallel,
     finalize_scan_cycle,
@@ -114,18 +56,83 @@ from core.bot_cycles import (
     run_market_refresh_cycle,
     run_triage_cycle,
 )
+from core.bot_guardian import run_guardian_loop
 from core.bot_housekeeping import run_periodic_housekeeping
+from core.bot_initialization import (
+    init_realtime_and_monitoring,
+    init_runtime_state,
+)
+from core.bot_io_loops import (
+    perform_post_mortem,
+    telegram_listener,
+    websocket_monitor,
+)
 from core.bot_main_loop import run_main_logic
-from core.bot_audit_verdict import get_audit_verdict as resolve_audit_verdict
+from core.bot_maintenance import backup_database_placeholder, check_for_evolution
+from core.bot_market_state import detect_market_regime, warmup_hmm_regime
+from core.bot_misc_ops import (
+    get_vol_24h as resolve_vol_24h,
+)
+from core.bot_misc_ops import (
+    handle_command as dispatch_command,
+)
+from core.bot_misc_ops import (
+    load_ai_restrictions,
+)
+from core.bot_misc_ops import (
+    self_adjust_exigency as adjust_exigency,
+)
+from core.bot_ml_health import check_ml_models_health
+from core.bot_ml_runtime import check_recent_mfe_health, init_ml_monitoring
+from core.bot_models_startup import init_models_and_startup_tasks
+from core.bot_pair_fetch import fetch_pair_data as run_fetch_pair_data
+from core.bot_performance_ops import (
+    get_ob_efficiency_report as build_ob_efficiency_report,
+)
+from core.bot_performance_ops import (
+    perform_healthcheck as run_healthcheck,
+)
+from core.bot_performance_ops import (
+    update_dynamic_risk as run_update_dynamic_risk,
+)
+from core.bot_post_exit_analysis import calc_post_exit_drift, load_local_candles
 from core.bot_radar import update_radar as run_update_radar
-from core.market_intelligence import acquire_targets, get_active_market_snapshot
 from core.bot_risk_cycles import run_btc_panic_cycle, run_crash_predictor_cycle
 from core.bot_runtime import run_bot_runtime_loop, run_initial_load
-from core.bot_trade_entry import execute_order as run_execute_order
-from core.trade_manager import abort_partial_trade as tm_abort_partial_trade
-from core.trade_manager import close_trade as tm_close_trade
-from core.strategy.shocks import next_shock_distance_pct
+from core.bot_runtime_monitor import (
+    append_runtime_metric,
+    get_rss_mb,
+    run_runtime_monitor_loop,
+)
+from core.bot_runtime_ops import (
+    check_instinctive_safety as run_check_instinctive_safety,
+)
+from core.bot_runtime_ops import (
+    close_all_positions_emergency,
+    heartbeat_loop,
+)
+from core.bot_runtime_safety import check_safety_and_goals as evaluate_safety_and_goals
+from core.bot_scorecard import (
+    maybe_send_daily_exit_scorecard,
+    send_daily_exit_scorecard,
+)
+from core.bot_shutdown import request_graceful_shutdown
 from core.bot_signals import run_signal_scan_cycle
+from core.bot_symbol_controls import (
+    get_cached_btc_data,
+    get_cached_funding_rate,
+    load_runtime_symbol_controls,
+    refresh_symbol_controls_if_due,
+)
+from core.bot_telemetry import collect_telemetry
+from core.bot_trade_entry import execute_order as run_execute_order
+from core.bot_trade_monitor import monitor_open_trades as run_monitor_open_trades
+from core.bot_wallet_sync import sync_wallet as run_wallet_sync
+from core.bot_weekly_ops import check_weekly_maintenance_utc, check_weekly_schedule
+from core.command_router import handle_basic_command
+from core.execution_runtime_state import persist_execution_runtime_state
+from core.market_intelligence import acquire_targets, get_active_market_snapshot
+from core.process_lock import acquire_single_instance_lock
 from core.signals.analyze import _analyze_symbol_candidate
 from core.signals.context import _build_symbol_context, _update_signal_diagnostics
 from core.signals.execution import _execute_and_update_symbol
@@ -134,11 +141,19 @@ from core.signals.filters import (
     _plan_execution_mode,
     _resolve_audit_verdict_and_stats,
 )
+from core.state_snapshot import start_state_snapshot_loop as run_start_state_snapshot_loop
+from core.strategy.shocks import next_shock_distance_pct
+from core.trade_manager import abort_partial_trade as tm_abort_partial_trade
+from core.trade_manager import close_trade as tm_close_trade
+from tools.learning import Brain, shadow_logger
+from tools.notifier import send_telegram_msg
+from tools.ui import UI
+from tools.ws_manager import BinanceWebSocket
 
 try:
     from tools.export_master_dataset import export_dataset
 except ImportError:
-    export_dataset = None
+    export_dataset = None  # type: ignore[assignment]
 
 
 def _module_available(module_name: str) -> bool:
@@ -157,9 +172,7 @@ if not logger.handlers:
         backupCount=5,
         encoding="utf-8",
     )
-    log_formatter = logging.Formatter(
-        "%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-    )
+    log_formatter = logging.Formatter("%(asctime)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     log_handler.setFormatter(log_formatter)
     logger.addHandler(log_handler)
 
@@ -174,7 +187,7 @@ try:
     import tools.dashboard as dashboard
 except (ImportError, ModuleNotFoundError) as error:
     print(f"⚠️ Dashboard no disponible: {error}")
-    dashboard = None
+    dashboard = None  # type: ignore[assignment]
 
 try:
     from tools.ml_monitor import MLMonitor
@@ -182,7 +195,7 @@ try:
     ML_MONITOR_AVAILABLE = True
 except ImportError:
     ML_MONITOR_AVAILABLE = False
-    MLMonitor = None
+    MLMonitor = None  # type: ignore[assignment, misc]
     print("⚠️ ML Monitor no disponible")
 
 
@@ -228,9 +241,7 @@ class Bot:
                 self._main_loop_ready.set()
                 loop.run_forever()
             except Exception as error:
-                logger.critical(
-                    f"🚨 FATAL BOOT ERROR: Event Loop thread falló: {error}"
-                )
+                logger.critical(f"🚨 FATAL BOOT ERROR: Event Loop thread falló: {error}")
             finally:
                 try:
                     loop.close()
@@ -333,13 +344,13 @@ class Bot:
     def _get_rss_mb(self) -> float:
         return self._delegate(get_rss_mb)
 
-    def _append_runtime_metric(self, payload: Dict[str, Any]) -> None:
+    def _append_runtime_metric(self, payload: dict[str, Any]) -> None:
         return self._delegate(append_runtime_metric, payload)
 
     def _runtime_monitor_loop(self):
         return self._delegate(run_runtime_monitor_loop)
 
-    def _collect_telemetry(self) -> Dict:
+    def _collect_telemetry(self) -> dict:
         return self._delegate(collect_telemetry, logger)
 
     def _get_market_regime(self) -> str:
@@ -437,9 +448,7 @@ class Bot:
     def _load_local_candles(self, symbol, timeframe="1h"):
         return load_local_candles(symbol, timeframe)
 
-    def _calc_post_exit_drift(
-        self, symbol, side, exit_ts_iso, exit_price, lookahead_bars=4
-    ):
+    def _calc_post_exit_drift(self, symbol, side, exit_ts_iso, exit_price, lookahead_bars=4):
         return calc_post_exit_drift(
             self,
             symbol=symbol,
@@ -517,16 +526,10 @@ class Bot:
         return fetch_triage_data_parallel(self, top_triage)
 
     def _analyze_symbol_candidate(self, symbol_raw, symbol, df_main, df_4h, elapsed):
-        return _analyze_symbol_candidate(
-            self, symbol_raw, symbol, df_main, df_4h, elapsed
-        )
+        return _analyze_symbol_candidate(self, symbol_raw, symbol, df_main, df_4h, elapsed)
 
-    def _build_symbol_context(
-        self, symbol_raw, symbol, df_main, price, ind, audit_signal
-    ):
-        return _build_symbol_context(
-            self, symbol_raw, symbol, df_main, price, ind, audit_signal
-        )
+    def _build_symbol_context(self, symbol_raw, symbol, df_main, price, ind, audit_signal):
+        return _build_symbol_context(self, symbol_raw, symbol, df_main, price, ind, audit_signal)
 
     def _execute_and_update_symbol(
         self,
@@ -626,9 +629,7 @@ class Bot:
         )
 
     def _run_signal_scan_cycle(self, top_triage, results, signal_stats, pnl_real_hoy):
-        return run_signal_scan_cycle(
-            self, top_triage, results, signal_stats, pnl_real_hoy
-        )
+        return run_signal_scan_cycle(self, top_triage, results, signal_stats, pnl_real_hoy)
 
     def _finalize_scan_cycle(self, signal_stats):
         return finalize_scan_cycle(self, signal_stats)
@@ -815,8 +816,12 @@ def run_entrypoint():
 
         mode_str = "REAL" if not Config.PAPER_MODE else "PAPER"
         logger.info(f"📋 CONFIG LOADED: mode={mode_str}")
-        logger.info(f"   RISK_PER_TRADE: {Config.RISK_PER_TRADE_PCT*100:.2f}% | MAX_OPEN_TRADES: {Config.MAX_OPEN_TRADES}")
-        logger.info(f"   MAX_RISK_USD: ${Config.MAX_RISK_USD:.2f} | DAILY_LOSS_LIMIT: {Config.DAILY_LOSS_LIMIT:.2f}%")
+        logger.info(
+            f"   RISK_PER_TRADE: {Config.RISK_PER_TRADE_PCT * 100:.2f}% | MAX_OPEN_TRADES: {Config.MAX_OPEN_TRADES}"
+        )
+        logger.info(
+            f"   MAX_RISK_USD: ${Config.MAX_RISK_USD:.2f} | DAILY_LOSS_LIMIT: {Config.DAILY_LOSS_LIMIT:.2f}%"
+        )
         logger.info(f"   SHOCK_MIN_DIST: {Config.SHOCK_MIN_DIST_PCT:.2f}%")
 
         _check_real_mode_guardrails()
@@ -833,12 +838,8 @@ def run_entrypoint():
             sys.exit(1)
 
         def _graceful_shutdown(signum, _frame):
-            signal_name = (
-                "SIGINT" if signum == getattr(signal, "SIGINT", -1) else "SIGTERM"
-            )
-            logger.warning(
-                f"⚠️ Señal {signal_name} recibida. Iniciando apagado ordenado..."
-            )
+            signal_name = "SIGINT" if signum == getattr(signal, "SIGINT", -1) else "SIGTERM"
+            logger.warning(f"⚠️ Señal {signal_name} recibida. Iniciando apagado ordenado...")
             request_graceful_shutdown(bot, reason=signal_name, logger=logger)
 
         signal.signal(signal.SIGINT, _graceful_shutdown)
@@ -849,8 +850,7 @@ def run_entrypoint():
 
         if getattr(bot, "shutdown_in_progress", False):
             shutdown_done = bool(
-                getattr(bot, "shutdown_complete", None)
-                and bot.shutdown_complete.wait(timeout=85)
+                getattr(bot, "shutdown_complete", None) and bot.shutdown_complete.wait(timeout=85)
             )
             if not shutdown_done:
                 logger.warning(

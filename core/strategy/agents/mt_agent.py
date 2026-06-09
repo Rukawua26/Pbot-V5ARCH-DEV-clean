@@ -1,8 +1,10 @@
-from typing import Dict, Any, Optional
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from core.strategy.base_agent import BaseAgent
+import pandas as pd
+
 from core.config.hyperopt_loader import HyperoptConfigLoader
+from core.strategy.base_agent import BaseAgent
 
 
 class MTAgent(BaseAgent):
@@ -25,7 +27,7 @@ class MTAgent(BaseAgent):
             float(params.get("alma_sigma", self.alma_sigma)),
         )
 
-    def _get_technical_score(self, context: Dict[str, Any]) -> float:
+    def _get_technical_score(self, context: dict[str, Any]) -> float:
         rsi = context.get("rsi", 50.0)
         adx = context.get("adx", 20.0)
         side = context.get("side", "BUY")
@@ -69,7 +71,11 @@ class MTAgent(BaseAgent):
         return float(alma)
 
     def _get_momentum_score(
-        self, df: pd.DataFrame, side: str, alma_offset: float | None = None, alma_sigma: float | None = None
+        self,
+        df: pd.DataFrame,
+        side: str,
+        alma_offset: float | None = None,
+        alma_sigma: float | None = None,
     ) -> float:
         if df is None or len(df) < 21:
             return 50.0
@@ -92,14 +98,8 @@ class MTAgent(BaseAgent):
             closes.iloc[:-1], window=20, offset=alma_offset, sigma=alma_sigma
         )
 
-        mom_now = (
-            (alma_short_now - alma_long_now) / alma_long_now if alma_long_now > 0 else 0
-        )
-        mom_prev = (
-            (alma_short_prev - alma_long_prev) / alma_long_prev
-            if alma_long_prev > 0
-            else 0
-        )
+        mom_now = (alma_short_now - alma_long_now) / alma_long_now if alma_long_now > 0 else 0
+        mom_prev = (alma_short_prev - alma_long_prev) / alma_long_prev if alma_long_prev > 0 else 0
 
         # Escala gradual para evitar "todo o nada"
         if side == "BUY":
@@ -137,7 +137,7 @@ class MTAgent(BaseAgent):
                 return 35.0
         return 50.0
 
-    def vote(self, context: Dict[str, Any]) -> float:
+    def vote(self, context: dict[str, Any]) -> float:
         df = context.get("df")
         side = context.get("side", "BUY")
         symbol = context.get("symbol", "")

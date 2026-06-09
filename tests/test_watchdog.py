@@ -28,7 +28,7 @@ class WatchdogHeartbeatTest(unittest.TestCase):
             write_watchdog_heartbeat(bot, path=hb, min_interval_s=0.0)
 
             self.assertTrue(os.path.exists(hb))
-            with open(hb, "r", encoding="utf-8") as handle:
+            with open(hb, encoding="utf-8") as handle:
                 payload = json.loads(handle.read())
             self.assertIn("ts", payload)
             self.assertIn("ts_iso", payload)
@@ -40,11 +40,11 @@ class WatchdogHeartbeatTest(unittest.TestCase):
             bot = SimpleNamespace(_watchdog_last_write_mono=0.0)
 
             write_watchdog_heartbeat(bot, path=hb, min_interval_s=9999.0)
-            with open(hb, "r", encoding="utf-8") as handle:
+            with open(hb, encoding="utf-8") as handle:
                 first = json.loads(handle.read())["ts"]
 
             write_watchdog_heartbeat(bot, path=hb, min_interval_s=9999.0)
-            with open(hb, "r", encoding="utf-8") as handle:
+            with open(hb, encoding="utf-8") as handle:
                 second = json.loads(handle.read())["ts"]
 
             self.assertEqual(first, second)

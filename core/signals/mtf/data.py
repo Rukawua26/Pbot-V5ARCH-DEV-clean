@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import Optional
-
 import pandas as pd
 
 
-def _fetch_timeframe(bot, symbol: str, timeframe: str) -> Optional[pd.DataFrame]:
+def _fetch_timeframe(bot, symbol: str, timeframe: str) -> pd.DataFrame | None:
     try:
         data_service = getattr(bot, "data_service", None)
         if data_service is None:
@@ -20,7 +18,7 @@ def _fetch_timeframe(bot, symbol: str, timeframe: str) -> Optional[pd.DataFrame]
     return None
 
 
-def fetch_mtf_data(bot, symbol: str) -> dict[str, Optional[pd.DataFrame]]:
+def fetch_mtf_data(bot, symbol: str) -> dict[str, pd.DataFrame | None]:
     return {
         "15m": _fetch_timeframe(bot, symbol, "15m"),
         "5m": _fetch_timeframe(bot, symbol, "5m"),

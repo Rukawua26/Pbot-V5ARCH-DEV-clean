@@ -85,9 +85,7 @@ class DailyScorecardTest(unittest.TestCase):
 
         bot = SimpleNamespace(
             brain=SimpleNamespace(db_name=db_path),
-            breakout_agent=SimpleNamespace(
-                watchlist={}, summary_by_source=lambda: {}
-            ),
+            breakout_agent=SimpleNamespace(watchlist={}, summary_by_source=lambda: {}),
             breakout_overrides_today=0,
             _safe_div=lambda a, b: a / b if b else 0.0,
             _calc_post_exit_drift=lambda **kwargs: None,
@@ -97,9 +95,9 @@ class DailyScorecardTest(unittest.TestCase):
         with patch("core.bot_scorecard.datetime") as mock_datetime:
             mock_now = __import__("datetime").datetime(2026, 4, 27, 12, 0, 0)
             mock_datetime.now.return_value = mock_now
-            mock_datetime.side_effect = lambda *args, **kwargs: __import__(
-                "datetime"
-            ).datetime(*args, **kwargs)
+            mock_datetime.side_effect = lambda *args, **kwargs: __import__("datetime").datetime(
+                *args, **kwargs
+            )
 
             with patch("core.bot_scorecard.send_telegram_msg") as send_mock:
                 send_daily_exit_scorecard(bot)

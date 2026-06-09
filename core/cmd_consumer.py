@@ -1,4 +1,5 @@
 """Lee comandos desde archivo IPC y los rutea al command_router del bot."""
+
 import json
 import os
 

@@ -1,7 +1,6 @@
-import threading
 import unittest
-from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pandas as pd
 

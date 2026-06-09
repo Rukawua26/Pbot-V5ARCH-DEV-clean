@@ -221,7 +221,7 @@ import pandas.core.frame as pdf
 _original_df = pd.DataFrame
 _original_core_df = pdf.DataFrame
 
-class _PatchedDataFrame(_original_df):
+class _PatchedDataFrame(_original_df):  # type: ignore[misc, valid-type]
     def __getattribute__(self, name):
         if name == 'ta':
             return _DataFrameTA(self)

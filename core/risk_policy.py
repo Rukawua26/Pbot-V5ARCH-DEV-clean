@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from core.execution_telemetry import append_execution_event
 from tools.learning import shadow_logger
 from tools.notifier import send_telegram_msg
-
 
 RISK_ACTION_ALLOW = "ALLOW"
 RISK_ACTION_BLOCK = "BLOCK"
@@ -50,7 +48,7 @@ def record_risk_decision(
     *,
     symbol: str | None = None,
     is_shadow: bool | None = None,
-    extra: Optional[dict] = None,
+    extra: dict | None = None,
 ) -> None:
     append_execution_event(
         bot,
@@ -75,7 +73,7 @@ def evaluate_entry_risk_decision(
     *,
     existing_state=None,
     is_trading_halted_fn=None,
-) -> Optional[EntryRiskDecision]:
+) -> EntryRiskDecision | None:
     if bool(getattr(bot, "stop_requested", False)) or bool(
         getattr(bot, "shutdown_in_progress", False)
     ):
@@ -151,7 +149,7 @@ def evaluate_entry_risk_decision(
     return None
 
 
-def evaluate_runtime_entry_decision(bot, symbol: str, is_shadow: bool) -> Optional[EntryRiskDecision]:
+def evaluate_runtime_entry_decision(bot, symbol: str, is_shadow: bool) -> EntryRiskDecision | None:
     if bool(getattr(bot, "halt_system_active", False)) and not is_shadow:
         return EntryRiskDecision(
             action=RISK_ACTION_HALT,
@@ -227,7 +225,7 @@ def activate_runtime_protection(
     source: str = "runtime_protection",
     scope: str = RISK_SCOPE_ALL,
     symbol: str | None = None,
-    extra: Optional[dict] = None,
+    extra: dict | None = None,
 ) -> None:
     if circuit_breaker:
         bot.circuit_breaker_active = True
@@ -243,7 +241,9 @@ def activate_runtime_protection(
     record_risk_decision(
         bot,
         EntryRiskDecision(
-            action=RISK_ACTION_HALT if (halt_system or circuit_breaker or pause) else RISK_ACTION_BLOCK,
+            action=RISK_ACTION_HALT
+            if (halt_system or circuit_breaker or pause)
+            else RISK_ACTION_BLOCK,
             reason=reason,
             scope=scope,
             log_message=log_message,

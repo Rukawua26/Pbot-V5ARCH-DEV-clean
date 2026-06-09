@@ -1,9 +1,9 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
-import pandas as pd
 import logging
+from abc import ABC, abstractmethod
+from typing import Any
 
 logger = logging.getLogger("SniperAI")
+
 
 class BaseAgent(ABC):
     """
@@ -16,7 +16,7 @@ class BaseAgent(ABC):
         self.weight = weight
 
     @abstractmethod
-    def vote(self, context: Dict[str, Any]) -> float:
+    def vote(self, context: dict[str, Any]) -> float:
         """
         Calcula el voto del agente (0-100).
         0: Bajista extremo / No compra

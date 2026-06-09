@@ -50,9 +50,7 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
         getattr(Config, "SYMBOL_CONTROLS_REFRESH_SECONDS", 1800)
     )
     bot._symbol_controls_last_refresh = 0.0
-    bot._symbol_reduced_size_mult = float(
-        getattr(Config, "SYMBOL_REDUCED_SIZE_MULTIPLIER", 0.5)
-    )
+    bot._symbol_reduced_size_mult = float(getattr(Config, "SYMBOL_REDUCED_SIZE_MULTIPLIER", 0.5))
     bot._exit_eval_last_log = {}
     now_mono = monotonic_now()
     bot._daily_report_next_ts = now_mono + 24 * 3600
@@ -103,9 +101,7 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
     bot.user_notes = "Escribe tus notas aquí..."
     bot.global_rag_impact = 0.0
     bot.instance_uuid = str(uuid.uuid4())[:12]
-    bot.pending_send_stale_seconds = int(
-        getattr(Config, "PENDING_SEND_STALE_SECONDS", 30)
-    )
+    bot.pending_send_stale_seconds = int(getattr(Config, "PENDING_SEND_STALE_SECONDS", 30))
     bot.last_entry_open_ts = 0.0
     bot.last_shadow_signal_ts = 0.0
     bot.confidence_stagnation_lock_active = False

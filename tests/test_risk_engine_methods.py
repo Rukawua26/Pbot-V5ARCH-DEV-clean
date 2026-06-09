@@ -1,6 +1,6 @@
 import unittest
-from unittest.mock import MagicMock, patch
 from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
 
 
 class TestCalculatePositionSizeByStop(unittest.TestCase):
@@ -13,6 +13,7 @@ class TestCalculatePositionSizeByStop(unittest.TestCase):
                     mock_config.MAX_RISK_USD = 100.0
                     mock_config.RISK_PER_TRADE_PCT = 0.01
                     from core.risk_engine import RiskEngine
+
                     self.engine = RiskEngine(brain=MagicMock())
 
     def test_returns_zero_when_balance_zero(self):
@@ -74,6 +75,7 @@ class TestCheckAntiRevengeBlacklist(unittest.TestCase):
             with patch("core.risk_engine.HyperoptConfigLoader") as mock_hyperopt:
                 mock_hyperopt.is_enabled.return_value = False
                 from core.risk_engine import RiskEngine
+
                 self.engine = RiskEngine(brain=MagicMock())
                 self.engine.symbol_streaks = {}
                 self.engine.temp_blacklist = {}
@@ -107,6 +109,7 @@ class TestRecordTradeResult(unittest.TestCase):
             with patch("core.risk_engine.HyperoptConfigLoader") as mock_hyperopt:
                 mock_hyperopt.is_enabled.return_value = False
                 from core.risk_engine import RiskEngine
+
                 self.engine = RiskEngine(brain=MagicMock())
                 self.engine.symbol_streaks = {}
                 self.engine.temp_blacklist = {}
@@ -138,6 +141,7 @@ class TestCheckSignalIntegrity(unittest.TestCase):
             with patch("core.risk_engine.HyperoptConfigLoader") as mock_hyperopt:
                 mock_hyperopt.is_enabled.return_value = False
                 from core.risk_engine import RiskEngine
+
                 self.engine = RiskEngine(brain=MagicMock())
 
     def test_returns_false_when_integrity_ok(self):
@@ -153,7 +157,6 @@ class TestCheckSignalIntegrity(unittest.TestCase):
         self.assertIn("CONFIDENCE_FLOOR_VIOLATED", reason)
 
     def test_detects_sudden_confidence_crash_long(self):
-        trade = {"entry_confidence": 80.0, "side": "BUY"}
         # Score drop > 30% within 3 mins: (80-50)/80 = 37.5% > 30%
         # But current_ai_score=50 < 52, so CONFIDENCE_FLOOR fires first
         # Let's use a score where floor doesn't fire: current > 52
@@ -176,6 +179,7 @@ class TestShouldAbortTrade(unittest.TestCase):
             with patch("core.risk_engine.HyperoptConfigLoader") as mock_hyperopt:
                 mock_hyperopt.is_enabled.return_value = False
                 from core.risk_engine import RiskEngine
+
                 self.engine = RiskEngine(brain=MagicMock())
 
     def test_does_not_abort_when_confidence_high(self):

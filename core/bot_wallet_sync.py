@@ -8,7 +8,6 @@ from core.time_utils import parse_datetime_utc, utc_now
 from core.trade_helpers import _emergency_market_close
 from tools.notifier import send_telegram_msg
 
-
 _OPEN_ENTRY_ORDER_LOOKUP_FAILED = object()
 
 
@@ -21,9 +20,7 @@ def _bool_reduce_only(order: dict) -> bool:
 
 
 def _is_protective_stop_for_trade(order: dict, trade: dict) -> bool:
-    order_type = str(
-        order.get("type") or (order.get("info") or {}).get("type") or ""
-    ).upper()
+    order_type = str(order.get("type") or (order.get("info") or {}).get("type") or "").upper()
     if "STOP" not in order_type:
         return False
     if not _bool_reduce_only(order):
@@ -218,9 +215,7 @@ def _find_open_entry_order(bot, symbol: str, trade: dict):
             continue
         order_id = str(order.get("id") or "")
         coid = str(
-            order.get("clientOrderId")
-            or (order.get("info") or {}).get("clientOrderId")
-            or ""
+            order.get("clientOrderId") or (order.get("info") or {}).get("clientOrderId") or ""
         )
         if entry_order_id and order_id == entry_order_id:
             return order
@@ -230,10 +225,7 @@ def _find_open_entry_order(bot, symbol: str, trade: dict):
 
 
 def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
-    if (
-        not trade.get("partial_fill_pending")
-        and trade.get("status") != "PARTIAL_FILL_PENDING"
-    ):
+    if not trade.get("partial_fill_pending") and trade.get("status") != "PARTIAL_FILL_PENDING":
         return
 
     executed_amount = float(info.get("amount") or trade.get("amount") or 0.0)
@@ -293,9 +285,7 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
         return
 
     cancel_order = getattr(bot.execution, "cancel_order", None)
-    order_id = str(
-        open_entry_order.get("id") or trade.get("entry_exchange_order_id") or ""
-    )
+    order_id = str(open_entry_order.get("id") or trade.get("entry_exchange_order_id") or "")
     if callable(cancel_order) and order_id:
         try:
             cancel_order(symbol, order_id)
@@ -398,9 +388,7 @@ def sync_wallet(bot):
 
         # LOG DE DIAGNÓSTICO: Ver qué detecta Binance
         if real_active_on_binance:
-            bot.log(
-                f"🔍 Wallet Sync: Binance reporta {list(real_active_on_binance.keys())}"
-            )
+            bot.log(f"🔍 Wallet Sync: Binance reporta {list(real_active_on_binance.keys())}")
 
         with bot.lock:
             emergency_closed_symbols = set()
@@ -409,30 +397,21 @@ def sync_wallet(bot):
 
             # A. ACTUALIZACIÓN DE PRECIOS REALES (Corrige el PnL)
             for symbol, info in real_active_on_binance.items():
-                if symbol in bot.active_trades and not bot.active_trades[symbol].get(
-                    "is_shadow"
-                ):
+                if symbol in bot.active_trades and not bot.active_trades[symbol].get("is_shadow"):
                     # Sincronizamos el precio de entrada del bot con el de Binance
                     # Validamos que el precio sea > 0 para evitar errores de API
-                    if (
-                        info["entry"] > 0
-                        and bot.active_trades[symbol]["entry"] != info["entry"]
-                    ):
+                    if info["entry"] > 0 and bot.active_trades[symbol]["entry"] != info["entry"]:
                         bot.log(
                             f"⚖️ Sincronizando precio {symbol}: {bot.active_trades[symbol]['entry']} -> {info['entry']}"
                         )
                         bot.active_trades[symbol]["entry"] = info["entry"]
                         bot.active_trades[symbol]["amount"] = info["amount"]
-                        bot.active_trades[symbol]["size_usd"] = (
-                            info["entry"] * info["amount"]
-                        )
+                        bot.active_trades[symbol]["size_usd"] = info["entry"] * info["amount"]
 
                     emergency_closed = _ensure_hard_sl_attached(
                         bot, symbol, bot.active_trades[symbol], info
                     )
-                    _manage_partial_fill_trade(
-                        bot, symbol, bot.active_trades[symbol], info
-                    )
+                    _manage_partial_fill_trade(bot, symbol, bot.active_trades[symbol], info)
                     if emergency_closed:
                         emergency_closed_symbols.add(symbol)
 
@@ -471,11 +450,7 @@ def sync_wallet(bot):
                         ),
                         "OTHE",
                     )
-                    sl = (
-                        info["entry"] * 0.95
-                        if info["side"] == "BUY"
-                        else info["entry"] * 1.05
-                    )
+                    sl = info["entry"] * 0.95 if info["side"] == "BUY" else info["entry"] * 1.05
 
                     bot.active_trades[symbol] = {
                         "symbol": symbol,
@@ -503,12 +478,8 @@ def sync_wallet(bot):
                         "sl_exchange_order_id": None,
                     }
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(
-                            symbol, bot.active_trades[symbol]
-                        )
-                    _ensure_hard_sl_attached(
-                        bot, symbol, bot.active_trades[symbol], info
-                    )
+                        bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
+                    _ensure_hard_sl_attached(bot, symbol, bot.active_trades[symbol], info)
     except Exception as error:
         bot.log(f"⚠️ Error Sync: {error}")
         if not Config.PAPER_MODE:

@@ -8,9 +8,10 @@ def init_ml_monitoring(bot, ml_monitor_available):
         return
 
     try:
-        from tools.strategy import AgentConsensusNN
-        from tools.ml_monitor import AlertManager, ModelPerformanceTracker
         import numpy as np
+
+        from tools.ml_monitor import AlertManager, ModelPerformanceTracker
+        from tools.strategy import AgentConsensusNN
 
         neural_nn = AgentConsensusNN()
         if neural_nn.is_trained:
@@ -56,8 +57,6 @@ def check_recent_mfe_health(bot):
         avg_mfe = sum(values) / max(1, len(values))
         if avg_mfe < 0.1:
             bot._mfe_alert_last_ts = now_ts
-            bot.log(
-                f"⚠️ EXIT_MFE_ALERT: MFE medio últimos 5 trades={avg_mfe:.3f}% (<0.1%)."
-            )
+            bot.log(f"⚠️ EXIT_MFE_ALERT: MFE medio últimos 5 trades={avg_mfe:.3f}% (<0.1%).")
     except Exception as error:
         bot.log(f"⚠️ Error chequeando scorecard diario: {error}")

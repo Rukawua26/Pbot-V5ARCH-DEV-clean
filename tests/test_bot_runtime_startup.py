@@ -46,8 +46,9 @@ class BotRuntimeStartupTest(unittest.TestCase):
         def stop_loop(_seconds):
             bot.is_running = False
 
-        with patch("core.bot_runtime.threading.Thread") as thread_cls, patch(
-            "core.bot_runtime.time.sleep", side_effect=stop_loop
+        with (
+            patch("core.bot_runtime.threading.Thread") as thread_cls,
+            patch("core.bot_runtime.time.sleep", side_effect=stop_loop),
         ):
             thread_cls.return_value.start = MagicMock()
             run_bot_runtime_loop(

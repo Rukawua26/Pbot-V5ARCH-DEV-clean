@@ -1,11 +1,11 @@
 {
-  "generated_at": "2026-06-06T17:00:27.091902+00:00",
+  "generated_at": "2026-06-09T14:24:54.399018+00:00",
   "root": "/home/miguel/Pbot-V5ARCH-DEV-main",
   "stats": {
-    "files": 341,
-    "python_files": 288,
-    "docs_files": 39,
-    "code_like_files": 288
+    "files": 349,
+    "python_files": 294,
+    "docs_files": 40,
+    "code_like_files": 294
   },
   "files": [
     {
@@ -63,14 +63,11 @@
         "core/signals/oi_filter.py",
         "core/state_snapshot.py",
         "core/strategy/orchestrator.py",
-        "core/strategy/utils.py",
         "core/strategy/weight_monitor.py",
         "core/telegram_api.py",
         "core/trade_entry.py",
         "core/trade_exit.py",
         "core/trade_helpers.py",
-        "learning.py",
-        "notifier.py",
         "tests/test_correlation_risk.py",
         "tests/test_cvd_filter.py",
         "tests/test_filters_execution_mode.py",
@@ -95,20 +92,6 @@
       ]
     },
     {
-      "path": "ml_optimizer.py",
-      "ext": ".py",
-      "size": 244,
-      "sha256": "c69e6a585ad35ee167a5bc364c6831e4e96ca7be12dd1505042af2c8030da36f",
-      "kind": "code",
-      "symbols": [],
-      "imports": [
-        "warnings"
-      ],
-      "headings": [],
-      "summary": "code, 1 imports",
-      "dependents": []
-    },
-    {
       "path": "CHANGELOG.md",
       "ext": ".md",
       "size": 1522,
@@ -127,173 +110,54 @@
       "dependents": []
     },
     {
-      "path": "learning.py",
-      "ext": ".py",
-      "size": 108321,
-      "sha256": "40c1167b6aadd1fa96d8d6661c172504abc4c0e525c8b7cf0ff86689a55af179",
-      "kind": "code",
-      "symbols": [
-        "Brain",
-        "__init__",
-        "_classify_pattern",
-        "_get_conn",
-        "_init_db",
-        "_init_rag_cache",
-        "_safe_add_column",
-        "_utc_now_naive",
-        "auto_blacklist_poor_performers",
-        "check_consecutive_losses",
-        "check_eureka_status",
-        "check_performance_drop",
-        "cleanup_old_patterns",
-        "delete_active_trade_state",
-        "evolve_genetics",
-        "finalize_confidence_exit_audit",
-        "get_agent_performance",
-        "get_agent_reputation",
-        "get_ai_maturity",
-        "get_contextual_performance_score",
-        "get_daily_real_pnl",
-        "get_dynamic_settings",
-        "get_elite_insights_stats",
-        "get_elite_patterns",
-        "get_equity_curve",
-        "get_experimental_patterns",
-        "get_genetic_history",
-        "get_genetic_params",
-        "get_hourly_blacklist",
-        "get_hourly_performance",
-        "get_last_n_trades",
-        "get_last_train_timestamp",
-        "get_metadata",
-        "get_metadata_json",
-        "get_model_insights",
-        "get_monthly_stats",
-        "get_optimal_hours",
-        "get_paper_trades_history",
-        "get_pattern_weight",
-        "get_pnl_history",
-        "get_rag_inference",
-        "get_recent_exit_confidence_stagnation",
-        "get_recent_performance",
-        "get_recent_vetos",
-        "get_sector_blacklist",
-        "get_sector_performance",
-        "get_similar_trades",
-        "get_stats",
-        "get_stats_by_trend",
-        "get_symbol_blacklist",
-        "get_symbol_performance",
-        "get_symbol_stats",
-        "get_todays_trades",
-        "get_trade_by_id",
-        "get_trades_pending_post_mortem",
-        "get_weekly_stats",
-        "get_winrate_in_window",
-        "get_worst_hours",
-        "load_active_trade_states",
-        "log_equity",
-        "log_signal_alert",
-        "log_trade",
-        "recalculate_elite_patterns",
-        "reload_ghost_model",
-        "reset_daily_stats",
-        "rotate_history",
-        "save_active_trade_state",
-        "save_error_snapshot",
-        "set_metadata",
-        "set_metadata_json",
-        "update_agent_reputation",
-        "update_dynamic_settings",
-        "update_genetic_params",
-        "update_hourly_blacklist",
-        "update_last_train_timestamp",
-        "update_meta_learning",
-        "update_post_mortem",
-        "update_rag_cache",
-        "update_sector_blacklist",
-        "update_signal_alert_status",
-        "update_symbol_blacklist",
-        "upsert_confidence_exit_audit",
-        "validate_pattern_robustness",
-        "weekly_maintenance"
-      ],
-      "imports": [
-        "collections",
-        "config",
-        "core.active_trade_store",
-        "core.learning_paths",
-        "core.model_loader",
-        "core.rag_cache",
-        "core.shadow_logger",
-        "datetime",
-        "json",
-        "numpy",
-        "pandas",
-        "random",
-        "sqlite3",
-        "time"
-      ],
-      "headings": [],
-      "summary": "code, 84 symbols, 14 imports",
-      "dependents": [
-        "tests/test_active_trade_store.py",
-        "tests/test_agent_pipeline.py",
-        "tests/test_boot_and_notifier.py",
-        "tests/test_learning_storage.py",
-        "tests/test_shadow_logger_module.py",
-        "tests/test_weekly_maintenance.py"
-      ]
-    },
-    {
       "path": "README.md",
       "ext": ".md",
-      "size": 35417,
-      "sha256": "4571ce3bb6e3b82cc058c6c07e0911bf917b92774f397724dea5447bfbe190fe",
+      "size": 17110,
+      "sha256": "56d590c8b6a6906903a1b07e1e051a5063a8610a53e8c6b9ef16811f817ae7f0",
       "kind": "doc",
       "symbols": [],
       "imports": [],
       "headings": [
-        "Pbot V5ARCH DEV",
-        "Phase 17 — Recalibración SHADOW (Mayo 2026)",
-        "🚀 Para Inversores y Colaboradores",
-        "📈 Propuesta de Valor",
-        "⚡ Ventaja Operativa",
-        "🏗️ Arquitectura en Resumen",
-        "🔍 Lo Más Destacado",
-        "Fases de Hardening Runtime",
-        "📊 Dashboard Preview",
+        "🤖 Sniper AI — Pbot V5ARCH DEV",
+        "*Bot cuantitativo runtime-first para Binance Futures*",
+        "📖 ¿Qué es Sniper AI?",
+        "✨ Últimas Fases",
+        "🔵 Phase 19 — Kanban GitHub Projects (Junio 2026)",
+        "🟣 Phase 18 — Hardening Técnico (Junio 2026)",
+        "🟡 Phase 17 — Recalibración SHADOW (Mayo 2026)",
+        "🧬 Inteligencia Markov",
+        "⚡ Ventajas Operativas",
+        "🎮 Modos de Operación",
         "🚀 Inicio Rápido",
-        "Clonar, preparar entorno y arrancar",
-        "Crear .env con tus variables antes de arrancar",
-        "🧭 Navegación Rápida",
-        "📡 Capacidades Actuales",
-        "🧬 Markov Intelligence Layer",
-        "🎮 Modos Operativos",
-        "🏗️ Arquitectura",
-        "Runtime",
+        "1. Clonar el repositorio",
+        "2. Crear entorno virtual e instalar dependencias",
+        "3. Configurar variables de entorno",
+        "Editar .env con tus credenciales y modo de operación",
+        "4. Arrancar el bot",
+        "📊 Dashboard",
+        "Iniciar manualmente",
+        "🏗️ Arquitectura del Runtime",
         "Módulos Clave",
         "🛡️ Seguridad Runtime",
-        "Estados Runtime de Orden/Trade",
-        "⚙️ Configuración",
-        "Variables Importantes",
-        "Activación Segura Phase 12",
-        "Variables Para `shadow_live`",
-        "📦 Instalación",
-        "Stack Principal",
-        "🚀 Puesta En Marcha",
+        "Estados de Orden/Trade",
+        "🔧 Fases de Hardening Runtime",
+        "📋 GitHub Projects Kanban",
+        "Inicializar tablero",
+        "⚙️ Variables de Configuración Principales",
+        "🚀 Despliegue",
         "Local",
-        "systemd User",
+        "systemd (recomendado para VPS)",
         "Docker",
         "📊 Operación Diaria",
-        "📡 Telemetría y Observabilidad",
-        "Eventos de Ejecución Relevantes",
-        "📲 Comandos Telegram Útiles",
-        "Control",
-        "Auditoría",
-        "Análisis e Inteligencia",
-        "✅ Validación Mínima",
-        "Testnet E2E Opt-In"
+        "📲 Comandos Telegram",
+        "✅ Validación Mínima (alineada con CI)",
+        "Compilación",
+        "Imports modulares",
+        "Guardrails",
+        "Contratos de arquitectura",
+        "Suite completa de tests",
+        "Invarianza temporal",
+        "🧪 REAL Pilot"
       ],
       "summary": "doc, 40 headings",
       "dependents": []
@@ -351,6 +215,30 @@
         "Mantenimiento Preventivo"
       ],
       "summary": "doc, 22 headings",
+      "dependents": []
+    },
+    {
+      "path": "__init__.py",
+      "ext": ".py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "code",
+      "symbols": [],
+      "imports": [],
+      "headings": [],
+      "summary": "code",
+      "dependents": []
+    },
+    {
+      "path": "api_server.py",
+      "ext": ".py",
+      "size": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "code",
+      "symbols": [],
+      "imports": [],
+      "headings": [],
+      "summary": "code",
       "dependents": []
     },
     {
@@ -431,10 +319,10 @@
       "dependents": []
     },
     {
-      "path": "pyproject.toml",
-      "ext": ".toml",
-      "size": 377,
-      "sha256": "dc1809a96e34e4b78103d69fcd557f980ca46bb36383234916abe847a57a8b11",
+      "path": "audit_report.json",
+      "ext": ".json",
+      "size": 49799,
+      "sha256": "1f8a762fc8a6865e2955d5bca60ead17ff1133e2c4506d36d667e81211f7e086",
       "kind": "data",
       "symbols": [],
       "imports": [],
@@ -443,17 +331,15 @@
       "dependents": []
     },
     {
-      "path": "test_start.py",
-      "ext": ".py",
-      "size": 238,
-      "sha256": "9097077dc17807772f6b71e59324a1d822f459f8acffca253cdc09021f01715f",
-      "kind": "code",
+      "path": "pyproject.toml",
+      "ext": ".toml",
+      "size": 653,
+      "sha256": "3698240cfb04c4dea9777394d55ee68340eca2d78c13548e20e131c0577725e6",
+      "kind": "data",
       "symbols": [],
-      "imports": [
-        "warnings"
-      ],
+      "imports": [],
       "headings": [],
-      "summary": "code, 1 imports",
+      "summary": "data",
       "dependents": []
     },
     {
@@ -476,76 +362,6 @@
       "dependents": []
     },
     {
-      "path": "notifier.py",
-      "ext": ".py",
-      "size": 7757,
-      "sha256": "6cd7c86d00c87bc3074cfa7403b3962ef123116e1ae15b9e37b3271633d9d6dd",
-      "kind": "code",
-      "symbols": [
-        "NotificationQueue",
-        "Priority",
-        "__init__",
-        "_send_with_retry",
-        "_worker",
-        "get_queue",
-        "notify_daily_summary",
-        "notify_panic",
-        "notify_trade",
-        "send",
-        "send_photo",
-        "send_telegram_msg",
-        "send_telegram_photo",
-        "stop"
-      ],
-      "imports": [
-        "config",
-        "core.telegram_api",
-        "enum",
-        "itertools",
-        "queue",
-        "threading",
-        "time"
-      ],
-      "headings": [],
-      "summary": "code, 14 symbols, 7 imports",
-      "dependents": [
-        "tests/test_boot_and_notifier.py",
-        "tools/health_check.py"
-      ]
-    },
-    {
-      "path": "monitor_trades.py",
-      "ext": ".py",
-      "size": 250,
-      "sha256": "e16ca4ea16111710d7cb4b61b03124b28cfb6fffa1fc83476671ff6b71c8cc5f",
-      "kind": "code",
-      "symbols": [],
-      "imports": [
-        "warnings"
-      ],
-      "headings": [],
-      "summary": "code, 1 imports",
-      "dependents": []
-    },
-    {
-      "path": "dashboard.py",
-      "ext": ".py",
-      "size": 236,
-      "sha256": "90778118003a83dacd5f043f083bc1af379fe2e82b4cd04bcd95a967b5d3b951",
-      "kind": "code",
-      "symbols": [],
-      "imports": [
-        "tools.dashboard",
-        "warnings"
-      ],
-      "headings": [],
-      "summary": "code, 2 imports",
-      "dependents": [
-        "tests/test_dashboard_ipc.py",
-        "tools/dashboard.py"
-      ]
-    },
-    {
       "path": "main.py",
       "ext": ".py",
       "size": 204,
@@ -563,8 +379,8 @@
     {
       "path": "AGENTS.md",
       "ext": ".md",
-      "size": 3710,
-      "sha256": "b84477aa1bebe024a53ffbca283ac8a80daaabd8ef974c980a56ec385bf02382",
+      "size": 3781,
+      "sha256": "89575a63607272db7c4eaf50029fa1b491933550ff34378e91e2c1a03b6fbd0a",
       "kind": "doc",
       "symbols": [],
       "imports": [],
@@ -599,59 +415,6 @@
       "ext": ".json",
       "size": 1291,
       "sha256": "957c6663921660ed8bac7b1fd1eef012efb5eae9860dfcbd98e0db7461fff633",
-      "kind": "data",
-      "symbols": [],
-      "imports": [],
-      "headings": [],
-      "summary": "data",
-      "dependents": []
-    },
-    {
-      "path": "docs/agent-context/README.md",
-      "ext": ".md",
-      "size": 216,
-      "sha256": "6af6277b3d527572d9d361bdc1d957baf3cd6402305de6abf08a5a1d2f9e7a6f",
-      "kind": "doc",
-      "symbols": [],
-      "imports": [],
-      "headings": [
-        "Agent Context"
-      ],
-      "summary": "doc, 1 headings",
-      "dependents": []
-    },
-    {
-      "path": "docs/agent-context/repo-map.json",
-      "ext": ".json",
-      "size": 323428,
-      "sha256": "c2e3c3325c8f51734cf73469fe4137acdfa1bb330f22a59f63bd0cc511b28d04",
-      "kind": "data",
-      "symbols": [],
-      "imports": [],
-      "headings": [],
-      "summary": "data",
-      "dependents": []
-    },
-    {
-      "path": "docs/agent-context/summaries/architecture.md",
-      "ext": ".md",
-      "size": 874,
-      "sha256": "9af04030374f2d6b4bc05979ac41e0d95c218c35c57005326bab03975133ab92",
-      "kind": "doc",
-      "symbols": [],
-      "imports": [],
-      "headings": [
-        "Architecture Snapshot",
-        "High-signal files"
-      ],
-      "summary": "doc, 2 headings",
-      "dependents": []
-    },
-    {
-      "path": "docs/agent-context/snapshots/latest-runtime.json",
-      "ext": ".json",
-      "size": 207,
-      "sha256": "26a02cb736e07c5f1c4241852123d6e8b56cdeb1aefc661bf09f7a7507626ee7",
       "kind": "data",
       "symbols": [],
       "imports": [],
@@ -757,6 +520,50 @@
       "dependents": []
     },
     {
+      "path": "docs/runbooks/github-projects-kanban.md",
+      "ext": ".md",
+      "size": 3221,
+      "sha256": "eefa8f44b13a1c98044a0490336918d713fc84b2fab98b713cb33eeeab8fe561",
+      "kind": "doc",
+      "symbols": [],
+      "imports": [],
+      "headings": [
+        "GitHub Projects Kanban",
+        "Archivos",
+        "Variables de entorno",
+        "Opcion A: usar el node ID directo del proyecto",
+        "Opcion B: resolver por owner + numero",
+        "Opcional: enlazar el project al repo",
+        "Columnas requeridas en GitHub Projects",
+        "Uso desde el bot",
+        "Crear el tablero automáticamente",
+        "Como obtener las credenciales en GitHub",
+        "Dónde ver el tablero",
+        "Comportamiento ante errores"
+      ],
+      "summary": "doc, 12 headings",
+      "dependents": []
+    },
+    {
+      "path": "docs/runbooks/audit-correl.md",
+      "ext": ".md",
+      "size": 1073,
+      "sha256": "21b589ae6b62a450ba9d1ea167901a2367081aabfd37e65c9268a68bba212882",
+      "kind": "doc",
+      "symbols": [],
+      "imports": [],
+      "headings": [
+        "Runbook: Auditoría de Correlación Agente G",
+        "Objetivo",
+        "Frecuencia Recomendada",
+        "Procedimiento",
+        "Interpretación de Resultados",
+        "Acciones Ante Fallo Crítico"
+      ],
+      "summary": "doc, 6 headings",
+      "dependents": []
+    },
+    {
       "path": "dashboard/run.sh",
       "ext": ".sh",
       "size": 119,
@@ -771,32 +578,16 @@
     {
       "path": "dashboard/__init__.py",
       "ext": ".py",
-      "size": 3337,
-      "sha256": "1236de33c00851a1a4dcae5d14ad29b33d271fd142b409a525491dd67b52fc8b",
+      "size": 114,
+      "sha256": "a320aa86d92c29b8ac10c0916d0da066423c2a91de25828eac1e3a57986c18b5",
       "kind": "code",
-      "symbols": [
-        "DashboardHandle",
-        "_env_bool",
-        "_is_port_open",
-        "_log",
-        "_run_server",
-        "start_dashboard"
-      ],
+      "symbols": [],
       "imports": [
-        "__future__",
-        "dataclasses",
-        "os",
-        "socket",
-        "threading",
-        "time",
-        "uvicorn"
+        "tools.dashboard"
       ],
       "headings": [],
-      "summary": "code, 6 symbols, 7 imports",
-      "dependents": [
-        "tests/test_dashboard_ipc.py",
-        "tools/dashboard.py"
-      ]
+      "summary": "code, 1 imports",
+      "dependents": []
     },
     {
       "path": "dashboard/api_server.py",
@@ -833,16 +624,13 @@
       ],
       "headings": [],
       "summary": "code, 13 symbols, 10 imports",
-      "dependents": [
-        "tests/test_dashboard_ipc.py",
-        "tools/dashboard.py"
-      ]
+      "dependents": []
     },
     {
       "path": "core/candle_close_cache.py",
       "ext": ".py",
-      "size": 1672,
-      "sha256": "975b0d9d0e3111c6fb7a170dfa3aa13231c9e87e6697cd283d7909d0c11e63dc",
+      "size": 1614,
+      "sha256": "f693d7266ccc13b385b79a8e7d9ff4778693853e01688596cc4d23fbe72fb8f5",
       "kind": "code",
       "symbols": [
         "CandleCloseCache",
@@ -874,8 +662,8 @@
     {
       "path": "core/bot_connection.py",
       "ext": ".py",
-      "size": 8937,
-      "sha256": "5f13183baea34b18540121205148b4b2fd6a0a2073a53c808bf3c5b609b9c0b0",
+      "size": 8817,
+      "sha256": "eb2aaa0bfc29254c043f214ddf54c6a7dd07f69e0474c0e8e18404399e98d250",
       "kind": "code",
       "symbols": [
         "_build_exchange",
@@ -906,8 +694,8 @@
     {
       "path": "core/bot_symbol_controls.py",
       "ext": ".py",
-      "size": 3719,
-      "sha256": "c4fc8874a2821fdc338ccb8588db1dc00154116bdf973c455ebda4a5aec42e4e",
+      "size": 3650,
+      "sha256": "7f213382739f2b9cc9fc326fb42abd8d6f9ce23deb66288895ed10c027a1c8cd",
       "kind": "code",
       "symbols": [
         "get_cached_btc_data",
@@ -937,13 +725,14 @@
     {
       "path": "core/command_router.py",
       "ext": ".py",
-      "size": 3285,
-      "sha256": "df2b8e1c06e2fdf80543762f2918f825656af455edb6958a0acb72f17358cb94",
+      "size": 3418,
+      "sha256": "3ba1d150cc7c8da1cdf99269ea4ba00ee37e587f68968e87321f183dd7253e9e",
       "kind": "code",
       "symbols": [
         "handle_basic_command"
       ],
       "imports": [
+        "core.commands.api_status",
         "core.commands.audit",
         "core.commands.history",
         "core.commands.intelligence",
@@ -952,7 +741,7 @@
         "tools.notifier"
       ],
       "headings": [],
-      "summary": "code, 1 symbols, 6 imports",
+      "summary": "code, 1 symbols, 7 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_bot_bootstrap.py",
@@ -967,8 +756,8 @@
     {
       "path": "core/risk_engine.py",
       "ext": ".py",
-      "size": 22826,
-      "sha256": "61f100630c48f5f1068d21bd20712887af9c565a785309d29d662afab650547b",
+      "size": 22599,
+      "sha256": "e1a0e1746e729039ca56833f054588ed44fc418dfedc7298a7db56ed0acc2516",
       "kind": "code",
       "symbols": [
         "RiskEngine",
@@ -993,11 +782,10 @@
         "logging",
         "sqlite3",
         "tools.crash_predictor",
-        "tools.strategy",
-        "typing"
+        "tools.strategy"
       ],
       "headings": [],
-      "summary": "code, 13 symbols, 9 imports",
+      "summary": "code, 13 symbols, 8 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "core/bot_main_loop.py",
@@ -1017,8 +805,8 @@
     {
       "path": "core/bot_weekly_ops.py",
       "ext": ".py",
-      "size": 3815,
-      "sha256": "c4c7e1ae25f6927bba5aa17055816fd82f7c49cfb8d1ac807488bfbba9762d7b",
+      "size": 3722,
+      "sha256": "8a9d7ca3639fb974e2cc3596243070dc71abeb0a0603d7b375e4652edc1093c0",
       "kind": "code",
       "symbols": [
         "_clear_transient_runtime_caches",
@@ -1047,8 +835,8 @@
     {
       "path": "core/bot_post_exit_analysis.py",
       "ext": ".py",
-      "size": 1628,
-      "sha256": "e20ef68ec22dea493febc55e4c58aca34f4c782a8f2a1166cee2ca3e4e1c4649",
+      "size": 1578,
+      "sha256": "ede06da95ece87956f579501668665e58e48adb95c7e1e959e17e97953d4a210",
       "kind": "code",
       "symbols": [
         "calc_post_exit_drift",
@@ -1073,8 +861,8 @@
     {
       "path": "core/cmd_consumer.py",
       "ext": ".py",
-      "size": 1431,
-      "sha256": "77c2d524096dbd33bb5c1233e2707816af28510eceacc664e0fb8f9d897541fd",
+      "size": 1432,
+      "sha256": "2cba8123d2d92c1934e72345a4cc939cbc44d709f6777b78571170792d8102cf",
       "kind": "code",
       "symbols": [
         "consume_command_file"
@@ -1119,8 +907,8 @@
     {
       "path": "core/ablation_manager.py",
       "ext": ".py",
-      "size": 1746,
-      "sha256": "7178cb804e4375976245de6b84ec4158c221c635f4bbda02f5c9c2cb046d399a",
+      "size": 1715,
+      "sha256": "8a5d67b161d2536bb03d643ef316680f0932c98f32f3a970106a639210cbe40d",
       "kind": "code",
       "symbols": [
         "AblationManager",
@@ -1130,11 +918,10 @@
       ],
       "imports": [
         "config",
-        "json",
         "pandas"
       ],
       "headings": [],
-      "summary": "code, 4 symbols, 3 imports",
+      "summary": "code, 4 symbols, 2 imports",
       "dependents": [
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
@@ -1147,8 +934,8 @@
     {
       "path": "core/execution_telemetry.py",
       "ext": ".py",
-      "size": 1747,
-      "sha256": "4025fdbcd20b8103391e5fa64ba0fa81716c06c5e2964e99c43aae29db8a6280",
+      "size": 1746,
+      "sha256": "ae1065f1716e7cfad43b907358be777be58b85336daf425eaffbf54918f502d4",
       "kind": "code",
       "symbols": [
         "_rotate_existing",
@@ -1191,11 +978,13 @@
     {
       "path": "core/trade_helpers.py",
       "ext": ".py",
-      "size": 13258,
-      "sha256": "e7c2f47e0b94eef0428a9d8f4b78d507b06229aa91bb8c410e91b82d64deb147",
+      "size": 16537,
+      "sha256": "dc77a30b7f913459a60e30137832329bc60b21bb5fded7427685fda3a56fc127",
       "kind": "code",
       "symbols": [
+        "_calculate_margin_used",
         "_calculate_pnl_and_metrics",
+        "_calculate_trade_pnl",
         "_clamp_leverage_1_to_10",
         "_emergency_close_verify_flat",
         "_emergency_market_close",
@@ -1204,6 +993,8 @@
         "_get_local_open_trade_counts",
         "_module_available",
         "_order_looks_filled",
+        "_release_simulated_margin",
+        "_reserve_simulated_margin",
         "_safe_log_signal_alert",
         "_safe_update_signal_alert_status",
         "_sanitize_context",
@@ -1225,8 +1016,10 @@
         "typing"
       ],
       "headings": [],
-      "summary": "code, 14 symbols, 12 imports",
+      "summary": "code, 18 symbols, 12 imports",
       "dependents": [
+        "core/bot_guardian.py",
+        "core/bot_trade_monitor.py",
         "core/bot_wallet_sync.py",
         "core/trade_entry.py",
         "core/trade_exit.py",
@@ -1237,14 +1030,15 @@
         "tests/test_market_intelligence_and_balance.py",
         "tests/test_rag_cache.py",
         "tests/test_shadow_logger_module.py",
+        "tests/test_shadow_wallet_runtime.py",
         "tests/test_weekly_maintenance.py"
       ]
     },
     {
       "path": "core/backtester.py",
       "ext": ".py",
-      "size": 14758,
-      "sha256": "9b8909d56b5d45cf99f7605b03db133c18773cfb1eb0ccf13812e95a1c45cb2a",
+      "size": 14602,
+      "sha256": "5e340c0f0c8c42a5bc1371f6197344dc17d238102fa009012b4bd20b7fdf8cb1",
       "kind": "code",
       "symbols": [
         "VectorBacktestResult",
@@ -1264,11 +1058,10 @@
         "__future__",
         "dataclasses",
         "numpy",
-        "pandas",
-        "typing"
+        "pandas"
       ],
       "headings": [],
-      "summary": "code, 12 symbols, 5 imports",
+      "summary": "code, 12 symbols, 4 imports",
       "dependents": [
         "tests/test_ablation_backtest.py",
         "tests/test_backtester.py",
@@ -1287,8 +1080,8 @@
     {
       "path": "core/bot_ml_runtime.py",
       "ext": ".py",
-      "size": 2143,
-      "sha256": "fa7ae23f021595d98140ba7fa184f4065f91f9fcd9b21773b041d0ff0920be3d",
+      "size": 2114,
+      "sha256": "b76a04d82f8c027fff799d3efb360591e5f0f67c0a75456cea34c40a4cbb31bb",
       "kind": "code",
       "symbols": [
         "check_recent_mfe_health",
@@ -1316,8 +1109,8 @@
     {
       "path": "core/bot_runtime.py",
       "ext": ".py",
-      "size": 6670,
-      "sha256": "718327bd58fa18d78829be829810583cf2448159b3f4ae3c9f31d71a0cbc481c",
+      "size": 6538,
+      "sha256": "2e0bd192c6817eaca0ced4e0673a72746eea1b21e7dfec581854b85f05618d2d",
       "kind": "code",
       "symbols": [
         "run_bot_runtime_loop",
@@ -1350,7 +1143,7 @@
       "path": "core/trade_manager.py",
       "ext": ".py",
       "size": 568,
-      "sha256": "4b2f0135e1a43d9ca46cd183804df1aad2ecb4b6d6d3fd8a75fa6e8d8af0504e",
+      "sha256": "d76ec29ced54d281b54f8aa4f6bddb2f543cffb9ac1fa46e0358127727107cda",
       "kind": "code",
       "symbols": [],
       "imports": [
@@ -1433,8 +1226,8 @@
     {
       "path": "core/intent_deduper.py",
       "ext": ".py",
-      "size": 1320,
-      "sha256": "01e8958047e521beec8d88aad590efb4c1c5eb9fa88c09784c33ba4c696f3051",
+      "size": 1291,
+      "sha256": "8d04cb7893caa070ca586baa3103a5c070d7cb90155b2d83a3333502ba1d148b",
       "kind": "code",
       "symbols": [
         "IntentDeduper",
@@ -1447,11 +1240,10 @@
       ],
       "imports": [
         "threading",
-        "time",
-        "typing"
+        "time"
       ],
       "headings": [],
-      "summary": "code, 7 symbols, 3 imports",
+      "summary": "code, 7 symbols, 2 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "tests/test_bot_bootstrap.py",
@@ -1465,8 +1257,8 @@
     {
       "path": "core/bot_cli_ops.py",
       "ext": ".py",
-      "size": 2451,
-      "sha256": "3eea94e1420383e9f782eef2c7115f986d574c6dc3737bd8c38ae79aac90b685",
+      "size": 2429,
+      "sha256": "8cf6176ba149a1460cee4058d9e10b84538cbde9e7b26c7c1875b9f889891c8f",
       "kind": "code",
       "symbols": [
         "get_vol",
@@ -1517,8 +1309,8 @@
     {
       "path": "core/bot_telemetry.py",
       "ext": ".py",
-      "size": 2377,
-      "sha256": "cbafebf08593fd3dccb12b661b5f32c9caa544e14562cbae3ce67ae9f8810f6a",
+      "size": 2337,
+      "sha256": "739c71b0259ff5830b0a5d9d4fd6cccc8a57a4dd5cd91ba9db2f18e7580ac8f3",
       "kind": "code",
       "symbols": [
         "collect_telemetry"
@@ -1542,8 +1334,8 @@
     {
       "path": "core/bot_consensus_display.py",
       "ext": ".py",
-      "size": 900,
-      "sha256": "416598ad53b0a4fc98fd3f81dc97ce1cb94306178ec552f8e8b2cd1330dbed26",
+      "size": 884,
+      "sha256": "b95e1cc7214d9946151c6af323da0804ceea98b57d4df947a7144e3166a09c67",
       "kind": "code",
       "symbols": [
         "get_icon",
@@ -1593,8 +1385,8 @@
     {
       "path": "core/trade_entry.py",
       "ext": ".py",
-      "size": 37238,
-      "sha256": "c908eea233af5fe0ed953bc66009e57d4893256c72d5f25ab3decd1e2b058452",
+      "size": 41953,
+      "sha256": "3fc0513afbb498f3a88ed2a34a829ff97a34889036fbf596e49727e2fbcba2b5",
       "kind": "code",
       "symbols": [
         "_discard_pending_signal",
@@ -1607,7 +1399,7 @@
         "config",
         "core.cooldown_state",
         "core.execution_telemetry",
-        "core.postmortem",
+        "core.kanban_sync",
         "core.reconciliation",
         "core.regime_tuning",
         "core.risk.correlation_risk",
@@ -1637,8 +1429,8 @@
     {
       "path": "core/bot_balance_ops.py",
       "ext": ".py",
-      "size": 2757,
-      "sha256": "fee8d8e19b5e4be234bab6a8a509ae55ee6a147e386c733ab341e3e6dfc12d0d",
+      "size": 2681,
+      "sha256": "4dd23508ed33e68a93de9132b81b6ee01421b09ae6cf21462464b8d79c7dd182",
       "kind": "code",
       "symbols": [
         "get_current_balance",
@@ -1662,16 +1454,53 @@
       ]
     },
     {
-      "path": "core/bot_signals.py",
+      "path": "core/kanban_sync.py",
       "ext": ".py",
-      "size": 11722,
-      "sha256": "8ea7cf90185a74057d8cc0c37559037ca632661502f3feeef1710960d90b8566",
+      "size": 3845,
+      "sha256": "9b10348d1f9f9ab836bcbf8f7fd2410bc27b2b9b001f538dc633552f5904bd6e",
       "kind": "code",
       "symbols": [
+        "_is_real_trade",
+        "_run",
+        "_safe_update_trade_state",
+        "async_actualizar_pnl",
+        "async_crear_tarjeta",
+        "async_mover_tarjeta"
+      ],
+      "imports": [
+        "logging",
+        "threading",
+        "time",
+        "tools.github_projects_kanban",
+        "typing"
+      ],
+      "headings": [],
+      "summary": "code, 6 symbols, 5 imports",
+      "dependents": [
+        "core/bot_guardian.py",
+        "core/trade_entry.py",
+        "core/trade_exit.py",
+        "tests/test_bot_bootstrap.py",
+        "tests/test_dashboard_ipc.py",
+        "tests/test_market_intelligence_and_balance.py",
+        "tests/test_rag_cache.py",
+        "tests/test_shadow_logger_module.py",
+        "tests/test_weekly_maintenance.py"
+      ]
+    },
+    {
+      "path": "core/bot_signals.py",
+      "ext": ".py",
+      "size": 13508,
+      "sha256": "5b26ee319d3f00c2957cee6f4cce1ace4bc6e92246c6a62866f469e6202b2329",
+      "kind": "code",
+      "symbols": [
+        "_precompute_signal_analysis",
         "run_signal_scan_cycle"
       ],
       "imports": [
         "asyncio",
+        "concurrent.futures",
         "config",
         "core.cooldown_state",
         "core.execution_telemetry",
@@ -1681,7 +1510,7 @@
         "traceback"
       ],
       "headings": [],
-      "summary": "code, 1 symbols, 8 imports",
+      "summary": "code, 2 symbols, 9 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_bot_bootstrap.py",
@@ -1696,8 +1525,8 @@
     {
       "path": "core/bot_maintenance.py",
       "ext": ".py",
-      "size": 1946,
-      "sha256": "94bd79bd65536301a3340c608a12551a69c4dfaefb42b5801b33bad6bc80029c",
+      "size": 1910,
+      "sha256": "d2d5bdcb0c184b9551c8c80e8151aee335e99f39c5679c355cd2bde9633a5a2b",
       "kind": "code",
       "symbols": [
         "backup_database_placeholder",
@@ -1723,8 +1552,8 @@
     {
       "path": "core/trade_state.py",
       "ext": ".py",
-      "size": 5136,
-      "sha256": "2ab0ccd1da1f9d6a81c51d46398a3656c006e98bb781726cee3894368ac5b198",
+      "size": 5653,
+      "sha256": "470b86eb8cfce3e6a4d0d91c1989711f420bf5da980f46d4c22c48cc101e08dc",
       "kind": "code",
       "symbols": [
         "TradeStatus",
@@ -1737,11 +1566,10 @@
       ],
       "imports": [
         "__future__",
-        "enum",
-        "typing"
+        "enum"
       ],
       "headings": [],
-      "summary": "code, 7 symbols, 3 imports",
+      "summary": "code, 7 symbols, 2 imports",
       "dependents": [
         "core/bot_guardian.py",
         "core/bot_shutdown.py",
@@ -1763,8 +1591,8 @@
     {
       "path": "core/types.py",
       "ext": ".py",
-      "size": 1607,
-      "sha256": "3311e06dc961656d2ea4481495099a902a5264dfc13733e68bfb492dfbd58d24",
+      "size": 1557,
+      "sha256": "b8041b9c41e3b7bf8a7d2595b786cdc73aa73025bc9dc0da736c474e6f044c5a",
       "kind": "code",
       "symbols": [
         "ADXData",
@@ -1776,12 +1604,11 @@
         "SignalContext"
       ],
       "imports": [
-        "dataclasses",
         "pandas",
         "typing"
       ],
       "headings": [],
-      "summary": "code, 7 symbols, 3 imports",
+      "summary": "code, 7 symbols, 2 imports",
       "dependents": [
         "core/execution_order_helpers.py",
         "core/execution_service.py",
@@ -1797,8 +1624,8 @@
     {
       "path": "core/bot_market_state.py",
       "ext": ".py",
-      "size": 10949,
-      "sha256": "d916ae3c0f3326dc0a45c6af437e7d49d04c0623f1e25fdeb174d8301d6905e1",
+      "size": 10843,
+      "sha256": "43633cd9921604996b77bd3f6a8bfdc762ea1d2475a248098f4044c70cb2e34a",
       "kind": "code",
       "symbols": [
         "_detect_market_regime_heuristic",
@@ -1857,8 +1684,8 @@
     {
       "path": "core/bot_guardian.py",
       "ext": ".py",
-      "size": 31803,
-      "sha256": "6813d590b4f5f5914ce700121ebdc6217551adb7f57477ac699f9b501e9b8ad2",
+      "size": 32473,
+      "sha256": "c2bab3bc0e4f7e8232b47a02015f81ac3757516bab3124e1f60228a3ea6c2276",
       "kind": "code",
       "symbols": [
         "_fetch_prices_with_fallback",
@@ -1869,13 +1696,15 @@
         "config",
         "contextlib",
         "core.execution_telemetry",
+        "core.kanban_sync",
         "core.time_utils",
+        "core.trade_helpers",
         "core.trade_state",
         "time",
         "tools.strategy"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 7 imports",
+      "summary": "code, 3 symbols, 9 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_bot_bootstrap.py",
@@ -1893,8 +1722,8 @@
     {
       "path": "core/time_utils.py",
       "ext": ".py",
-      "size": 496,
-      "sha256": "ab0929d21db5c33145cc8805c3fc48f3e0a20a1f87f224639a8981aaca06c467",
+      "size": 464,
+      "sha256": "cca5c1ed29cbd8df7f4d067042ed5c5ed9370b8a12645250ae65655d54161eed",
       "kind": "code",
       "symbols": [
         "monotonic_now",
@@ -1941,8 +1770,8 @@
     {
       "path": "core/api_weight_tracker.py",
       "ext": ".py",
-      "size": 14134,
-      "sha256": "34a9f0759aa0a7d6d544237b06cee6044954f6e0961652380e81845f4b9104b7",
+      "size": 14008,
+      "sha256": "375ebfde540c6995f126f643b57a8474be43df99009906f13b36591011ae0645",
       "kind": "code",
       "symbols": [
         "BinanceWeightTracker",
@@ -1963,11 +1792,10 @@
         "collections",
         "logging",
         "threading",
-        "time",
-        "typing"
+        "time"
       ],
       "headings": [],
-      "summary": "code, 13 symbols, 5 imports",
+      "summary": "code, 13 symbols, 4 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_api_weight_tracker.py",
@@ -1982,8 +1810,8 @@
     {
       "path": "core/bot_trade_monitor.py",
       "ext": ".py",
-      "size": 8934,
-      "sha256": "523a28e4c3b229f0b86c79b7596647213bf336f8f06253c5a852bb8e862a83b6",
+      "size": 9243,
+      "sha256": "3598a31957877e466a011d256970ca62d7702e78004e33105510f16791e72934",
       "kind": "code",
       "symbols": [
         "_derive_dominant_killer",
@@ -1994,13 +1822,14 @@
         "config",
         "contextlib",
         "core.time_utils",
+        "core.trade_helpers",
         "core.trade_state",
         "datetime",
         "time",
         "tools.strategy"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 7 imports",
+      "summary": "code, 3 symbols, 8 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_bot_bootstrap.py",
@@ -2015,8 +1844,8 @@
     {
       "path": "core/rag_cache.py",
       "ext": ".py",
-      "size": 5432,
-      "sha256": "7e56afe8ee7481c82622c1d7a2cad3014f5c756a047ca1fc90cb2e88128c7eb3",
+      "size": 5401,
+      "sha256": "a5334500aed4a2d611fe04e7e2a5728580627cad134ba3b30f9d84f7748df4ce",
       "kind": "code",
       "symbols": [
         "build_rag_vector",
@@ -2031,7 +1860,6 @@
       "headings": [],
       "summary": "code, 4 symbols, 2 imports",
       "dependents": [
-        "learning.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
@@ -2044,8 +1872,8 @@
     {
       "path": "core/bot_runtime_ops.py",
       "ext": ".py",
-      "size": 1821,
-      "sha256": "2e9087e50f6b5e438bc815af47a1cc2a293469d38a29ea1e82b60642cbc314d4",
+      "size": 1767,
+      "sha256": "0eae6e2cc902250599eb48d37b03a95169f72e680ce25ae604252b0b378ff78d",
       "kind": "code",
       "symbols": [
         "check_instinctive_safety",
@@ -2107,8 +1935,8 @@
     {
       "path": "core/watchdog.py",
       "ext": ".py",
-      "size": 1791,
-      "sha256": "99a4f07087f6cdccb0bf4a9072e6324b5359bfa065265031421d2ffb119da5dd",
+      "size": 1774,
+      "sha256": "84644a9f7cf55a1a133297765d3c28c408f22a5aa3515511c4d11977d52b70cf",
       "kind": "code",
       "symbols": [
         "resolve_watchdog_heartbeat_path",
@@ -2138,8 +1966,8 @@
     {
       "path": "core/data_service.py",
       "ext": ".py",
-      "size": 12994,
-      "sha256": "6b5b84f490d7aa79fb3631968d63c3ae817ff719d9356321d756f573496ea5ac",
+      "size": 16016,
+      "sha256": "6fb73c045ed24f7683309d686d2b10c2212919f12f887fa7531e2982468ecd56",
       "kind": "code",
       "symbols": [
         "DataService",
@@ -2147,8 +1975,10 @@
         "_candle_file_path",
         "_clean_df",
         "_snapshot_cache_for_save",
+        "_snapshot_maturity_cache_for_save",
         "_track_api_weight",
         "_write_cache_snapshot",
+        "_write_maturity_snapshot",
         "audit_symbol_maturity",
         "download_historical_data",
         "download_multiscale_historical_data",
@@ -2159,23 +1989,23 @@
         "save_cache",
         "save_cache_async",
         "save_maturity_cache",
+        "save_maturity_cache_async",
         "set_weight_tracker"
       ],
       "imports": [
         "ccxt",
         "concurrent.futures",
         "config",
+        "importlib.util",
         "json",
         "logging",
         "os",
         "pandas",
-        "pyarrow",
         "threading",
-        "time",
-        "typing"
+        "time"
       ],
       "headings": [],
-      "summary": "code, 18 symbols, 11 imports",
+      "summary": "code, 21 symbols, 10 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "tests/test_bot_bootstrap.py",
@@ -2192,8 +2022,8 @@
     {
       "path": "core/execution_order_helpers.py",
       "ext": ".py",
-      "size": 4607,
-      "sha256": "9544d5a3f2eccd87dd27b2f6363fea902ee27ef4b04d8541717ce406f11c5830",
+      "size": 4623,
+      "sha256": "ba1251a8d5b848f8406bbb813efc9640c4b7de9706c5e67b7c7eda76ed8bda15",
       "kind": "code",
       "symbols": [
         "_execute_chase_limit_steps",
@@ -2202,11 +2032,10 @@
       ],
       "imports": [
         "__future__",
-        "core.types",
-        "typing"
+        "core.types"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 3 imports",
+      "summary": "code, 3 symbols, 2 imports",
       "dependents": [
         "core/execution_service.py",
         "tests/test_bot_bootstrap.py",
@@ -2244,8 +2073,8 @@
     {
       "path": "core/bot_risk_cycles.py",
       "ext": ".py",
-      "size": 3652,
-      "sha256": "dffab6d08377c3b159cb740cfd53a60fd4eb198469a9e49db28fce73211298b0",
+      "size": 3622,
+      "sha256": "80fa257a21aea04f904e97c9cfecbdc842fa20fa529047425e2b8d0ad1bdde7b",
       "kind": "code",
       "symbols": [
         "_btc_price_is_fresh",
@@ -2304,8 +2133,8 @@
     {
       "path": "core/bot_io_loops.py",
       "ext": ".py",
-      "size": 7007,
-      "sha256": "4bb645aba9ab9bdd78337b27eb78fbe953162e4da5b2ee24f509b357d35873e2",
+      "size": 6899,
+      "sha256": "4ee4bd92df3f8bffa58d3d937e03c24235d917a7f9cf7e19c237419e9ca10fb7",
       "kind": "code",
       "symbols": [
         "_apply_ticker_stream_update",
@@ -2343,8 +2172,8 @@
     {
       "path": "core/bot_core_setup.py",
       "ext": ".py",
-      "size": 2858,
-      "sha256": "0b679508c789fe1c030486d2eeff6d5392e2fecdd6084b6d3bacf2abdbbed586",
+      "size": 2682,
+      "sha256": "b8e8a079b18a4aabb4df3a971d4469bffaaec41d96c0775e6c375d5596e8a638",
       "kind": "code",
       "symbols": [
         "init_core_services_and_engines"
@@ -2377,8 +2206,8 @@
     {
       "path": "core/cooldown_state.py",
       "ext": ".py",
-      "size": 4634,
-      "sha256": "f9554c743994a5a453beb0cf477b57ab02ba14819f3b40ac9c228285baf53274",
+      "size": 4476,
+      "sha256": "0b7567c4a849e8bebabdfa0490392e8b08b05930afad909a692b1e6fa7f3283a",
       "kind": "code",
       "symbols": [
         "_to_utc_datetime",
@@ -2415,8 +2244,8 @@
     {
       "path": "core/regime_tuning.py",
       "ext": ".py",
-      "size": 3245,
-      "sha256": "b6879e5d234e1b899232a26350aa855b68a1bf3f5264ce87b3610c8b649e6f41",
+      "size": 3223,
+      "sha256": "758de90098243d03c9ca9893a5dfd37efc62cddb0e70e77284fe27b3363b1acb",
       "kind": "code",
       "symbols": [
         "_ensure_dir",
@@ -2453,8 +2282,8 @@
     {
       "path": "core/bot_housekeeping.py",
       "ext": ".py",
-      "size": 3430,
-      "sha256": "b99fdbfef4ccd619d16570a2bb72d0e86163d0626da42b183ca26ee9182ab938",
+      "size": 3408,
+      "sha256": "e380db5f5eb0d43604845fcce1040c3b9b2c6c1b6fc8c9adb1fc9f6b16e8fd69",
       "kind": "code",
       "symbols": [
         "run_periodic_housekeeping"
@@ -2499,7 +2328,6 @@
       "headings": [],
       "summary": "code, 3 symbols, 4 imports",
       "dependents": [
-        "learning.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
@@ -2512,8 +2340,8 @@
     {
       "path": "core/execution_adapters.py",
       "ext": ".py",
-      "size": 14575,
-      "sha256": "5f582a4c095c1bbf38fd4bddababd6507fc439b2e8cb1cb3c8645f67eb39507d",
+      "size": 14772,
+      "sha256": "57d8e11f5b21579063f60d323e410aab93c0458d373f426b3b24bd9d6a3a40b8",
       "kind": "code",
       "symbols": [
         "ShadowExecutionAdapter",
@@ -2542,6 +2370,7 @@
         "get_balance",
         "place_hard_sl",
         "set_leverage",
+        "set_simulated_balance_provider",
         "set_weight_tracker"
       ],
       "imports": [
@@ -2549,11 +2378,10 @@
         "random",
         "threading",
         "time",
-        "typing",
         "uuid"
       ],
       "headings": [],
-      "summary": "code, 27 symbols, 6 imports",
+      "summary": "code, 28 symbols, 5 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "tests/test_bot_bootstrap.py",
@@ -2562,6 +2390,7 @@
         "tests/test_market_intelligence_and_balance.py",
         "tests/test_rag_cache.py",
         "tests/test_shadow_logger_module.py",
+        "tests/test_shadow_wallet_runtime.py",
         "tests/test_weekly_maintenance.py",
         "tools/shadow_stress_injector.py"
       ]
@@ -2595,8 +2424,8 @@
     {
       "path": "core/bot_runtime_safety.py",
       "ext": ".py",
-      "size": 2465,
-      "sha256": "5020d4e12e2318d0b8d7d25a7160c0b6939424b5c88482b795f989f75fcddcfc",
+      "size": 2449,
+      "sha256": "97f5f8ad31cd3585ebb7fe6bd35e42a66389b48d75de779d9d1b46bf967f2fa8",
       "kind": "code",
       "symbols": [
         "check_safety_and_goals"
@@ -2620,8 +2449,8 @@
     {
       "path": "core/execution_service.py",
       "ext": ".py",
-      "size": 40432,
-      "sha256": "ba292673e0d1fa8ebea2c2e7c44462a508435e5a306c8ce18e6b0fcdf3f0226b",
+      "size": 40045,
+      "sha256": "4e6e3553ffe0eabba7625a4825e09fc2b8a03076a96e1ce021aad53d1c95e521",
       "kind": "code",
       "symbols": [
         "ExecutionService",
@@ -2685,11 +2514,10 @@
         "random",
         "threading",
         "time",
-        "tools.notifier",
-        "typing"
+        "tools.notifier"
       ],
       "headings": [],
-      "summary": "code, 48 symbols, 13 imports",
+      "summary": "code, 48 symbols, 12 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "tests/integration/test_binance_testnet_execution_flow.py",
@@ -2714,8 +2542,8 @@
     {
       "path": "core/bot_scorecard.py",
       "ext": ".py",
-      "size": 6268,
-      "sha256": "061f703b3cbc36560342a0dbaa173bda3360f6b6aa03f264372a9dbb4976553d",
+      "size": 6255,
+      "sha256": "355e61cfb4db024e2a9851cc1d9c51849dca13ff419b0187db0f5e4d354b19fb",
       "kind": "code",
       "symbols": [
         "map_reason",
@@ -2770,8 +2598,8 @@
     {
       "path": "core/reconciliation.py",
       "ext": ".py",
-      "size": 29824,
-      "sha256": "4385927fbca2a8193bafca2f0131462f2e4e8fee93c5558c7606e45f60631b82",
+      "size": 29362,
+      "sha256": "13c6d3d29ecd01a8f62d9b5fd0ba64d7c406eba2eff1b5ca207baea17761da30",
       "kind": "code",
       "symbols": [
         "_build_open_order_index",
@@ -2822,8 +2650,8 @@
     {
       "path": "core/market_intelligence.py",
       "ext": ".py",
-      "size": 19169,
-      "sha256": "aaaa09a7860df95854b4c6a06f656d04eac686a6ef1b751c4326072fba6f28fc",
+      "size": 19191,
+      "sha256": "204f660b05a555abe2b5748408744685d35fb247f27d78a5729c1382e016cb75",
       "kind": "code",
       "symbols": [
         "_compact_ticker",
@@ -2862,8 +2690,8 @@
     {
       "path": "core/bot_radar.py",
       "ext": ".py",
-      "size": 5255,
-      "sha256": "a509edd076d5a9868e96a991dc153fc26505b68c6cf80e9f1d3e2cd4858d43de",
+      "size": 5157,
+      "sha256": "8eca5b687358664768e606eae7da012b21744c19864281596f57a9fe02974da1",
       "kind": "code",
       "symbols": [
         "_safe_metric_to_int",
@@ -2888,8 +2716,8 @@
     {
       "path": "core/trade_exit.py",
       "ext": ".py",
-      "size": 26535,
-      "sha256": "37b740bc9f25465113da093325053c0bba619dfc058bb76c5066d8e7a8a532ca",
+      "size": 27414,
+      "sha256": "8a9e4503de45d1a2f22b44a63ca1905781f07ff3c631d225e4c793a3e2258860",
       "kind": "code",
       "symbols": [
         "_exchange_position_is_flat",
@@ -2902,9 +2730,9 @@
         "config",
         "core.cooldown_state",
         "core.execution_telemetry",
+        "core.kanban_sync",
         "core.postmortem",
         "core.regime_tuning",
-        "core.symbol_utils",
         "core.time_utils",
         "core.trade_helpers",
         "core.trade_state",
@@ -2926,6 +2754,7 @@
         "tests/test_mtf_metrics.py",
         "tests/test_rag_cache.py",
         "tests/test_shadow_logger_module.py",
+        "tests/test_shadow_wallet_runtime.py",
         "tests/test_trade_exit.py",
         "tests/test_weekly_maintenance.py"
       ]
@@ -2933,8 +2762,8 @@
     {
       "path": "core/bot_initialization.py",
       "ext": ".py",
-      "size": 6709,
-      "sha256": "4cd798c21194f2c315085baa43077a48e07a8b84381d7e8957f7111d25eaacf2",
+      "size": 6873,
+      "sha256": "1c3a4eac16fe3f630419fcbaba17119a5b15e2c541f47e7f43a526b350fcebd1",
       "kind": "code",
       "symbols": [
         "init_realtime_and_monitoring",
@@ -2964,8 +2793,8 @@
     {
       "path": "core/model_loader.py",
       "ext": ".py",
-      "size": 1970,
-      "sha256": "e09cf8cd2183b5d2ff428af0d774604a57de563325210baca5b4899ea3c7b594",
+      "size": 1969,
+      "sha256": "9a97ca72a437c881269a2bcafe86c5f412e2f9e7edd70bb66c3b9c5fa01c0346",
       "kind": "code",
       "symbols": [
         "ModelHashMismatchError",
@@ -2990,7 +2819,6 @@
         "core/bot_models_startup.py",
         "core/strategy/agents/ghost_agent.py",
         "core/strategy/consensus_nn.py",
-        "learning.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
@@ -3023,7 +2851,6 @@
       "dependents": [
         "core/bot_io_loops.py",
         "core/commands/intelligence.py",
-        "notifier.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
@@ -3037,8 +2864,8 @@
     {
       "path": "core/postmortem.py",
       "ext": ".py",
-      "size": 4602,
-      "sha256": "e54646f4c19018175d017c92bec4b3b61af11044f7be1e8e0bc17f275406c999",
+      "size": 4603,
+      "sha256": "5cc450ee3878a8db8e2633c8fca86c12699051d26301789633ddcb0bb5498701",
       "kind": "code",
       "symbols": [
         "PostMortemLabeler",
@@ -3054,7 +2881,6 @@
       "headings": [],
       "summary": "code, 5 symbols, 2 imports",
       "dependents": [
-        "core/trade_entry.py",
         "core/trade_exit.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
@@ -3082,7 +2908,6 @@
         "core/config/manager.py",
         "core/reconciliation.py",
         "core/trade_entry.py",
-        "core/trade_exit.py",
         "core/trade_helpers.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
@@ -3153,8 +2978,8 @@
     {
       "path": "core/bot_main_loop.py",
       "ext": ".py",
-      "size": 6621,
-      "sha256": "ae8d75585d4eb124d5e66d1140eaa612f044bf08a697a6b857a1cb4423a6153e",
+      "size": 6707,
+      "sha256": "1951e5049917388e5939714c118c570e3aae67836cdf690fcf1c9edf39022bd4",
       "kind": "code",
       "symbols": [
         "check_daily_drawdown_breaker",
@@ -3186,8 +3011,8 @@
     {
       "path": "core/bot_ml_health.py",
       "ext": ".py",
-      "size": 4393,
-      "sha256": "f6afc94b08b6b9aafe5255dbfa73ca286341f71e17bd6fc59a97b88553257671",
+      "size": 4323,
+      "sha256": "a9c5b687d4a4b56325ff125a451de6e68d4e0ad4a999875dbf54ea66a8c3909e",
       "kind": "code",
       "symbols": [
         "check_ml_models_health"
@@ -3211,8 +3036,8 @@
     {
       "path": "core/shadow_logger.py",
       "ext": ".py",
-      "size": 6586,
-      "sha256": "ebfb0b364ff7075cec40982e147322ff45ca2399d637a0e97cb528f4904bb914",
+      "size": 6540,
+      "sha256": "79f89b0a4910b3da4e4ed55874da00cdab57af80c3054dc158f4f5142a8ba4be",
       "kind": "code",
       "symbols": [
         "AsyncShadowLogger",
@@ -3241,7 +3066,6 @@
       "headings": [],
       "summary": "code, 12 symbols, 8 imports",
       "dependents": [
-        "learning.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
@@ -3254,8 +3078,8 @@
     {
       "path": "core/bot_wallet_sync.py",
       "ext": ".py",
-      "size": 20356,
-      "sha256": "b03e3ea884402e2ac52c9db3926e23af3249aa42ad95c906a417a4cca038c2f0",
+      "size": 19841,
+      "sha256": "23f3c4b9546e8f83dda0fc08f60d45429e7e86c603f9ec0596bb5efc5a5c4129",
       "kind": "code",
       "symbols": [
         "_bool_reduce_only",
@@ -3298,8 +3122,8 @@
     {
       "path": "core/bot_runtime_monitor.py",
       "ext": ".py",
-      "size": 5058,
-      "sha256": "e738290ba34a3600fd659171127eb316a68fa302be98e049588182d36e2c7a78",
+      "size": 5012,
+      "sha256": "8bdb833b79abdb071a400868ab19c806fae3bde99cef5a9ead06ccdf0ffe5bc1",
       "kind": "code",
       "symbols": [
         "_rotate_jsonl",
@@ -3331,8 +3155,8 @@
     {
       "path": "core/execution_port.py",
       "ext": ".py",
-      "size": 1657,
-      "sha256": "99f0eaab9d750ebe417eb3ceed860bfac2f9ca26d07a2ff7cc7ecf7d35230b39",
+      "size": 1638,
+      "sha256": "2713077085f36b77c3aba8b883995c85694b170e176195a4c89a1440aa9aae1d",
       "kind": "code",
       "symbols": [
         "ExecutionPort",
@@ -3374,8 +3198,8 @@
     {
       "path": "core/bot_cycles.py",
       "ext": ".py",
-      "size": 15788,
-      "sha256": "1cdd54bf383c6ec619ee193a8e504899be0241614302f674c8fda1af87e93907",
+      "size": 15656,
+      "sha256": "1a41bee0a62089488f76a76a4dc707f4cd19df998686b525320654d7ea3bff3f",
       "kind": "code",
       "symbols": [
         "_btc_cache_marker",
@@ -3400,7 +3224,6 @@
         "config",
         "core.market_intelligence",
         "core.time_utils",
-        "datetime",
         "os",
         "pandas",
         "ta.trend",
@@ -3409,7 +3232,7 @@
         "traceback"
       ],
       "headings": [],
-      "summary": "code, 14 symbols, 13 imports",
+      "summary": "code, 14 symbols, 12 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_bot_bootstrap.py",
@@ -3425,8 +3248,8 @@
     {
       "path": "core/risk_policy.py",
       "ext": ".py",
-      "size": 9043,
-      "sha256": "eb1e9178a8fbb4ad9f7679b659877d8a724e26c540d210a223b517b3175dc438",
+      "size": 9026,
+      "sha256": "0a57617d61e6e33b961b014c4bc2f0b5e08529fca2393d9bd767908fc1a7f9c9",
       "kind": "code",
       "symbols": [
         "EntryRiskDecision",
@@ -3442,11 +3265,10 @@
         "core.trade_state",
         "dataclasses",
         "tools.learning",
-        "tools.notifier",
-        "typing"
+        "tools.notifier"
       ],
       "headings": [],
-      "summary": "code, 6 symbols, 7 imports",
+      "summary": "code, 6 symbols, 6 imports",
       "dependents": [
         "core/bot_main_loop.py",
         "core/bot_runtime_safety.py",
@@ -3464,8 +3286,8 @@
     {
       "path": "core/bot_app.py",
       "ext": ".py",
-      "size": 26909,
-      "sha256": "e6c5c6a6642e570fa66aaccca9a5984f4b64672881422af903212ebe547b15ce",
+      "size": 27019,
+      "sha256": "1420c55758876e76985eba5c8a2ecf9db622e212b08be415028c22a205416b85",
       "kind": "code",
       "symbols": [
         "Bot",
@@ -3654,8 +3476,8 @@
     {
       "path": "core/learning_paths.py",
       "ext": ".py",
-      "size": 289,
-      "sha256": "b1e975efce5370b3e43a4ec37e846978bc9ba7bdf86a7f409c76e469a5f7aaea",
+      "size": 299,
+      "sha256": "0bf6b6ef84356e0dcbee862c60a5e93a70180ba09ba56e1be7e90d94f2b12217",
       "kind": "code",
       "symbols": [
         "resolve_default_db_path"
@@ -3668,21 +3490,21 @@
       "summary": "code, 1 symbols, 2 imports",
       "dependents": [
         "core/shadow_logger.py",
-        "learning.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
         "tests/test_rag_cache.py",
         "tests/test_shadow_logger_module.py",
         "tests/test_weekly_maintenance.py",
+        "tools/dashboard_api_server.py",
         "tools/learning.py"
       ]
     },
     {
       "path": "core/cycle_context.py",
       "ext": ".py",
-      "size": 1932,
-      "sha256": "c9774c8e5bea1ffe5b7ed0396c06330cf8454fe3ac0ef4fd88bed2f242877cef",
+      "size": 1904,
+      "sha256": "24a3982709e6a0dd6a0ec0bd9beb7aa4500f138a69d41795d1ed7049bbd3b3e8",
       "kind": "code",
       "symbols": [
         "CycleContext",
@@ -3708,8 +3530,8 @@
     {
       "path": "core/bot_models_startup.py",
       "ext": ".py",
-      "size": 5283,
-      "sha256": "9c4f73d8efedd3b96dd806d4a4f66791b22f89b8e7ef177e67afec0b2589ce79",
+      "size": 5872,
+      "sha256": "599e8602373e66e6939eb33be8bd4b9a5e70982eff6450f9b2ebaa289c299eb4",
       "kind": "code",
       "symbols": [
         "init_models_and_startup_tasks"
@@ -3742,8 +3564,8 @@
     {
       "path": "core/bot_pair_fetch.py",
       "ext": ".py",
-      "size": 1833,
-      "sha256": "8c181014a14b82617be21c6418e2a8875d660f4405a844746e7216020ef7be17",
+      "size": 1743,
+      "sha256": "4b3e44fefcaf0216977ac46f96eddc04bd6216762c14b12fa75fa0a18c5f5f39",
       "kind": "code",
       "symbols": [
         "fetch_pair_data"
@@ -3766,8 +3588,8 @@
     {
       "path": "core/state_snapshot.py",
       "ext": ".py",
-      "size": 4957,
-      "sha256": "d61602b769079d2b5b8885d9c72359c407eebcb81af665f4433c5e08f93b9a24",
+      "size": 4928,
+      "sha256": "bd1790677d621f360fea9817cf6b3a2d7a39e1e41571976ef34bd0e004c03f2c",
       "kind": "code",
       "symbols": [
         "_pending_target_entry",
@@ -3797,8 +3619,8 @@
     {
       "path": "core/commands/audit.py",
       "ext": ".py",
-      "size": 6726,
-      "sha256": "f88300998bcabf8e694b06befc7c1b61f2f44b0c2c25c7e0b901f64d5f71dc99",
+      "size": 8745,
+      "sha256": "8dadba7c5290fa250f5d1ed50178a2b2356986b140cf90061044accda7cbda38",
       "kind": "code",
       "symbols": [
         "_handle_audit_commands"
@@ -3806,12 +3628,15 @@
       "imports": [
         "collections",
         "config",
+        "pathlib",
         "platform",
+        "sqlite3",
+        "tools.data_utility_audit",
         "tools.notifier",
         "tools.reporter"
       ],
       "headings": [],
-      "summary": "code, 1 symbols, 5 imports",
+      "summary": "code, 1 symbols, 8 imports",
       "dependents": [
         "core/command_router.py",
         "tests/test_bot_bootstrap.py",
@@ -3825,8 +3650,8 @@
     {
       "path": "core/commands/intelligence.py",
       "ext": ".py",
-      "size": 7499,
-      "sha256": "ee7fe37300e2622ba185ded68bc40a700bfed41022d15297ab490e44d512a55b",
+      "size": 7423,
+      "sha256": "d10d6da96e8d7549771878c0d94fefce231d0eee6a1846895f1885e94b3171b4",
       "kind": "code",
       "symbols": [
         "_handle_intelligence_commands"
@@ -3854,8 +3679,8 @@
     {
       "path": "core/commands/ops.py",
       "ext": ".py",
-      "size": 21134,
-      "sha256": "35fd716637668a9313ac4bf6f15c2c93708e3c88375fa5a047c424a93c53adf5",
+      "size": 20861,
+      "sha256": "c04158860adc1b10b76682b8d6910f7983b44ef7eb7f28911490a1a23caa8e6d",
       "kind": "code",
       "symbols": [
         "_handle_misc_commands",
@@ -3894,8 +3719,8 @@
     {
       "path": "core/commands/history.py",
       "ext": ".py",
-      "size": 11849,
-      "sha256": "25f77dc420598f80359b3f5959f77e34ed3ec55499cf67a6b54d08c25b78bf33",
+      "size": 11677,
+      "sha256": "167f5078a7a9eee8b073a5a6ba5480ee382eab4fb2c59fb347e3d1052b3b5f50",
       "kind": "code",
       "symbols": [
         "_handle_history_commands"
@@ -3921,10 +3746,34 @@
       ]
     },
     {
+      "path": "core/commands/api_status.py",
+      "ext": ".py",
+      "size": 486,
+      "sha256": "bb1bc1614b8dc7b6063484ac40a838c133cb18f1826b9ea4f58b899cde375d93",
+      "kind": "code",
+      "symbols": [
+        "_handle_api_status_commands"
+      ],
+      "imports": [
+        "tools.notifier"
+      ],
+      "headings": [],
+      "summary": "code, 1 symbols, 1 imports",
+      "dependents": [
+        "core/command_router.py",
+        "tests/test_bot_bootstrap.py",
+        "tests/test_dashboard_ipc.py",
+        "tests/test_market_intelligence_and_balance.py",
+        "tests/test_rag_cache.py",
+        "tests/test_shadow_logger_module.py",
+        "tests/test_weekly_maintenance.py"
+      ]
+    },
+    {
       "path": "core/config/manager.py",
       "ext": ".py",
-      "size": 12621,
-      "sha256": "5bc28b4aaaf5a4a416fe4232aeb752a8b7b0ff02532fbf6894a34b600af48323",
+      "size": 13407,
+      "sha256": "90bfd5019deb83c05bcdd8ea9afb499e4b99504eaaab4ea5edc072ac5db88a26",
       "kind": "code",
       "symbols": [
         "Config",
@@ -3957,7 +3806,7 @@
       "path": "core/config/thresholds.py",
       "ext": ".py",
       "size": 9575,
-      "sha256": "bce890b573dd96db00e0e7d4f43e7766d2cfdb00d7030f50599f58ae09a9df55",
+      "sha256": "9c62577b102c727f5510c57e8349e8a666830f34f02c0e45aae4bd98753fe0a6",
       "kind": "code",
       "symbols": [
         "ThresholdSpec",
@@ -4010,20 +3859,18 @@
     {
       "path": "core/config/operational.py",
       "ext": ".py",
-      "size": 5241,
-      "sha256": "9d08a196f9404221cdcaa58ef198e7ed6d7174399873ce8ae45d45958e2e3326",
+      "size": 5457,
+      "sha256": "ef18fdc5bdec503cdf79d7943f4ee18cdcf8d63151f37fdfdbf41413403731d8",
       "kind": "code",
       "symbols": [
         "OperationalConfig"
       ],
       "imports": [
         "core.config.env_helpers",
-        "dotenv",
-        "os",
-        "typing"
+        "dotenv"
       ],
       "headings": [],
-      "summary": "code, 1 symbols, 4 imports",
+      "summary": "code, 1 symbols, 2 imports",
       "dependents": [
         "core/config/manager.py",
         "core/reconciliation.py",
@@ -4041,8 +3888,8 @@
     {
       "path": "core/config/hyperopt_loader.py",
       "ext": ".py",
-      "size": 3304,
-      "sha256": "d20ab657c63b9944170879d7c54fbf3842475ef027ef37aa0d66ff86ac98ea94",
+      "size": 3283,
+      "sha256": "6523042a28a7c9dd7447b3b72b02e2defdeacd614344e58a536352284cbad547",
       "kind": "code",
       "symbols": [
         "HyperoptConfigLoader",
@@ -4080,8 +3927,8 @@
     {
       "path": "core/config/strategy.py",
       "ext": ".py",
-      "size": 3983,
-      "sha256": "78fc2e5ee7b96d7640c91a67613c3e216ea719057ae26822f314c5ae52336ed7",
+      "size": 4107,
+      "sha256": "decd3b8dadae38f63060ad9f6f393242022bdb3d22199725063241cc01b2cf21",
       "kind": "code",
       "symbols": [
         "StrategyConfig"
@@ -4105,13 +3952,14 @@
     {
       "path": "core/config/env_helpers.py",
       "ext": ".py",
-      "size": 1431,
-      "sha256": "8f42971560a0009cf84c180140d406e1516340993c59700d348d5f6b0656e0f1",
+      "size": 1689,
+      "sha256": "1c6edb59648e4d3aae8e24fa72150baeaf6cbebd723865f2871e9e1658120555",
       "kind": "code",
       "symbols": [
         "env_bool",
         "env_float",
         "env_int",
+        "env_list",
         "env_str",
         "get_env_warnings"
       ],
@@ -4119,7 +3967,7 @@
         "os"
       ],
       "headings": [],
-      "summary": "code, 5 symbols, 1 imports",
+      "summary": "code, 6 symbols, 1 imports",
       "dependents": [
         "core/config/manager.py",
         "core/config/operational.py",
@@ -4134,11 +3982,12 @@
     {
       "path": "core/signals/oi_filter.py",
       "ext": ".py",
-      "size": 4033,
-      "sha256": "dd0799aaf06e7b5f1297fd4bcc5cd7c379dfbac5df793afe9b3456cc13ece7c3",
+      "size": 4629,
+      "sha256": "8e46cb5c01cc0658c082b769006e9a0b665035854b1172e41f7eac195f250ed6",
       "kind": "code",
       "symbols": [
         "_get_cached_oi",
+        "_get_cached_oi_api",
         "_update_oi_cache",
         "fetch_oi_delta",
         "validate_signal_with_oi"
@@ -4146,11 +3995,10 @@
       "imports": [
         "config",
         "logging",
-        "time",
-        "typing"
+        "time"
       ],
       "headings": [],
-      "summary": "code, 4 symbols, 4 imports",
+      "summary": "code, 5 symbols, 3 imports",
       "dependents": [
         "core/signals/filters.py",
         "tests/test_bot_bootstrap.py",
@@ -4167,8 +4015,8 @@
     {
       "path": "core/signals/analyze.py",
       "ext": ".py",
-      "size": 8185,
-      "sha256": "7a5fdbf81a1881299d5cfe0fe60b0807264905d01feb6e294937c46291499a27",
+      "size": 8113,
+      "sha256": "7baf8cdd2b91d2f91b7b506b540afe0ca891075b3b5a6016b42e65d81220c443",
       "kind": "code",
       "symbols": [
         "_analyze_symbol_candidate",
@@ -4200,8 +4048,8 @@
     {
       "path": "core/signals/execution.py",
       "ext": ".py",
-      "size": 4606,
-      "sha256": "7037ef3888e27e17b29f08824ef790a96ae1e80cb06d01677ccf191ca3e4951e",
+      "size": 5024,
+      "sha256": "f21354518bc1b83d6d337761d528b2ea31228a6f876e89fc79cd9d1d5129f92d",
       "kind": "code",
       "symbols": [
         "_execute_and_update_symbol"
@@ -4250,8 +4098,8 @@
     {
       "path": "core/signals/filters.py",
       "ext": ".py",
-      "size": 34244,
-      "sha256": "676ec8967d16b24426191ffce596d07f4fb203ba40c73523ad74a8e4e87bb5b4",
+      "size": 33708,
+      "sha256": "1f4d9e83d41f7aaf874cecb86a72de924b82848ba29a512b415ee108e66597e2",
       "kind": "code",
       "symbols": [
         "_apply_entry_filters_and_adjust_prob",
@@ -4298,8 +4146,8 @@
     {
       "path": "core/signals/context.py",
       "ext": ".py",
-      "size": 5877,
-      "sha256": "787f0ec183fd8d6de5b0bcef3e657fd7a8521ad2db2307e3da1f1c1cc27a0f85",
+      "size": 4056,
+      "sha256": "fcfa827e138a1fdeccf22fa2778d458777fb066016da931aeeb9d637f992fc62",
       "kind": "code",
       "symbols": [
         "_build_symbol_context",
@@ -4327,8 +4175,8 @@
     {
       "path": "core/signals/cvd_filter.py",
       "ext": ".py",
-      "size": 3127,
-      "sha256": "70562b8a8309bb4c5a3c3f561e476c272cfb01d77708ae40acc46bd115720c39",
+      "size": 3133,
+      "sha256": "7371484fb3f8d26be7ed02ff3f3658c3c7da61fae4dd99fb36a2dc816067393c",
       "kind": "code",
       "symbols": [
         "_cvd_direction",
@@ -4357,8 +4205,8 @@
     {
       "path": "core/signals/mtf/data.py",
       "ext": ".py",
-      "size": 846,
-      "sha256": "7d349f9115d4134e1f6a8eecbdb8a2f367b0bd33141b02615ea16f1f37c3c23d",
+      "size": 811,
+      "sha256": "7aed5caf5d9bdcb39e8630b8a7bdbe1b65b10c574626a6eca83bba1c21ac558f",
       "kind": "code",
       "symbols": [
         "_fetch_timeframe",
@@ -4366,11 +4214,10 @@
       ],
       "imports": [
         "__future__",
-        "pandas",
-        "typing"
+        "pandas"
       ],
       "headings": [],
-      "summary": "code, 2 symbols, 3 imports",
+      "summary": "code, 2 symbols, 2 imports",
       "dependents": [
         "core/signals/mtf/__init__.py",
         "core/signals/mtf/filter.py",
@@ -4446,8 +4293,8 @@
     {
       "path": "core/signals/mtf/analyzer.py",
       "ext": ".py",
-      "size": 4052,
-      "sha256": "6320a8ce3631b054581de661be5b674bd187ea7f00b69267fcd56e0a8a5f89ec",
+      "size": 3999,
+      "sha256": "8f29f1f939094164ad44caf25e67f11218741697cb6ca80e3f6b70983cf02453",
       "kind": "code",
       "symbols": [
         "_confirms_signal",
@@ -4460,11 +4307,10 @@
       "imports": [
         "__future__",
         "config",
-        "pandas",
-        "typing"
+        "pandas"
       ],
       "headings": [],
-      "summary": "code, 6 symbols, 4 imports",
+      "summary": "code, 6 symbols, 3 imports",
       "dependents": [
         "core/signals/mtf/__init__.py",
         "core/signals/mtf/filter.py",
@@ -4481,8 +4327,8 @@
     {
       "path": "core/risk/exit_engine_v1.py",
       "ext": ".py",
-      "size": 10252,
-      "sha256": "e78012ad15b2888fa09a083e0a9ba93f6d173b396fb0b74d327855326e13f2f2",
+      "size": 10191,
+      "sha256": "175a1fa5a0671dbf37fbef0b105174e581dedb6edb88f96b67f9d997095833be",
       "kind": "code",
       "symbols": [
         "ExitEngineV1",
@@ -4518,8 +4364,8 @@
     {
       "path": "core/risk/correlation_risk.py",
       "ext": ".py",
-      "size": 2850,
-      "sha256": "c43da5aad5c499201768e4b0d82077542c8af2019093987f0c1bf62d4849207e",
+      "size": 2798,
+      "sha256": "e8f3c2ff1149fa276ec8373bd2873b17d142f4cc904737ccdf3d722353fe9ce9",
       "kind": "code",
       "symbols": [
         "_get_close_series",
@@ -4530,11 +4376,10 @@
         "__future__",
         "config",
         "numpy",
-        "pandas",
-        "typing"
+        "pandas"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 5 imports",
+      "summary": "code, 3 symbols, 4 imports",
       "dependents": [
         "core/trade_entry.py",
         "tests/test_bot_bootstrap.py",
@@ -4549,8 +4394,8 @@
     {
       "path": "core/strategy/utils.py",
       "ext": ".py",
-      "size": 13624,
-      "sha256": "799444e17980a42d1e893c831be42710ca4b7801f929ed1883b4a39ed79c5822",
+      "size": 13310,
+      "sha256": "3993bd9b7e8b9311961fbde5d7728ea097f11ee9308625b417efbbec28023231",
       "kind": "code",
       "symbols": [
         "StrategyUtils",
@@ -4562,9 +4407,7 @@
       ],
       "imports": [
         "__future__",
-        "config",
         "core.candle_close_cache",
-        "datetime",
         "logging",
         "numpy",
         "pandas",
@@ -4572,11 +4415,10 @@
         "typing"
       ],
       "headings": [],
-      "summary": "code, 6 symbols, 9 imports",
+      "summary": "code, 6 symbols, 7 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "core/bot_weekly_ops.py",
-        "core/strategy/agents/sr_agent.py",
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
         "tests/test_market_intelligence_and_balance.py",
@@ -4591,8 +4433,8 @@
     {
       "path": "core/strategy/regime_hmm.py",
       "ext": ".py",
-      "size": 8793,
-      "sha256": "53b13134b19e85d2ab4d6ca49025de2b65bc1023c42bd83b19d8e6c0e1c19ffe",
+      "size": 8688,
+      "sha256": "d7851604f48a65774f4bad7053319f153f85173e78bdfe3e07c71c1720d0abf9",
       "kind": "code",
       "symbols": [
         "DynamicHMMRegime",
@@ -4613,11 +4455,10 @@
         "logging",
         "numpy",
         "pandas",
-        "sklearn.preprocessing",
-        "typing"
+        "sklearn.preprocessing"
       ],
       "headings": [],
-      "summary": "code, 11 symbols, 7 imports",
+      "summary": "code, 11 symbols, 6 imports",
       "dependents": [
         "core/bot_market_state.py",
         "tests/test_bot_bootstrap.py",
@@ -4632,8 +4473,8 @@
     {
       "path": "core/strategy/shocks.py",
       "ext": ".py",
-      "size": 1877,
-      "sha256": "abdac7e4aa36a95843de16bb627befb77a3bfbba6223b54873febe8bcb1a3a62",
+      "size": 1835,
+      "sha256": "f4a64855db14a71d939edee5108e55cc916ac5ba9a45b418fd298e31020f7d51",
       "kind": "code",
       "symbols": [
         "next_shock_distance_pct"
@@ -4641,11 +4482,10 @@
       "imports": [
         "__future__",
         "numpy",
-        "pandas",
-        "typing"
+        "pandas"
       ],
       "headings": [],
-      "summary": "code, 1 symbols, 4 imports",
+      "summary": "code, 1 symbols, 3 imports",
       "dependents": [
         "core/bot_app.py",
         "tests/test_bot_bootstrap.py",
@@ -4660,8 +4500,8 @@
     {
       "path": "core/strategy/orchestrator.py",
       "ext": ".py",
-      "size": 8879,
-      "sha256": "c064f5df9b7a337de0d8337d107578d6a202b6887014473163b659f1471ad42d",
+      "size": 8575,
+      "sha256": "6ad93a8cdc7938644b5503bc50eb47a0978ac94ed61d1a0d28ab3a8aa7f087d2",
       "kind": "code",
       "symbols": [
         "StrategyOrchestrator",
@@ -4702,8 +4542,8 @@
     {
       "path": "core/strategy/weight_monitor.py",
       "ext": ".py",
-      "size": 3734,
-      "sha256": "4a36b6c9d24988a0c0110665dae4034e99a1c20077c84e7a1f3addf3a4e674b9",
+      "size": 3770,
+      "sha256": "be575c260cab79b442355a7c2aa37788fc20e74931fec168e5e8b3925604559b",
       "kind": "code",
       "symbols": [
         "AgentWeightMonitor",
@@ -4737,8 +4577,8 @@
     {
       "path": "core/strategy/consensus_nn.py",
       "ext": ".py",
-      "size": 5588,
-      "sha256": "2d6e80165265f89fefe2d284fa35f61fdfb0979966ad970081036e465c720ba0",
+      "size": 5493,
+      "sha256": "f358348a7c29f04206b424f3408eb8424a269da1f154cd04cdc9a143c9b7e78d",
       "kind": "code",
       "symbols": [
         "AgentConsensusNN",
@@ -4776,8 +4616,8 @@
     {
       "path": "core/strategy/base_agent.py",
       "ext": ".py",
-      "size": 945,
-      "sha256": "d1ac9391d556e620259daf6072b7ee7c9db359e94e0238495e41eb1c3a84d30d",
+      "size": 910,
+      "sha256": "b571cf9615c65b1809c4d1eb436a391b441b489187e25e45fe8a253cf3996344",
       "kind": "code",
       "symbols": [
         "BaseAgent",
@@ -4788,11 +4628,10 @@
       "imports": [
         "abc",
         "logging",
-        "pandas",
         "typing"
       ],
       "headings": [],
-      "summary": "code, 4 symbols, 4 imports",
+      "summary": "code, 4 symbols, 3 imports",
       "dependents": [
         "core/strategy/agents/correlation_agent.py",
         "core/strategy/agents/ghost_agent.py",
@@ -4813,8 +4652,8 @@
     {
       "path": "core/strategy/agents/correlation_agent.py",
       "ext": ".py",
-      "size": 868,
-      "sha256": "ced6a6ea0af0163c90c213de0e123278f035ad1ba657b0a1a0675f0c3b70e464",
+      "size": 856,
+      "sha256": "15976b32c73ab3c695b24ac42b19793ee8c140d3a0dc7ba87be77b12066d145a",
       "kind": "code",
       "symbols": [
         "CorrelationAgent",
@@ -4839,8 +4678,8 @@
     {
       "path": "core/strategy/agents/judging_agent.py",
       "ext": ".py",
-      "size": 947,
-      "sha256": "887346ab614ced7a179c60a761b84c68a63c0060dc0711fbfc4cfcc44c7e05e2",
+      "size": 935,
+      "sha256": "1e7b75ba9d5c5de0dd432a5ae1e38f8683ca671b6455309e9f08ec145831eb1c",
       "kind": "code",
       "symbols": [
         "JudgingAgent",
@@ -4865,8 +4704,8 @@
     {
       "path": "core/strategy/agents/sr_agent.py",
       "ext": ".py",
-      "size": 5657,
-      "sha256": "00d64b43b3635fcdecf4c0ecb40ba887ac7a395bdec2d00d2573375f49b8cb3b",
+      "size": 5607,
+      "sha256": "81ec6724eb0959def99cd7c6ffa4dc59c6845476505b52ca73445666294b3502",
       "kind": "code",
       "symbols": [
         "SRAgent",
@@ -4879,13 +4718,12 @@
       "imports": [
         "core.config.hyperopt_loader",
         "core.strategy.base_agent",
-        "core.strategy.utils",
         "numpy",
         "pandas",
         "typing"
       ],
       "headings": [],
-      "summary": "code, 6 symbols, 6 imports",
+      "summary": "code, 6 symbols, 5 imports",
       "dependents": [
         "core/strategy/orchestrator.py",
         "tests/test_agent_pipeline.py",
@@ -4900,8 +4738,8 @@
     {
       "path": "core/strategy/agents/mt_agent.py",
       "ext": ".py",
-      "size": 5984,
-      "sha256": "2deeb895871d0f8e18e21fff7302a64e9aee2b4a6c911ca01d9dc8d82b756a31",
+      "size": 5931,
+      "sha256": "48b99040bd8a33817eeb2b7029f7df8f002f7348a17e0825ccf63febca92a8ae",
       "kind": "code",
       "symbols": [
         "MTAgent",
@@ -4935,8 +4773,8 @@
     {
       "path": "core/strategy/agents/ghost_agent.py",
       "ext": ".py",
-      "size": 8843,
-      "sha256": "dd31108f245d6bf9234743da27b2b9b4a88213ba06451b37fc0529455efb4d49",
+      "size": 8503,
+      "sha256": "d85a3e682d14a1e2e90afd2316125afa214fe8e45c39eb10899ec1c669065c58",
       "kind": "code",
       "symbols": [
         "GhostAgent",
@@ -4951,20 +4789,17 @@
         "vote"
       ],
       "imports": [
-        "advanced_ensemble",
         "core.model_loader",
         "core.strategy.base_agent",
+        "importlib.util",
         "logging",
         "numpy",
         "os",
         "pandas",
-        "sklearn.neural_network",
-        "sklearn.preprocessing",
-        "tools.ultimate_ml",
         "typing"
       ],
       "headings": [],
-      "summary": "code, 10 symbols, 11 imports",
+      "summary": "code, 10 symbols, 8 imports",
       "dependents": [
         "core/strategy/orchestrator.py",
         "tests/test_bot_bootstrap.py",
@@ -4979,8 +4814,8 @@
     {
       "path": "core/strategy/agents/breakout_agent.py",
       "ext": ".py",
-      "size": 4441,
-      "sha256": "8601e95707f4c06baa76cfabaac51bce44dbc267e011b4cd30d5de8c28c89c98",
+      "size": 4382,
+      "sha256": "87d6566793f19ca95639590c45994df6e771defa9636d88b0f351c8c0da8f369",
       "kind": "code",
       "symbols": [
         "BreakoutAgent",
@@ -5012,8 +4847,8 @@
     {
       "path": "core/strategy/agents/sentiment_agent.py",
       "ext": ".py",
-      "size": 1164,
-      "sha256": "2435c8db9b1272dda4a534e8147f89f769cefb7e6578b1cd9c5d40bf7a0ae70d",
+      "size": 1141,
+      "sha256": "a55fac9c33f74141f431ffeefb4374078dc40cb685fa337ac603398a6257e8af",
       "kind": "code",
       "symbols": [
         "SentimentAgent",
@@ -5038,8 +4873,8 @@
     {
       "path": "core/strategy/agents/lb_agent.py",
       "ext": ".py",
-      "size": 2617,
-      "sha256": "0f1db9d4952937ed2244632346ba3d30a758a4a1c16408cee268839c4d413192",
+      "size": 2613,
+      "sha256": "178083e04e34df70333641aed27abd4e42be0fb0d7fda1920d57331224e38b78",
       "kind": "code",
       "symbols": [
         "LBAgent",
@@ -5048,11 +4883,10 @@
       ],
       "imports": [
         "advanced_ensemble",
-        "core.strategy.base_agent",
-        "typing"
+        "core.strategy.base_agent"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 3 imports",
+      "summary": "code, 3 symbols, 2 imports",
       "dependents": [
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
@@ -5065,8 +4899,8 @@
     {
       "path": "core/strategy/agents/visual_agent.py",
       "ext": ".py",
-      "size": 1684,
-      "sha256": "68bfc2d60029499b6c70de499c4304b779f4195027a2e5e94b0007f28fc30ef2",
+      "size": 1640,
+      "sha256": "182c594c7c85c05f4aa5ba5ff9347addd675de64009f8c756146784f454d7d5f",
       "kind": "code",
       "symbols": [
         "VisualAgent",
@@ -5075,11 +4909,10 @@
       ],
       "imports": [
         "core.strategy.base_agent",
-        "pandas",
         "typing"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 3 imports",
+      "summary": "code, 3 symbols, 2 imports",
       "dependents": [
         "tests/test_bot_bootstrap.py",
         "tests/test_dashboard_ipc.py",
@@ -5113,8 +4946,8 @@
     {
       "path": "tests/test_shadow_logger_module.py",
       "ext": ".py",
-      "size": 1110,
-      "sha256": "8d4c120a6ea62f1f3fabfcdf93cc04dd4bbac8cc6a7d69815560cdae269d7106",
+      "size": 1128,
+      "sha256": "1e612a2f81f171bbd08fe55aafdbda6611cdde8821842e52fcc3a78411a63cd9",
       "kind": "code",
       "symbols": [
         "ShadowLoggerModuleTest",
@@ -5124,9 +4957,9 @@
       ],
       "imports": [
         "core",
-        "learning",
         "os",
         "pathlib",
+        "tools.learning",
         "unittest",
         "unittest.mock"
       ],
@@ -5137,8 +4970,8 @@
     {
       "path": "tests/test_risk_engine_coverage.py",
       "ext": ".py",
-      "size": 10936,
-      "sha256": "06622e6f535215982d4703e629bf71aa49918ca444faebf5bee6d36edb33016e",
+      "size": 10887,
+      "sha256": "8cdbdc09802689af13ebf87fe210b3bd7e5feeab0f159287e12827a124a8b37e",
       "kind": "code",
       "symbols": [
         "TestCalculatePositionSize",
@@ -5172,20 +5005,19 @@
         "datetime",
         "os",
         "sqlite3",
-        "sys",
         "tempfile",
         "unittest",
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 25 symbols, 8 imports",
+      "summary": "code, 25 symbols, 7 imports",
       "dependents": []
     },
     {
       "path": "tests/test_dashboard_ipc.py",
       "ext": ".py",
-      "size": 5703,
-      "sha256": "444b5471d30ba7f5f7b8666b7ed2f4a04f48d765c3b6ca1b79c8c0b1256a93a1",
+      "size": 5758,
+      "sha256": "bf8b4b807f7b93238bc57411a4ff1ff193d1c6ca622702387770e616bb543dbd",
       "kind": "code",
       "symbols": [
         "DashboardIpcTest",
@@ -5202,12 +5034,12 @@
       ],
       "imports": [
         "core",
-        "dashboard",
         "fastapi",
         "json",
         "os",
         "tempfile",
         "threading",
+        "tools.dashboard",
         "unittest",
         "unittest.mock"
       ],
@@ -5218,8 +5050,8 @@
     {
       "path": "tests/test_watchdog.py",
       "ext": ".py",
-      "size": 2012,
-      "sha256": "fc1d3b71e3c3fb411ce3511c642d92b2b43ee0c7bdec645b7995f0b6dfd1fb46",
+      "size": 1997,
+      "sha256": "85d0bad2e97c4ff805f70a0a8e4cf0202e9f5270e6bb465a7a516c17886c7952",
       "kind": "code",
       "symbols": [
         "WatchdogHeartbeatTest",
@@ -5243,8 +5075,8 @@
     {
       "path": "tests/test_execution_wrappers.py",
       "ext": ".py",
-      "size": 2937,
-      "sha256": "08baabc6c976fc8794d08ef99842da96e19cd7f8c0eda29b322a3f9d7b9ca2f7",
+      "size": 2934,
+      "sha256": "d8f2437e40ca0339e48745a194a59c882fd18785d3a8264bef2dfe1e548ddb3b",
       "kind": "code",
       "symbols": [
         "TestFetchBalance",
@@ -5273,8 +5105,8 @@
     {
       "path": "tests/test_filters_pure_functions.py",
       "ext": ".py",
-      "size": 7972,
-      "sha256": "065ca6e01118d2583827376c477ba153a25d37c4851d2965abb7c2b68a1f6970",
+      "size": 8214,
+      "sha256": "92af1519cf956e06ff0c9291acfc89690cf3271d4d84b98f6b3ee9fc87e07516",
       "kind": "code",
       "symbols": [
         "TestEvaluateBootstrapHeuristic",
@@ -5334,8 +5166,8 @@
     {
       "path": "tests/test_execution_service_resilience.py",
       "ext": ".py",
-      "size": 14760,
-      "sha256": "fa0d38b447d0e08cd804a3de223ffe66d183ccd4577cf29744a3dd20a5ac9295",
+      "size": 14524,
+      "sha256": "d45a7658b1edfdee81de1868429269d208534201d801b5457a381a6afb5cdfd7",
       "kind": "code",
       "symbols": [
         "ExecutionServiceResilienceTest",
@@ -5375,21 +5207,20 @@
       ],
       "imports": [
         "ccxt",
-        "concurrent.futures",
         "core.execution_service",
         "threading",
         "unittest",
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 34 symbols, 6 imports",
+      "summary": "code, 34 symbols, 5 imports",
       "dependents": []
     },
     {
       "path": "tests/test_daily_circuit_breaker.py",
       "ext": ".py",
-      "size": 5515,
-      "sha256": "2371f602317b487ead08c717766d8c5a526c2222f588f5b15707147aac6ed5ad",
+      "size": 5437,
+      "sha256": "4fdacfc9f883ab9a5598b1518411d8a6e2c7a35c8392632ab4e65739aa892387",
       "kind": "code",
       "symbols": [
         "DailyCircuitBreakerTest",
@@ -5418,8 +5249,8 @@
     {
       "path": "tests/test_strategy_utils.py",
       "ext": ".py",
-      "size": 6815,
-      "sha256": "ac9bcf90395a9fedb2150b85c95933a05acf16780f402a8312f9595251b35be8",
+      "size": 6830,
+      "sha256": "9a4deac54f372f8e6842a65403620a38d0005de8bf2d37ff633742489c60dacd",
       "kind": "code",
       "symbols": [
         "TestCalculateZScore",
@@ -5468,8 +5299,8 @@
     {
       "path": "tests/test_execution_lock_separation.py",
       "ext": ".py",
-      "size": 11547,
-      "sha256": "0782be5193557dd6c8924317006af3fe01ff437c81d4e70467f32b8eadc904ce",
+      "size": 11715,
+      "sha256": "a743b04dd6c97eeb0abc50f95490e194e2d3e1d181903943a9ff10d3bf78c5d5",
       "kind": "code",
       "symbols": [
         "ExecutionLockSeparationTest",
@@ -5516,8 +5347,8 @@
     {
       "path": "tests/test_shadow_delta_report.py",
       "ext": ".py",
-      "size": 8092,
-      "sha256": "533a6bcdf0d8b9d40650d9803b48506a7f11d3b5069b02d3785a4bb98896f0d8",
+      "size": 8015,
+      "sha256": "bd94f7600775d281234279b4b6b8175037a6a9fafaf856f26b29a3bb0680cf7f",
       "kind": "code",
       "symbols": [
         "ShadowDeltaReportTests",
@@ -5543,8 +5374,8 @@
     {
       "path": "tests/test_market_intelligence_and_balance.py",
       "ext": ".py",
-      "size": 21887,
-      "sha256": "e20b0e8da637a5550d31a84783dc8cdcdbc0a60488a7fe8923483a5d6007f78d",
+      "size": 21929,
+      "sha256": "77a8d327f1046438d347466db472ea37af462b8b45f836059ee54f5f9f78e7b5",
       "kind": "code",
       "symbols": [
         "BalanceOpsPressureTests",
@@ -5590,8 +5421,8 @@
     {
       "path": "tests/test_symbol_utils.py",
       "ext": ".py",
-      "size": 952,
-      "sha256": "6787b9ffb76178efa97681ddf99da84b4671ac8a5b48faf7646c29a157c7e07f",
+      "size": 974,
+      "sha256": "0ffcce43410a8d72fcc4df922436cf603d32b4387466f7955a005ee08491d487",
       "kind": "code",
       "symbols": [
         "SymbolUtilsTest",
@@ -5610,8 +5441,8 @@
     {
       "path": "tests/test_graceful_shutdown.py",
       "ext": ".py",
-      "size": 3487,
-      "sha256": "258f2f785003ea42fb6c6cdd3791a9f2cf88ab78a84f79e7a3c16c4e38ed22cc",
+      "size": 3465,
+      "sha256": "37cf070cc5fcfbbd826a1d04df0397783f062708195da767c0b40a217c33fbde",
       "kind": "code",
       "symbols": [
         "GracefulShutdownTest",
@@ -5640,8 +5471,8 @@
     {
       "path": "tests/test_trade_manager_more.py",
       "ext": ".py",
-      "size": 4020,
-      "sha256": "ec4528a690bed35b867203775ad3e96623850616d0eb484733b598f0fddd2a9c",
+      "size": 4005,
+      "sha256": "3fd98e5f4d74d7db7f9c6b7f87397f47006d6875076820bf6f3a785ce8fe077b",
       "kind": "code",
       "symbols": [
         "TestClampLeverage",
@@ -5669,19 +5500,18 @@
       ],
       "imports": [
         "core.trade_manager",
-        "time",
         "unittest",
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 22 symbols, 4 imports",
+      "summary": "code, 22 symbols, 3 imports",
       "dependents": []
     },
     {
       "path": "tests/test_reconciliation.py",
       "ext": ".py",
-      "size": 30494,
-      "sha256": "e6002907698264ca5c42bb09c6dd0e89e00ec8b07d802f992f01aba6f4853fce",
+      "size": 30382,
+      "sha256": "1fbeeb4b4236b5b2b09bb2d96d13ddbfdad9d896deb50efd11c2219762a5cb7f",
       "kind": "code",
       "symbols": [
         "ChildOrderIdTest",
@@ -5758,8 +5588,8 @@
     {
       "path": "tests/test_risk_engine_methods.py",
       "ext": ".py",
-      "size": 8867,
-      "sha256": "a4f5f62588b84928b69704ea352622dcde44792141cd852ca84ec86d7f7f12d1",
+      "size": 8814,
+      "sha256": "e27b2f86af8c3f294e697c646c557eedf5727ed22292d4c1cb1b8961c4013b55",
       "kind": "code",
       "symbols": [
         "TestCalculatePositionSizeByStop",
@@ -5802,8 +5632,8 @@
     {
       "path": "tests/test_trade_manager_states.py",
       "ext": ".py",
-      "size": 4978,
-      "sha256": "eb97a5600b6707d8be8403b34f982dc48a82239bab34feb7b26be0d91059f870",
+      "size": 4967,
+      "sha256": "db68d276429788877818b73d3c9fa54f0fa32615223678f9a70f400b30ca4a8d",
       "kind": "code",
       "symbols": [
         "TestExchangePositionIsFlat",
@@ -5835,8 +5665,8 @@
     {
       "path": "tests/test_bot_scorecard.py",
       "ext": ".py",
-      "size": 3825,
-      "sha256": "4932e4469f6a44f3af782ea96dad6e29d2f16f625735470eadfed434d7da767e",
+      "size": 3795,
+      "sha256": "7e5a8f43dea100d473407550ec29cf6be00185d1ae4c4108eaaaadcb539815a3",
       "kind": "code",
       "symbols": [
         "DailyScorecardTest",
@@ -5878,8 +5708,8 @@
     {
       "path": "tests/test_bot_signal_scan_cycle.py",
       "ext": ".py",
-      "size": 1849,
-      "sha256": "17f0ffad85e918eb9028105f82f5f232c015131bc246cec5a24d22bee135105b",
+      "size": 1805,
+      "sha256": "d82488f1c515db36ce4e456bcb3705788ff5d948af3eceb17eca02721ae95f4e",
       "kind": "code",
       "symbols": [
         "BotSignalScanCycleTest",
@@ -5960,8 +5790,8 @@
     {
       "path": "tests/test_regression_flows.py",
       "ext": ".py",
-      "size": 10744,
-      "sha256": "29bbd16d41dd71603dae9ffc8b602d3c7e5b0852f828aa787ef174d6f127b6a9",
+      "size": 10730,
+      "sha256": "3048bfe7cdf4f3ce4c2dab6047dbca2ee061ca9c48fdcb5afa4c2c8b7a2736b7",
       "kind": "code",
       "symbols": [
         "ExecutionServiceHelpersTest",
@@ -6014,8 +5844,8 @@
     {
       "path": "tests/test_commands_history.py",
       "ext": ".py",
-      "size": 8567,
-      "sha256": "95c253683a2ffb8faaa420914ad1e629589949e7f27fc4614a12e1b3d3e88095",
+      "size": 8733,
+      "sha256": "9ed6c27ac62fb038a44b90b9bc8e7bed64539040af5be0ed398dfa938e4be032",
       "kind": "code",
       "symbols": [
         "TestHandleHistoryCommands",
@@ -6049,8 +5879,8 @@
     {
       "path": "tests/test_telegram_api.py",
       "ext": ".py",
-      "size": 3084,
-      "sha256": "b0baef2340a52410840b6f5f5d113398b78450937fdbd2263d028f6f1be6b787",
+      "size": 3105,
+      "sha256": "9496d06061f4126efa3643907e12c7426f0b8a8257f606b055dc9105f2bd1d57",
       "kind": "code",
       "symbols": [
         "TestSanitizeTelegramError",
@@ -6080,7 +5910,7 @@
       "path": "tests/test_model_loader.py",
       "ext": ".py",
       "size": 1904,
-      "sha256": "af15e3a4f48d02ea2014ca4fbbc8c677e17186dd366a83b4a9175037a80361eb",
+      "sha256": "f7ed587fe0e7f6a3234f2a045c42a3ad6e548b0b3d10f7d0ba6a858edb34895a",
       "kind": "code",
       "symbols": [
         "ModelLoaderTest",
@@ -6104,8 +5934,8 @@
     {
       "path": "tests/test_mtf_filter.py",
       "ext": ".py",
-      "size": 10172,
-      "sha256": "b3ef39c52e9e60536295340036aa6d44d99d36f0834c1066a7f86794cc86e2f4",
+      "size": 10202,
+      "sha256": "a69df6ce671dd1cc6c5e13c19e2e4e541adeed03abe8638fa88e3a862391a0b0",
       "kind": "code",
       "symbols": [
         "MTFAnalyzerTests",
@@ -6154,13 +5984,16 @@
     {
       "path": "tests/test_data_service_cache_save.py",
       "ext": ".py",
-      "size": 1985,
-      "sha256": "ca20224af7bca9430616e7ff135605adef9ec4d43e0284a8aeb2aad8f47e289a",
+      "size": 3711,
+      "sha256": "7a36d2d54b1ff73eed98661b3453f2438b6431e6e4b9571dcd7baac4a77e5177",
       "kind": "code",
       "symbols": [
         "DataServiceCacheSaveTest",
         "test_async_cache_save_skips_when_save_already_running",
-        "test_async_cache_save_submits_snapshot_copy"
+        "test_async_cache_save_submits_snapshot_copy",
+        "test_async_maturity_save_respects_debounce",
+        "test_async_maturity_save_skips_when_save_already_running",
+        "test_async_maturity_save_submits_snapshot_copy"
       ],
       "imports": [
         "core.data_service",
@@ -6169,14 +6002,14 @@
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 4 imports",
+      "summary": "code, 6 symbols, 4 imports",
       "dependents": []
     },
     {
       "path": "tests/test_trade_exit.py",
       "ext": ".py",
-      "size": 14763,
-      "sha256": "2164eee13610832d0ca0f91dc8f23d62ce447b35f2db8ebabd1bf1955c4eaa6a",
+      "size": 14327,
+      "sha256": "66b9df6129de49699f509de8892e670b041183c364f269835ca454a48e438082",
       "kind": "code",
       "symbols": [
         "TestAbortPartialTrade",
@@ -6220,8 +6053,8 @@
     {
       "path": "tests/test_oi_filter.py",
       "ext": ".py",
-      "size": 2478,
-      "sha256": "043cb1d2983e977b64d34d80e3de5de68b05e991eeb25dc5189a2dbbd57efd9e",
+      "size": 2468,
+      "sha256": "bab5ec18c54170e3e55791bec4a1ed82c5292a4665f40fa48b7aec50cccaac0f",
       "kind": "code",
       "symbols": [
         "OICacheTests",
@@ -6242,11 +6075,10 @@
       ],
       "imports": [
         "core.signals.oi_filter",
-        "unittest",
-        "unittest.mock"
+        "unittest"
       ],
       "headings": [],
-      "summary": "code, 15 symbols, 3 imports",
+      "summary": "code, 15 symbols, 2 imports",
       "dependents": []
     },
     {
@@ -6273,8 +6105,8 @@
     {
       "path": "tests/test_execution_service_methods.py",
       "ext": ".py",
-      "size": 10809,
-      "sha256": "d6faf1aeeec197dd6e99747815a4e86edb27079fe5820049a21e6873b50bf29f",
+      "size": 10791,
+      "sha256": "231f7920b22bcfd9f9a6f0ecaa155b61f4d585201e17b332890b62bec1fe771d",
       "kind": "code",
       "symbols": [
         "TestActiveNoPriceDayKey",
@@ -6358,8 +6190,8 @@
     {
       "path": "tests/test_backtester.py",
       "ext": ".py",
-      "size": 4743,
-      "sha256": "63e36037e4801aa4241b1e490c556f14460ec7eafb5d4a9bb31db14313c3f346",
+      "size": 4793,
+      "sha256": "173795da88a420a3d7f50ebad68ceccb345f3343d53eeadd0ed4f50d9c28410a",
       "kind": "code",
       "symbols": [
         "VectorBacktesterTest",
@@ -6388,8 +6220,8 @@
     {
       "path": "tests/test_cvd_filter.py",
       "ext": ".py",
-      "size": 5847,
-      "sha256": "9eaa715fa9ddc4dd528de6e48134fdee3d65c9652d5164a443ba91ffe5b265d5",
+      "size": 5949,
+      "sha256": "7cc9237a805d1cf5042b79e4b8a365f1bdd62eb046fce4569ed9bdc25719af11",
       "kind": "code",
       "symbols": [
         "CVDFilterTests",
@@ -6421,8 +6253,8 @@
     {
       "path": "tests/test_bot_runtime_startup.py",
       "ext": ".py",
-      "size": 2119,
-      "sha256": "515221ebb7ccd49bc87cdca0151d6dd4520133853fb098a8b782d84b5b03897a",
+      "size": 2134,
+      "sha256": "c502da57bde6aaf5fd58c3a3e6532aac6878136a7c797ea877ab121c124fd40d",
       "kind": "code",
       "symbols": [
         "BotRuntimeStartupTest",
@@ -6516,8 +6348,8 @@
     {
       "path": "tests/test_trade_state.py",
       "ext": ".py",
-      "size": 2189,
-      "sha256": "edb366a5fe4a788b7c4a132ad0a081a4816fb1e9351117383f652abb96a33d13",
+      "size": 2235,
+      "sha256": "14973ea3be42bb5458b6e1bc6e85b332b2ef6130ed07c6db7fcf0e79963d4093",
       "kind": "code",
       "symbols": [
         "TradeStateTest",
@@ -6619,8 +6451,8 @@
     {
       "path": "tests/test_execute_order_coverage.py",
       "ext": ".py",
-      "size": 15249,
-      "sha256": "e43b3300e60042fc92ddd5945ff86417669db00943114efbe1a5ed0e79f6b898",
+      "size": 16324,
+      "sha256": "587877eea8fd0328c13762e16af539b945327b07e949d2599ee640201287a6c8",
       "kind": "code",
       "symbols": [
         "ExecuteOrderCoverageTest",
@@ -6665,8 +6497,8 @@
     {
       "path": "tests/test_bot_security_runtime.py",
       "ext": ".py",
-      "size": 10465,
-      "sha256": "a275642f455314e24db60f684891f0bfa92f55d59a494a98a6c3151f156101fa",
+      "size": 10409,
+      "sha256": "ef46704ba91bb8f89cb149e15e439921082a57dca50c0e9854eb5b57b86f20ee",
       "kind": "code",
       "symbols": [
         "BotSecurityRuntimeTest",
@@ -6696,8 +6528,8 @@
     {
       "path": "tests/test_regime_tuning.py",
       "ext": ".py",
-      "size": 7541,
-      "sha256": "a80b37105013fbcefc1863c3f4d7bb607380d5bf1dbc7c0706d4f42e817c0bba",
+      "size": 7598,
+      "sha256": "beb8e2be5ced448b1955d1cbb056b8ed8915265701be5fda2ab22e08ee34f128",
       "kind": "code",
       "symbols": [
         "RegimeTuningRiskEngineIntegrationTests",
@@ -6724,7 +6556,6 @@
         "core.regime_tuning",
         "core.risk_engine",
         "json",
-        "os",
         "pathlib",
         "shutil",
         "tempfile",
@@ -6733,7 +6564,7 @@
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 18 symbols, 11 imports",
+      "summary": "code, 18 symbols, 10 imports",
       "dependents": []
     },
     {
@@ -6792,8 +6623,8 @@
     {
       "path": "tests/test_hyperopt_loader.py",
       "ext": ".py",
-      "size": 2246,
-      "sha256": "6dd0e8649624328da3f7fe376ff68f6b10bef492b03b1a8152fe3403098d3382",
+      "size": 2322,
+      "sha256": "b542122b9f1f37e0967d1599418a9e0c1b84e94948a859f8452c1864762fb7ee",
       "kind": "code",
       "symbols": [
         "HyperoptConfigLoaderTest",
@@ -6843,8 +6674,8 @@
     {
       "path": "tests/test_filters_execution_mode.py",
       "ext": ".py",
-      "size": 12104,
-      "sha256": "440032c76ee6e4dc68260b49c9f5628bad08ff2624acb2fa73cf2666532b3bae",
+      "size": 13010,
+      "sha256": "f36b78a2b286c164aea15a9eb2663bdccbd17a48d9fa4cee1c2a939ce7d8f53d",
       "kind": "code",
       "symbols": [
         "TestPlanExecutionMode",
@@ -6885,10 +6716,48 @@
       "dependents": []
     },
     {
+      "path": "tests/test_shadow_wallet_runtime.py",
+      "ext": ".py",
+      "size": 4881,
+      "sha256": "d4813e971d10648ed95a0f708680826607872915c52d49ed547674702029bde8",
+      "kind": "code",
+      "symbols": [
+        "ShadowWalletRuntimeTest",
+        "_Brain",
+        "_LiveExecution",
+        "__init__",
+        "check_eureka_status",
+        "delete_active_trade_state",
+        "evolve_genetics",
+        "finalize_confidence_exit_audit",
+        "get_recent_exit_confidence_stagnation",
+        "log_trade",
+        "save_active_trade_state",
+        "test_close_trade_releases_shadow_margin_and_persists_margin_pnl",
+        "test_margin_reserve_and_release_are_idempotent",
+        "test_reserve_blocks_when_available_balance_is_insufficient",
+        "test_shadow_adapter_balance_provider",
+        "test_shadow_pnl_percent_uses_margin_base",
+        "update_trade_context_result"
+      ],
+      "imports": [
+        "core.execution_adapters",
+        "core.trade_exit",
+        "core.trade_helpers",
+        "threading",
+        "types",
+        "unittest",
+        "unittest.mock"
+      ],
+      "headings": [],
+      "summary": "code, 17 symbols, 7 imports",
+      "dependents": []
+    },
+    {
       "path": "tests/test_agent_pipeline.py",
       "ext": ".py",
-      "size": 8882,
-      "sha256": "a309dddd37c927b67c77614dfb086a9d83740518595e94493f217da183e8ab21",
+      "size": 9188,
+      "sha256": "c6b21f9ccf2e9e9225fd4c67c54cd7af104a9d90c864b17a6dd58f3e113c2d1c",
       "kind": "code",
       "symbols": [
         "TestGetAgentPerformance",
@@ -6914,9 +6783,9 @@
         "core.strategy.agents.sr_agent",
         "core.strategy.orchestrator",
         "json",
-        "learning",
         "numpy",
         "pandas",
+        "tools.learning",
         "unittest",
         "unittest.mock"
       ],
@@ -6954,8 +6823,8 @@
     {
       "path": "tests/test_walk_forward_backtest_tool.py",
       "ext": ".py",
-      "size": 3244,
-      "sha256": "8b6203d41ee636cfd65ecbf7cdb6454579527751880a77aefbabd6f03fa40111",
+      "size": 3292,
+      "sha256": "6f14b111a5428d6a1c045ad2ffba3503e683d85133457da028ebe42b32d62ff1",
       "kind": "code",
       "symbols": [
         "WalkForwardBacktestToolTest",
@@ -7004,8 +6873,8 @@
     {
       "path": "tests/test_smart_exit_confidence_guardrails.py",
       "ext": ".py",
-      "size": 13127,
-      "sha256": "690d5e839e0888b0a38047c33e2aecad1ed47ae01d340968d8ae606101ba9896",
+      "size": 13018,
+      "sha256": "cd7f8ac3342f5f990fa46326e5e357c4594e7875dda9be33bf5d8bfd2546d823",
       "kind": "code",
       "symbols": [
         "SmartExitConfidenceGuardrailsTest",
@@ -7041,8 +6910,8 @@
     {
       "path": "tests/test_boot_and_notifier.py",
       "ext": ".py",
-      "size": 5560,
-      "sha256": "2573d5d7b65b25169355d55f8b02b594c1837ea26cb0ea912a635409fb4a0314",
+      "size": 5619,
+      "sha256": "739e0dc8fcd970c8bc2845d53f6f970acec02274d30c115f1d880beca1db0911",
       "kind": "code",
       "symbols": [
         "BootAndNotifierTest",
@@ -7061,9 +6930,9 @@
       "imports": [
         "core.bot_app",
         "io",
-        "learning",
-        "notifier",
         "time",
+        "tools.learning",
+        "tools.notifier",
         "unittest",
         "unittest.mock"
       ],
@@ -7119,8 +6988,8 @@
     {
       "path": "tests/test_trade_manager_calc.py",
       "ext": ".py",
-      "size": 5039,
-      "sha256": "7f5fd9bdc3e5942214d8fa5da4806cd9779cba9a6c2724beb56a048d6912481a",
+      "size": 5038,
+      "sha256": "cfa4ab0bbaa1f5a884b6bbfdc7ef8cc2a3f09bc5d16a17783a328e1177294386",
       "kind": "code",
       "symbols": [
         "TestCalculatePnlAndMetrics",
@@ -7149,8 +7018,8 @@
     {
       "path": "tests/test_execution_and_update.py",
       "ext": ".py",
-      "size": 3657,
-      "sha256": "e82409a17c420e5b3d2da2cf5e5b149650659c2875c8cc6a169ff61e7480f77a",
+      "size": 3789,
+      "sha256": "75687803d05549ea67caba60dbdc774bb3f990a27862bebebbed58a19868d8bd",
       "kind": "code",
       "symbols": [
         "TestExecuteAndUpdateSymbol",
@@ -7170,20 +7039,19 @@
       "imports": [
         "core.signals.execution",
         "pandas",
-        "threading",
         "types",
         "unittest",
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 13 symbols, 6 imports",
+      "summary": "code, 13 symbols, 5 imports",
       "dependents": []
     },
     {
       "path": "tests/test_shadow_readiness_gate.py",
       "ext": ".py",
-      "size": 4271,
-      "sha256": "fb154f8c243f611c0c35f580147f323be2838eaa85af2a6b58b7a1ab0b72b46a",
+      "size": 4293,
+      "sha256": "8f0fb9a543a5ea41eef4319023e730079eb8c54685fbe4a0ed0e2f97004005bd",
       "kind": "code",
       "symbols": [
         "ShadowReadinessGateTests",
@@ -7205,8 +7073,8 @@
     {
       "path": "tests/test_execution_telemetry.py",
       "ext": ".py",
-      "size": 859,
-      "sha256": "4c515f1ffcf0539354a6eb91c91ce3e492dd17e57c4e2d3122a5809536c0915e",
+      "size": 907,
+      "sha256": "caf58e92c1541f59f78b514cb8829f11c569da00b7ccf134fa61577e91745a56",
       "kind": "code",
       "symbols": [
         "ExecutionTelemetryTests",
@@ -7215,21 +7083,40 @@
       "imports": [
         "core.execution_telemetry",
         "os",
-        "pathlib",
         "tempfile",
         "types",
         "unittest",
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 2 symbols, 7 imports",
+      "summary": "code, 2 symbols, 6 imports",
+      "dependents": []
+    },
+    {
+      "path": "tests/test_imports_guardrail.py",
+      "ext": ".py",
+      "size": 1961,
+      "sha256": "e9bd26a0449ec6b082ac3b5c82d927f250b0d8e472c7a3722606ce00013ad2f6",
+      "kind": "code",
+      "symbols": [
+        "TestImportsGuardrail",
+        "test_no_legacy_imports_internally"
+      ],
+      "imports": [
+        "os",
+        "pathlib",
+        "re",
+        "unittest"
+      ],
+      "headings": [],
+      "summary": "code, 2 symbols, 4 imports",
       "dependents": []
     },
     {
       "path": "tests/test_correlation_risk.py",
       "ext": ".py",
-      "size": 6323,
-      "sha256": "3047390698c6ba1daf039097049394837e8f225350520b06111fce5170e68d97",
+      "size": 6403,
+      "sha256": "f7db21ed2372fffc195c2890ed2a5c77ffc6c618242b03d74235b9d531642e5e",
       "kind": "code",
       "symbols": [
         "CorrelationReductionTests",
@@ -7265,8 +7152,8 @@
     {
       "path": "tests/test_active_trade_store.py",
       "ext": ".py",
-      "size": 1092,
-      "sha256": "1e409225ba494fb5686575e1497f482147fdc5dab55b92d95174fefb3ef5a303",
+      "size": 1098,
+      "sha256": "ffc58430ab92857a1d00a03ee6a1fc42f74b7d13f83118a7f07efd719992a82a",
       "kind": "code",
       "symbols": [
         "ActiveTradeStoreTest",
@@ -7274,9 +7161,9 @@
       ],
       "imports": [
         "datetime",
-        "learning",
         "pathlib",
         "tempfile",
+        "tools.learning",
         "unittest"
       ],
       "headings": [],
@@ -7286,8 +7173,8 @@
     {
       "path": "tests/test_fidelity_audit.py",
       "ext": ".py",
-      "size": 9035,
-      "sha256": "009c2f81d580afa0f5377af3de9865705ee7e828d1e2a9885d636283b678cd1e",
+      "size": 9294,
+      "sha256": "f0d6a315ce73b8a606185d9b4c1893f63e8a68841f48289a486ed0849277b9cb",
       "kind": "code",
       "symbols": [
         "FidelityAuditTest",
@@ -7313,7 +7200,7 @@
       "path": "tests/test_bot_cycles_performance.py",
       "ext": ".py",
       "size": 3940,
-      "sha256": "5a36d3b40295a22df2a6eb7ad68793c35439937027a3e3688e117449477a0126",
+      "sha256": "9ec6963eb3c0a9c91db5cdf6ced67277a422cf785da2fe64bf6b319a73451c93",
       "kind": "code",
       "symbols": [
         "BotCyclesPerformanceTest",
@@ -7344,8 +7231,8 @@
     {
       "path": "tests/test_weight_monitor.py",
       "ext": ".py",
-      "size": 4705,
-      "sha256": "df036300ca3dc790b811ea2ea6b4b3ff80e960a2f0f3276c509a14fd28194a39",
+      "size": 4927,
+      "sha256": "194edaffb5d7e6a5cfa63d694fac9c6b1088ab067c6788fd4ade3540d64bdacb",
       "kind": "code",
       "symbols": [
         "TestAgentWeightMonitor",
@@ -7370,8 +7257,8 @@
     {
       "path": "tests/test_wallet_sync_sl_recovery.py",
       "ext": ".py",
-      "size": 16946,
-      "sha256": "0cc03c534e1ae3eba2808b72a3ae41978cc62fcb497c4f0eff85bf4fea7f6e1a",
+      "size": 16820,
+      "sha256": "504172362c3afa74710017667e399f82c7aa58cdb43c8442d755f9279ded1912",
       "kind": "code",
       "symbols": [
         "WalletSyncSlRecoveryTest",
@@ -7402,8 +7289,8 @@
     {
       "path": "tests/test_mtf_metrics.py",
       "ext": ".py",
-      "size": 5432,
-      "sha256": "44aa442392cdf254868569366f5db19c7a808c6ec1c891bafa5ca4371283b12a",
+      "size": 5252,
+      "sha256": "d2b6f0726fae8f5850d59725419083781b4df6e0b6e5e4d461c557197dba6cb0",
       "kind": "code",
       "symbols": [
         "TestMTFVetoStats",
@@ -7431,8 +7318,8 @@
     {
       "path": "tests/test_watchdog_integration.py",
       "ext": ".py",
-      "size": 4655,
-      "sha256": "575b5cd8e1bb1dff675c12e46b90ba7d4c21aa4dcc52b13052e73795479019dc",
+      "size": 4651,
+      "sha256": "16830b508fe6544fc173e25114aab04a4b454cf0042df6725c130ed33324e818",
       "kind": "code",
       "symbols": [
         "TestWatchdogHeartbeatPathResolution",
@@ -7507,8 +7394,8 @@
     {
       "path": "tests/test_trade_manager_helpers.py",
       "ext": ".py",
-      "size": 8630,
-      "sha256": "cea7f4ee524756d2e5e8bf175398f09aaaf182b04d16bf893d1b2e237041592b",
+      "size": 8639,
+      "sha256": "d9e0ddf91886422719b0758847f86a3791b23b0239de96e4de42c8271afaa1ee",
       "kind": "code",
       "symbols": [
         "TestClampLeverage",
@@ -7540,19 +7427,18 @@
       ],
       "imports": [
         "core.trade_manager",
-        "time",
         "unittest",
         "unittest.mock"
       ],
       "headings": [],
-      "summary": "code, 26 symbols, 4 imports",
+      "summary": "code, 26 symbols, 3 imports",
       "dependents": []
     },
     {
       "path": "tests/test_regime_hmm.py",
       "ext": ".py",
-      "size": 37877,
-      "sha256": "59d67cdd7313ec8b8ebcb9c87a457ecba6f1300e3538da340369b1c58a9219e1",
+      "size": 38302,
+      "sha256": "14877f4b8fffa314dbf2bcf487230bd75744858fd712ef62d62bb8db8cb86c75",
       "kind": "code",
       "symbols": [
         "DynamicHMMRegimeTests",
@@ -7617,13 +7503,41 @@
       "dependents": []
     },
     {
+      "path": "tests/test_github_projects_kanban.py",
+      "ext": ".py",
+      "size": 7040,
+      "sha256": "94e8e20c80307651f8878a520427097fc1d3226f9eedf22b79ed5492979f4cd2",
+      "kind": "code",
+      "symbols": [
+        "GitHubProjectsKanbanTests",
+        "setUp",
+        "test_actualizar_pnl_tarjeta_updates_draft_issue_body",
+        "test_actualizar_pnl_tarjeta_wrapper_returns_error_without_env",
+        "test_configurar_tablero_kanban_updates_status_and_returns_url",
+        "test_crear_tablero_kanban_creates_and_configures_project",
+        "test_crear_tablero_kanban_wrapper_returns_error_without_env",
+        "test_crear_tarjeta_operacion_creates_draft_and_sets_status",
+        "test_mover_tarjeta_rejects_unknown_column"
+      ],
+      "imports": [
+        "tools.github_projects_kanban",
+        "unittest",
+        "unittest.mock"
+      ],
+      "headings": [],
+      "summary": "code, 9 symbols, 3 imports",
+      "dependents": []
+    },
+    {
       "path": "tests/test_entry_risk_guardrails.py",
       "ext": ".py",
-      "size": 2298,
-      "sha256": "127343c066600c4824a79033446945defd61b00de8630abefbe7c2fd39189272",
+      "size": 4261,
+      "sha256": "f4db89e041374a84eff9a927f6b6b9c0e2c3a363a3f589b9552c1da27c413d63",
       "kind": "code",
       "symbols": [
         "EntryRiskGuardrailsTest",
+        "test_kava_default_3_0_passes_sl_2_8",
+        "test_kava_default_3_0_vetoes_sl_over_3_0",
         "test_kava_veto_uses_configurable_max_entry_sl_pct",
         "test_kava_veto_uses_runtime_sl_modifier_and_genes"
       ],
@@ -7633,14 +7547,14 @@
         "unittest"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 3 imports",
+      "summary": "code, 5 symbols, 3 imports",
       "dependents": []
     },
     {
       "path": "tests/test_ops_force_clear.py",
       "ext": ".py",
-      "size": 5389,
-      "sha256": "af4bc5fc62bf03fbfdc778bb33c613a65acadf825b4e069e31dee9643b5ad04f",
+      "size": 5278,
+      "sha256": "bc8dff19f55f0d39f39e99b6127744a62d84e09a16fbe9f952f0824c1a143255",
       "kind": "code",
       "symbols": [
         "OpsForceClearTest",
@@ -7690,8 +7604,8 @@
     {
       "path": "tests/test_advanced_runtime_flows.py",
       "ext": ".py",
-      "size": 16445,
-      "sha256": "badf9c2ea26bbc0998cb6c69873467122f27b48df760657aa6b0d71a85b91527",
+      "size": 16387,
+      "sha256": "4b0d10b95ad6f4f392987eca6279cd05f0098688608abe79dc9e51cecb5afb69",
       "kind": "code",
       "symbols": [
         "AdvancedRuntimeFlowsTest",
@@ -7775,8 +7689,8 @@
     {
       "path": "tests/test_execution_service_helpers.py",
       "ext": ".py",
-      "size": 3265,
-      "sha256": "316a3b9a0f485ffbdc124f2abacb8be3a99586df1dca63fd0fc7aec627d44676",
+      "size": 3241,
+      "sha256": "ffb19c1e4db5de68b2d6a24d48363e601780ab97b7cf7528e8cb5301e9ad4599",
       "kind": "code",
       "symbols": [
         "TestExecuteChaseLimitSteps",
@@ -7808,6 +7722,35 @@
       "dependents": []
     },
     {
+      "path": "tests/test_trade_context_snapshots.py",
+      "ext": ".py",
+      "size": 4669,
+      "sha256": "08853e1ae09d607df7cb6820f6bf20578973e65cc66a9416011f1ae9a108da53",
+      "kind": "code",
+      "symbols": [
+        "TradeContextSnapshotsTest",
+        "_fake_context",
+        "setUp",
+        "tearDown",
+        "test_cleanup_stale_snapshots",
+        "test_extract_similarity_vector_returns_11_features",
+        "test_find_similar_contexts_empty",
+        "test_find_similar_contexts_with_data",
+        "test_save_trade_context_snapshot",
+        "test_update_trade_context_result",
+        "test_update_trade_context_result_with_matching_symbol"
+      ],
+      "imports": [
+        "pathlib",
+        "tempfile",
+        "tools.learning",
+        "unittest"
+      ],
+      "headings": [],
+      "summary": "code, 11 symbols, 4 imports",
+      "dependents": []
+    },
+    {
       "path": "tests/test_real_readiness_check.py",
       "ext": ".py",
       "size": 1980,
@@ -7830,17 +7773,17 @@
     {
       "path": "tests/test_learning_storage.py",
       "ext": ".py",
-      "size": 605,
-      "sha256": "9d3701838392d30b04d74ee11533dfc010ccb67b850cd5a8a410477e0d311665",
+      "size": 611,
+      "sha256": "d96690d8724704549f615394a9e04f7312865fa6404130636a38121098dab6f4",
       "kind": "code",
       "symbols": [
         "LearningStorageTest",
         "test_brain_sqlite_uses_normal_synchronous"
       ],
       "imports": [
-        "learning",
         "pathlib",
         "tempfile",
+        "tools.learning",
         "unittest"
       ],
       "headings": [],
@@ -7873,8 +7816,8 @@
     {
       "path": "tests/test_weekly_maintenance.py",
       "ext": ".py",
-      "size": 4742,
-      "sha256": "7467b11bf50d21d8ba2f73326d1415148565cbb06807b059864dbf824378fbf8",
+      "size": 4810,
+      "sha256": "1785f88c5f173a8f5196b0064ef06ad77498315039bbe1985fd7321622bf9096",
       "kind": "code",
       "symbols": [
         "FakeDateTime",
@@ -7888,9 +7831,9 @@
       "imports": [
         "core",
         "datetime",
-        "learning",
         "pathlib",
         "tempfile",
+        "tools.learning",
         "types",
         "unittest"
       ],
@@ -7923,7 +7866,7 @@
       "path": "tests/test_config_precedence.py",
       "ext": ".py",
       "size": 2999,
-      "sha256": "824029a7102607d57e5b6fe7384a64432130bab45d2c51df74e950a0aad02e22",
+      "sha256": "342df379528046def7d6f6f310eaf46d22ab625c2d9203b450c1edb73e6b1b28",
       "kind": "code",
       "symbols": [
         "ConfigPrecedenceTest",
@@ -7970,8 +7913,8 @@
     {
       "path": "tests/test_api_constraints.py",
       "ext": ".py",
-      "size": 5067,
-      "sha256": "57bee2ee40ca82746f8fd50410781bad33b4ee2752c14c4c7f81323c202309eb",
+      "size": 4881,
+      "sha256": "e87247719bd1e6430264b7f5e84298485777461a69fa47df358a4d0475603697",
       "kind": "code",
       "symbols": [
         "TestAPIConstraints",
@@ -7995,8 +7938,8 @@
     {
       "path": "tests/test_temporal_invariance.py",
       "ext": ".py",
-      "size": 1501,
-      "sha256": "9a507506d577025d4836ab50a2c8b8b0c469d6900b92c1ef95070f74f2ce4881",
+      "size": 1425,
+      "sha256": "48905c82b6299ec3f4efe0b9893249dd46353eef458eb99b09ce817981e6f426",
       "kind": "code",
       "symbols": [
         "TemporalInvarianceTest",
@@ -8031,7 +7974,7 @@
       "path": "tests/integration/test_binance_testnet_execution_flow.py",
       "ext": ".py",
       "size": 4340,
-      "sha256": "72ab7f7c1d0c403d51bba67dac2a636321edfc359439c3fff3487849e6eab476",
+      "sha256": "5fc57f764beb1dba0f5ad6ca86507089c16d4de1ea13d7fc0ccd26c87cff0063",
       "kind": "code",
       "symbols": [
         "BinanceTestnetExecutionFlowTest",
@@ -8923,7 +8866,31 @@
       "path": "data_storage/symbol_controls.json",
       "ext": ".json",
       "size": 171,
-      "sha256": "e1882739f84adc5ba3247721b90e016d5921eae14a9e7aeacab9287145795ebf",
+      "sha256": "5234a2fa21d47471a74684b2a175a56721854d853dff266dc26d85a49d49616e",
+      "kind": "data",
+      "symbols": [],
+      "imports": [],
+      "headings": [],
+      "summary": "data",
+      "dependents": []
+    },
+    {
+      "path": "data_storage/maturity_cache.json",
+      "ext": ".json",
+      "size": 5106,
+      "sha256": "ea5fa7d256a2604d4d85de1a71d5b0f19cd4f3c021d88a597412e30770236de0",
+      "kind": "data",
+      "symbols": [],
+      "imports": [],
+      "headings": [],
+      "summary": "data",
+      "dependents": []
+    },
+    {
+      "path": "logs/metrics_summary.json",
+      "ext": ".json",
+      "size": 1005,
+      "sha256": "07aa71af64580101315bcb8519936ff3b3b9e86738d946ff3d9e58a9694a22bc",
       "kind": "data",
       "symbols": [],
       "imports": [],
@@ -8941,6 +8908,32 @@
       "imports": [],
       "headings": [],
       "summary": "data",
+      "dependents": []
+    },
+    {
+      "path": "Propuestas/Informe de Información sobre Estrategias Algorítmicas, Riesgos e Infraestructura.md",
+      "ext": ".md",
+      "size": 8032,
+      "sha256": "1e92150fb727cb3c55e00c98a5fe250c8b5d6117f16544681c7176a64323a287",
+      "kind": "doc",
+      "symbols": [],
+      "imports": [],
+      "headings": [
+        "Informe de Información sobre Estrategias Algorítmicas, Riesgos e Infraestructura",
+        "Resumen Ejecutivo",
+        "1\\. Errores Críticos en el Backtesting y su Mitigación",
+        "2\\. Modelado de Impacto de Mercado y Ejecución Óptima",
+        "Dinámica del Modelo",
+        "Estrategias y Objetivos de Ejecución",
+        "3\\. Gestión de Riesgos y Evaluación de Desempeño",
+        "Métricas Avanzadas: VaR vs. Expected Shortfall (ES)",
+        "Dimensionamiento de Posiciones (Sizing)",
+        "4\\. Infraestructura Técnica para Trading de Baja Latencia",
+        "Optimización de Datos e Ingesta",
+        "Monitoreo y Cumplimiento",
+        "5\\. Citas Clave y Perspectivas del Sector"
+      ],
+      "summary": "doc, 13 headings",
       "dependents": []
     },
     {
@@ -9214,13 +9207,16 @@
     {
       "path": "tools/learning.py",
       "ext": ".py",
-      "size": 108234,
-      "sha256": "4cefcd2287cdd52e0b7209b40debeab7c9e4f5da0207d32fddc26d7d8a343aeb",
+      "size": 117774,
+      "sha256": "6a8a14ca9b685ec18bed6972b9eb05a0c85b1c29a867ee1bdb4d24437fdec309",
       "kind": "code",
       "symbols": [
         "Brain",
         "__init__",
         "_classify_pattern",
+        "_compute_context_hash",
+        "_cosine_similarity",
+        "_extract_similarity_vector",
         "_get_conn",
         "_init_db",
         "_init_rag_cache",
@@ -9231,9 +9227,11 @@
         "check_eureka_status",
         "check_performance_drop",
         "cleanup_old_patterns",
+        "cleanup_stale_snapshots",
         "delete_active_trade_state",
         "evolve_genetics",
         "finalize_confidence_exit_audit",
+        "find_similar_contexts",
         "get_agent_performance",
         "get_agent_reputation",
         "get_ai_maturity",
@@ -9286,6 +9284,7 @@
         "rotate_history",
         "save_active_trade_state",
         "save_error_snapshot",
+        "save_trade_context_snapshot",
         "set_metadata",
         "set_metadata_json",
         "update_agent_reputation",
@@ -9299,6 +9298,7 @@
         "update_sector_blacklist",
         "update_signal_alert_status",
         "update_symbol_blacklist",
+        "update_trade_context_result",
         "upsert_confidence_exit_audit",
         "validate_pattern_robustness",
         "weekly_maintenance"
@@ -9312,6 +9312,7 @@
         "core.rag_cache",
         "core.shadow_logger",
         "datetime",
+        "hashlib",
         "json",
         "numpy",
         "pandas",
@@ -9320,7 +9321,7 @@
         "time"
       ],
       "headings": [],
-      "summary": "code, 84 symbols, 14 imports",
+      "summary": "code, 91 symbols, 15 imports",
       "dependents": [
         "core/bot_app.py",
         "core/risk_policy.py",
@@ -9328,7 +9329,14 @@
         "core/trade_entry.py",
         "core/trade_exit.py",
         "core/trade_helpers.py",
+        "tests/test_active_trade_store.py",
+        "tests/test_agent_pipeline.py",
+        "tests/test_boot_and_notifier.py",
+        "tests/test_learning_storage.py",
+        "tests/test_shadow_logger_module.py",
         "tests/test_symbol_controls.py",
+        "tests/test_trade_context_snapshots.py",
+        "tests/test_weekly_maintenance.py",
         "tools/audit.py",
         "tools/audit_correl.py",
         "tools/reporter.py"
@@ -9392,7 +9400,6 @@
       "headings": [],
       "summary": "code, 8 symbols, 13 imports",
       "dependents": [
-        "core/strategy/agents/ghost_agent.py",
         "tests/test_symbol_controls.py",
         "tools/ghost_trainer.py",
         "tools/ml_optimizer.py",
@@ -9456,8 +9463,8 @@
     {
       "path": "tools/audit_correl.py",
       "ext": ".py",
-      "size": 7551,
-      "sha256": "e81b20be2c6cbaacd8426cad1c9871b1190f69b0a005e5008e5d92659c52d513",
+      "size": 8700,
+      "sha256": "195fff7319624bf82fc3f8998407522f25832d40b36b8148a3abbeef7ea11a62",
       "kind": "code",
       "symbols": [
         "fetch_votes",
@@ -9915,6 +9922,43 @@
         "tests/test_export_validation_candles.py",
         "tests/test_symbol_controls.py",
         "tools/fidelity_batch.py"
+      ]
+    },
+    {
+      "path": "tools/data_utility_audit.py",
+      "ext": ".py",
+      "size": 12514,
+      "sha256": "76e70e7e42aef2cf4aa95a04452c18ddcbc22f9baa2bf2080bc39776d57f0a44",
+      "kind": "code",
+      "symbols": [
+        "_check_constant",
+        "_find_redundant_groups",
+        "_generate_recommendations",
+        "_rate_utility",
+        "analysis_summary",
+        "analyze_features_json",
+        "eprint",
+        "fmt_bytes",
+        "main",
+        "table_stats"
+      ],
+      "imports": [
+        "__future__",
+        "collections",
+        "datetime",
+        "json",
+        "os",
+        "pathlib",
+        "sqlite3",
+        "sys",
+        "time",
+        "typing"
+      ],
+      "headings": [],
+      "summary": "code, 10 symbols, 10 imports",
+      "dependents": [
+        "core/commands/audit.py",
+        "tests/test_symbol_controls.py"
       ]
     },
     {
@@ -10423,6 +10467,46 @@
       ]
     },
     {
+      "path": "tools/dashboard_api_server.py",
+      "ext": ".py",
+      "size": 8304,
+      "sha256": "7f2579ce314d3aea8b6746c02e24d8a00dd0de0e58593aaaa799adf0f8fd13b2",
+      "kind": "code",
+      "symbols": [
+        "Command",
+        "_get_db",
+        "get_blocked",
+        "get_equity",
+        "get_exec_events",
+        "get_logs",
+        "get_state",
+        "get_trade_stats",
+        "get_trades",
+        "health",
+        "index",
+        "send_command",
+        "verify_key"
+      ],
+      "imports": [
+        "collections",
+        "core.learning_paths",
+        "fastapi",
+        "fastapi.middleware.cors",
+        "fastapi.responses",
+        "hmac",
+        "json",
+        "os",
+        "pydantic",
+        "sqlite3",
+        "time"
+      ],
+      "headings": [],
+      "summary": "code, 13 symbols, 11 imports",
+      "dependents": [
+        "tests/test_symbol_controls.py"
+      ]
+    },
+    {
       "path": "tools/weekly_scorecard.py",
       "ext": ".py",
       "size": 5187,
@@ -10447,6 +10531,28 @@
       ],
       "headings": [],
       "summary": "code, 6 symbols, 7 imports",
+      "dependents": [
+        "tests/test_symbol_controls.py"
+      ]
+    },
+    {
+      "path": "tools/bootstrap_github_project_kanban.py",
+      "ext": ".py",
+      "size": 1818,
+      "sha256": "c8424deca5b446f554be9232c7ef4125e71d9cf2d9bf9c85d5f810fbca121ef7",
+      "kind": "code",
+      "symbols": [
+        "main"
+      ],
+      "imports": [
+        "__future__",
+        "argparse",
+        "github_projects_kanban",
+        "json",
+        "tools.github_projects_kanban"
+      ],
+      "headings": [],
+      "summary": "code, 1 symbols, 5 imports",
       "dependents": [
         "tests/test_symbol_controls.py"
       ]
@@ -10605,6 +10711,7 @@
         "core/bot_wallet_sync.py",
         "core/bot_weekly_ops.py",
         "core/command_router.py",
+        "core/commands/api_status.py",
         "core/commands/audit.py",
         "core/commands/history.py",
         "core/commands/intelligence.py",
@@ -10617,8 +10724,10 @@
         "core/trade_entry.py",
         "core/trade_exit.py",
         "core/trade_helpers.py",
+        "tests/test_boot_and_notifier.py",
         "tests/test_symbol_controls.py",
-        "tools/ghost_trainer.py"
+        "tools/ghost_trainer.py",
+        "tools/health_check.py"
       ]
     },
     {
@@ -10655,18 +10764,33 @@
     {
       "path": "tools/dashboard.py",
       "ext": ".py",
-      "size": 52,
-      "sha256": "82da4d602f840e0944d1ced5d9be42cac0cda993ffb06a164383216dd356f963",
+      "size": 3431,
+      "sha256": "cf4b08cbc2f532d1190ea75139228644f30cc0df33ef63a4e5a7dba6db9a60e5",
       "kind": "code",
-      "symbols": [],
+      "symbols": [
+        "DashboardHandle",
+        "__getattr__",
+        "_env_bool",
+        "_is_port_open",
+        "_log",
+        "_run_server",
+        "start_dashboard"
+      ],
       "imports": [
-        "dashboard"
+        "dataclasses",
+        "importlib",
+        "os",
+        "socket",
+        "threading",
+        "time",
+        "uvicorn"
       ],
       "headings": [],
-      "summary": "code, 1 imports",
+      "summary": "code, 7 symbols, 7 imports",
       "dependents": [
         "core/bot_app.py",
-        "dashboard.py",
+        "dashboard/__init__.py",
+        "tests/test_dashboard_ipc.py",
         "tests/test_symbol_controls.py"
       ]
     },
@@ -10915,6 +11039,63 @@
       ]
     },
     {
+      "path": "tools/github_projects_kanban.py",
+      "ext": ".py",
+      "size": 25732,
+      "sha256": "209e2becf512cf241ffc8b0aef6ceac48e9ef492edbd12a2615f375699d599e5",
+      "kind": "code",
+      "symbols": [
+        "GitHubProjectActionResult",
+        "GitHubProjectsError",
+        "GitHubProjectsKanbanClient",
+        "ProjectStatusField",
+        "__init__",
+        "_build_project_readme",
+        "_build_trade_body",
+        "_ensure_project_id",
+        "_error_result",
+        "_fetch_status_field",
+        "_get_item_with_content",
+        "_get_project_summary",
+        "_get_status_field",
+        "_graphql",
+        "_merge_live_metrics",
+        "_query_owner_for_type",
+        "_query_project_for_owner_type",
+        "_read_int_env",
+        "_replace_or_append_line",
+        "_resolve_owner_id",
+        "_resolve_repository_id",
+        "_set_status",
+        "_split_repo_full_name",
+        "_update_project_metadata",
+        "_update_status_field_options",
+        "actualizar_pnl_tarjeta",
+        "configurar_tablero_kanban",
+        "crear_tablero_kanban",
+        "crear_tarjeta_operacion",
+        "mover_tarjeta",
+        "to_dict"
+      ],
+      "imports": [
+        "__future__",
+        "dataclasses",
+        "dotenv",
+        "os",
+        "re",
+        "requests",
+        "typing"
+      ],
+      "headings": [],
+      "summary": "code, 31 symbols, 7 imports",
+      "dependents": [
+        "core/kanban_sync.py",
+        "tests/test_github_projects_kanban.py",
+        "tests/test_symbol_controls.py",
+        "tools/bootstrap_github_project_kanban.py"
+      ]
+    },
+    {
       "path": "tools/promotion_gate.py",
       "ext": ".py",
       "size": 11737,
@@ -10951,8 +11132,8 @@
     {
       "path": "tools/health_check.py",
       "ext": ".py",
-      "size": 1461,
-      "sha256": "635da7f80c697b898729f69a5e3a28f2381872024e8425454eb3696c18fabeff",
+      "size": 1467,
+      "sha256": "4cad0f4a4aa67863e95587f0e4d11ccfc9098a2b9ab7cf44bee755052f270c48",
       "kind": "code",
       "symbols": [
         "main",
@@ -10961,11 +11142,11 @@
       ],
       "imports": [
         "dotenv",
-        "notifier",
         "os",
         "pathlib",
         "subprocess",
-        "sys"
+        "sys",
+        "tools.notifier"
       ],
       "headings": [],
       "summary": "code, 3 symbols, 6 imports",

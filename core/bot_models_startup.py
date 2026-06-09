@@ -1,8 +1,8 @@
+import ctypes
 import os
 import platform
 import sys
 import threading
-import ctypes
 
 import ccxt
 import joblib
@@ -12,9 +12,7 @@ from core.model_loader import safe_pickle_load
 from tools.notifier import send_telegram_msg
 
 
-def init_models_and_startup_tasks(
-    bot, export_dataset_fn, backup_database_fn, tf_module
-):
+def init_models_and_startup_tasks(bot, export_dataset_fn, backup_database_fn, tf_module):
     import sklearn
 
     bot.log(
@@ -43,9 +41,7 @@ def init_models_and_startup_tasks(
                 bot.ghost_model = safe_pickle_load(advanced_model_path)
                 bot.ghost_model_type = "ADVANCED_ENSEMBLE"
                 bot.bootstrap_heuristic_mode = False
-                bot.log(
-                    "👻 Agente Ghost (Advanced Ensemble v118): Sistema avanzado cargado."
-                )
+                bot.log("👻 Agente Ghost (Advanced Ensemble v118): Sistema avanzado cargado.")
                 bot.log(
                     f"   📊 Features: {len(bot.ghost_model.get('general', {}).get('feature_cols', []))}"
                 )
@@ -54,9 +50,7 @@ def init_models_and_startup_tasks(
                 )
                 send_telegram_msg("🧠 *IA v118 (Advanced Ensemble) operativa*")
             except Exception as error:
-                bot.log(
-                    f"⚠️ Error cargando Advanced: {error}, intentando otros modelos..."
-                )
+                bot.log(f"⚠️ Error cargando Advanced: {error}, intentando otros modelos...")
 
         if bot.ghost_model_type == "OFF":
             if os.path.exists(pro_model_path):
@@ -65,9 +59,7 @@ def init_models_and_startup_tasks(
                 bot.bootstrap_heuristic_mode = False
                 bot.log("👻 Agente Ghost (PRO v2): Ensemble cargado.")
                 send_telegram_msg("🧠 *IA Nivel 6 (Ghost Pro Ensemble) operativa*")
-            elif (
-                tf_module and os.path.exists(model_path) and os.path.exists(scaler_path)
-            ):
+            elif tf_module and os.path.exists(model_path) and os.path.exists(scaler_path):
                 bot.ghost_model = tf_module.keras.models.load_model(model_path)
                 bot.scaler = joblib.load(scaler_path)
                 bot.ghost_model_type = "LSTM"
@@ -85,9 +77,7 @@ def init_models_and_startup_tasks(
                     bot.ghost_model = safe_pickle_load(agent_models_path)
                     bot.ghost_model_type = "AGENT_MODELS"
                     bot.bootstrap_heuristic_mode = False
-                    bot.log(
-                        "👻 Agente Ghost (Agent Models): Modelos de agentes cargados."
-                    )
+                    bot.log("👻 Agente Ghost (Agent Models): Modelos de agentes cargados.")
                     send_telegram_msg("🧠 *IA (Agent Models) operativa*")
                 except Exception as error:
                     bot.log(f"⚠️ Error cargando {agent_models_path}: {error}")

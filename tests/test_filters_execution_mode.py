@@ -1,10 +1,10 @@
 import io
 import unittest
-from unittest.mock import MagicMock, patch
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-from core.signals.filters import _plan_execution_mode, _resolve_audit_verdict_and_stats
 from config import Config
+from core.signals.filters import _plan_execution_mode, _resolve_audit_verdict_and_stats
 
 
 def _make_bot(**attrs):
@@ -32,10 +32,12 @@ def _ctx(**kw):
 class TestPlanExecutionMode(unittest.TestCase):
     def test_normal_shadow_execution(self):
         bot = _make_bot()
-        with patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75), \
-             patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "BUY", 60.0, "OK", True, "", _ctx()
             )
@@ -44,10 +46,12 @@ class TestPlanExecutionMode(unittest.TestCase):
 
     def test_normal_real_execution(self):
         bot = _make_bot()
-        with patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75), \
-             patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "BUY", 80.0, "OK", True, "", _ctx()
             )
@@ -56,23 +60,29 @@ class TestPlanExecutionMode(unittest.TestCase):
 
     def test_prob_below_shadow_min_no_execution(self):
         bot = _make_bot()
-        with patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75), \
-             patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "BUY", 30.0, "OK", True, "", _ctx()
             )
         self.assertFalse(ok)
 
     def test_directional_coherence_bull_sell_blocked(self):
-        bot = _make_bot(current_sentiment=["🟢 TENDENCIA ALCISTA", 1.0],
-                        breakout_agent=SimpleNamespace(add_to_watchlist=MagicMock(return_value=True)))
-        with patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "BREAKOUT_WATCH_ENABLED", True), \
-             patch.object(Config, "BREAKOUT_WATCH_COHERENCE_ENABLED", True), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True):
+        bot = _make_bot(
+            current_sentiment=["🟢 TENDENCIA ALCISTA", 1.0],
+            breakout_agent=SimpleNamespace(add_to_watchlist=MagicMock(return_value=True)),
+        )
+        with (
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "BREAKOUT_WATCH_ENABLED", True),
+            patch.object(Config, "BREAKOUT_WATCH_COHERENCE_ENABLED", True),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "SELL", 60.0, "OK", True, "", _ctx(shock_level=0.02)
             )
@@ -81,13 +91,17 @@ class TestPlanExecutionMode(unittest.TestCase):
         self.assertIn("COHERENCIA", fr)
 
     def test_directional_coherence_bear_buy_blocked(self):
-        bot = _make_bot(current_sentiment=["🔴 TENDENCIA BAJISTA", -1.0],
-                        breakout_agent=SimpleNamespace(add_to_watchlist=MagicMock(return_value=True)))
-        with patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "BREAKOUT_WATCH_ENABLED", True), \
-             patch.object(Config, "BREAKOUT_WATCH_COHERENCE_ENABLED", True), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True):
+        bot = _make_bot(
+            current_sentiment=["🔴 TENDENCIA BAJISTA", -1.0],
+            breakout_agent=SimpleNamespace(add_to_watchlist=MagicMock(return_value=True)),
+        )
+        with (
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "BREAKOUT_WATCH_ENABLED", True),
+            patch.object(Config, "BREAKOUT_WATCH_COHERENCE_ENABLED", True),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "BUY", 60.0, "OK", True, "", _ctx(shock_level=0.02)
             )
@@ -99,8 +113,18 @@ class TestPlanExecutionMode(unittest.TestCase):
         bot = _make_bot(bootstrap_heuristic_mode=True)
         with patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
-                bot, "BTC/USDT", "BUY", 60.0, "OK", True, "",
-                _ctx(heuristic_hits=[1, 2, 3, 4, 5], bootstrap_ready_real=True, bootstrap_ready_shadow=False)
+                bot,
+                "BTC/USDT",
+                "BUY",
+                60.0,
+                "OK",
+                True,
+                "",
+                _ctx(
+                    heuristic_hits=[1, 2, 3, 4, 5],
+                    bootstrap_ready_real=True,
+                    bootstrap_ready_shadow=False,
+                ),
             )
         self.assertTrue(ok)
         self.assertFalse(shadow)
@@ -109,8 +133,18 @@ class TestPlanExecutionMode(unittest.TestCase):
         bot = _make_bot(bootstrap_heuristic_mode=True)
         with patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
-                bot, "BTC/USDT", "BUY", 60.0, "OK", True, "",
-                _ctx(heuristic_hits=[1, 2, 3], bootstrap_ready_real=False, bootstrap_ready_shadow=True)
+                bot,
+                "BTC/USDT",
+                "BUY",
+                60.0,
+                "OK",
+                True,
+                "",
+                _ctx(
+                    heuristic_hits=[1, 2, 3],
+                    bootstrap_ready_real=False,
+                    bootstrap_ready_shadow=True,
+                ),
             )
         self.assertTrue(ok)
         self.assertTrue(shadow)
@@ -119,18 +153,26 @@ class TestPlanExecutionMode(unittest.TestCase):
         bot = _make_bot(bootstrap_heuristic_mode=True)
         with patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
-                bot, "BTC/USDT", "BUY", 60.0, "OK", True, "",
-                _ctx(heuristic_hits=[1], bootstrap_ready_real=False, bootstrap_ready_shadow=False)
+                bot,
+                "BTC/USDT",
+                "BUY",
+                60.0,
+                "OK",
+                True,
+                "",
+                _ctx(heuristic_hits=[1], bootstrap_ready_real=False, bootstrap_ready_shadow=False),
             )
         self.assertFalse(ok)
 
     def test_bear_trend_confidence_boost(self):
         bot = _make_bot(_get_market_regime=MagicMock(return_value="BEAR_TREND"))
-        with patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75), \
-             patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BEAR_TREND_CONFIDENCE_BOOST", 10.0), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BEAR_TREND_CONFIDENCE_BOOST", 10.0),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "BUY", 80.0, "SCOUT", True, "", _ctx()
             )
@@ -138,10 +180,12 @@ class TestPlanExecutionMode(unittest.TestCase):
 
     def test_degradation_to_shadow(self):
         bot = _make_bot()
-        with patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75), \
-             patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
                 bot, "BTC/USDT", "BUY", 55.0, "SCOUT", True, "", _ctx()
             )
@@ -150,15 +194,23 @@ class TestPlanExecutionMode(unittest.TestCase):
 
     def test_breakout_shadow_override(self):
         bot = _make_bot()
-        with patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75), \
-             patch.object(Config, "SHADOW_PROB_MIN", 0.50), \
-             patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", True), \
-             patch.object(Config, "BREAKOUT_MIN_IA_PROB", 60.0), \
-             patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False), \
-             patch.object(Config, "SHADOW_MODE_MIN", 50.0):
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", True),
+            patch.object(Config, "BREAKOUT_MIN_IA_PROB", 60.0),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+            patch.object(Config, "SHADOW_MODE_MIN", 50.0),
+        ):
             ok, shadow, verdict, fp, fr = _plan_execution_mode(
-                bot, "BTC/USDT", "BUY", 70.0, "SCOUT", False, "SHOCK DEMASIADO CERCA",
-                _ctx(breakout_ready=True)
+                bot,
+                "BTC/USDT",
+                "BUY",
+                70.0,
+                "SCOUT",
+                False,
+                "SHOCK DEMASIADO CERCA",
+                _ctx(breakout_ready=True),
             )
         self.assertTrue(ok)
         self.assertTrue(shadow)
@@ -178,8 +230,7 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(), True, "", 50.0, stats
+                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL", _ctx(), True, "", 50.0, stats
             )
         self.assertEqual(verdict, "OK_BUY")
         self.assertEqual(stats["REAL"], 1)
@@ -189,8 +240,18 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(), False, "bad volume", 50.0, stats
+                bot,
+                "BTC/USDT",
+                "BUY",
+                80.0,
+                "⚪",
+                0.5,
+                "REAL",
+                _ctx(),
+                False,
+                "bad volume",
+                50.0,
+                stats,
             )
         self.assertIn("VETO", verdict)
         self.assertIn("bad volume", verdict)
@@ -201,8 +262,18 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(breakout_ready=True), False, "bad volume", 50.0, stats
+                bot,
+                "BTC/USDT",
+                "BUY",
+                80.0,
+                "⚪",
+                0.5,
+                "REAL",
+                _ctx(breakout_ready=True),
+                False,
+                "bad volume",
+                50.0,
+                stats,
             )
         self.assertIn("BREAKOUT READY", verdict)
 
@@ -211,8 +282,7 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 96.0, "⚪", 0.5, "REAL",
-                _ctx(), True, "", 50.0, stats
+                bot, "BTC/USDT", "BUY", 96.0, "⚪", 0.5, "REAL", _ctx(), True, "", 50.0, stats
             )
         self.assertIn("VETO", verdict)
         self.assertIn("ML_CONF", verdict)
@@ -220,11 +290,12 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
     def test_ab_conflict_high_ml(self):
         bot = _make_bot()
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
-        with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)), \
-             patch("core.signals.filters.open", return_value=io.StringIO()) as mock_open:
+        with (
+            patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)),
+            patch("core.signals.filters.open", return_value=io.StringIO()),
+        ):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(), False, "bad", 85.0, stats
+                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL", _ctx(), False, "bad", 85.0, stats
             )
             self.assertIn("VETO", verdict)
 
@@ -233,8 +304,7 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(), True, "", 40.0, stats
+                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL", _ctx(), True, "", 40.0, stats
             )
             self.assertIn("OK", verdict)
 
@@ -243,8 +313,7 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(True, 15)):
             verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(), True, "", 50.0, stats
+                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL", _ctx(), True, "", 50.0, stats
             )
         self.assertIn("COOLDOWN", verdict)
         self.assertEqual(stats["VETO"], 1)
@@ -253,9 +322,8 @@ class TestResolveAuditVerdictAndStats(unittest.TestCase):
         bot = _make_bot(get_audit_verdict=MagicMock(return_value="SHADOW_OK"))
         stats = {"VETO": 0, "SHADOW": 0, "REAL": 0}
         with patch("core.signals.filters.is_symbol_in_cooldown", return_value=(False, 0)):
-            verdict = _resolve_audit_verdict_and_stats(
-                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL",
-                _ctx(), True, "", 50.0, stats
+            _resolve_audit_verdict_and_stats(
+                bot, "BTC/USDT", "BUY", 80.0, "⚪", 0.5, "REAL", _ctx(), True, "", 50.0, stats
             )
         self.assertEqual(stats["SHADOW"], 1)
 

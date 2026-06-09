@@ -32,6 +32,7 @@ def save_active_trade_state(brain, symbol, state_data) -> bool:
         except Exception as error:
             print(f"❌ Error guardando estado de trade activo: {error}")
             return False
+    return False
 
 
 def load_active_trade_states(brain) -> dict:

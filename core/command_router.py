@@ -89,8 +89,8 @@ def handle_basic_command(bot, text: str) -> bool:
         return True
 
     if text == "/recover_halt":
-        from tools.notifier import send_telegram_msg
         from core.reconciliation import recover_halt_if_exchange_consistent
+        from tools.notifier import send_telegram_msg
 
         ok, message = recover_halt_if_exchange_consistent(bot)
         prefix = "✅" if ok else "🛑"
