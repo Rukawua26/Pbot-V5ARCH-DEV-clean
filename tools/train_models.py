@@ -17,11 +17,13 @@ from sklearn.metrics import (
     f1_score,
     mean_squared_error,
     precision_score,
-    recall_score,
     r2_score,
+    recall_score,
 )
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
+
+from core.model_loader import safe_pickle_load
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -44,8 +46,9 @@ class DatasetBundle:
 
 
 def _load_runtime_classes():
-    from core.strategy.consensus_nn import AgentConsensusNN
     from ultimate_ml import UltimateMLSystem
+
+    from core.strategy.consensus_nn import AgentConsensusNN
 
     return AgentConsensusNN, UltimateMLSystem
 
@@ -157,7 +160,7 @@ def train_ghost(bundle: DatasetBundle, output_path: Path, positive_class_weight:
         positive_class_weight=positive_class_weight,
     )
 
-    model_data = pickle.loads(output_path.read_bytes())
+    model_data = safe_pickle_load(str(output_path))
     clf = model_data.get("clf", {}).get("rf")
     reg = model_data.get("reg", {}).get("rf")
     metrics = {"samples": int(len(bundle.x_ghost))}

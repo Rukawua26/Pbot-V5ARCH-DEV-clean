@@ -4,6 +4,8 @@ import subprocess
 import sys
 import time
 
+from core.model_loader import ROOT, resolve_script_path
+
 
 def load_runtime_symbol_controls(bot):
     now = time.time()
@@ -58,16 +60,10 @@ def refresh_symbol_controls_if_due(bot):
     ):
         return
 
-    script_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "..",
-        "tools",
-        "generate_symbol_controls.py",
-    )
-    script_path = os.path.abspath(script_path)
     try:
+        script_path = resolve_script_path(ROOT / "tools" / "generate_symbol_controls.py")
         proc = subprocess.run(
-            [sys.executable, script_path],
+            [sys.executable, str(script_path)],
             capture_output=True,
             text=True,
             timeout=60,

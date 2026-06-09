@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-09T14:24:54.399018+00:00",
+  "generated_at": "2026-06-09T14:48:44.457441+00:00",
   "root": "/home/miguel/Pbot-V5ARCH-DEV-main",
   "stats": {
     "files": 349,
@@ -333,8 +333,8 @@
     {
       "path": "pyproject.toml",
       "ext": ".toml",
-      "size": 653,
-      "sha256": "3698240cfb04c4dea9777394d55ee68340eca2d78c13548e20e131c0577725e6",
+      "size": 1101,
+      "sha256": "a4fc9eb31096f63c94fb9e8e2621f0e682383078f16c9d2858cfb50dc92572ba",
       "kind": "data",
       "symbols": [],
       "imports": [],
@@ -1357,8 +1357,8 @@
     {
       "path": "core/process_lock.py",
       "ext": ".py",
-      "size": 1755,
-      "sha256": "03584f2917cdcbb521a3b11171f2efcb74f665691fa81c05671cb10c014c075f",
+      "size": 1811,
+      "sha256": "b60c462cb9b8388b57127cbfea1198bab801e2a5c26fa3f0029d4c34a345161c",
       "kind": "code",
       "symbols": [
         "_try_acquire_lock",
@@ -1966,8 +1966,8 @@
     {
       "path": "core/data_service.py",
       "ext": ".py",
-      "size": 16016,
-      "sha256": "6fb73c045ed24f7683309d686d2b10c2212919f12f887fa7531e2982468ecd56",
+      "size": 16048,
+      "sha256": "37904f8caf3fef450e2c9ee909cd1e55fd2b52fda381269bdf0cb9fff35ae85a",
       "kind": "code",
       "symbols": [
         "DataService",
@@ -2022,8 +2022,8 @@
     {
       "path": "core/execution_order_helpers.py",
       "ext": ".py",
-      "size": 4623,
-      "sha256": "ba1251a8d5b848f8406bbb813efc9640c4b7de9706c5e67b7c7eda76ed8bda15",
+      "size": 4743,
+      "sha256": "bb09ee39794cba0e0488448708fc6aed1078f0f4a626ad76e7889a99eed36c96",
       "kind": "code",
       "symbols": [
         "_execute_chase_limit_steps",
@@ -2032,10 +2032,11 @@
       ],
       "imports": [
         "__future__",
-        "core.types"
+        "core.types",
+        "typing"
       ],
       "headings": [],
-      "summary": "code, 3 symbols, 2 imports",
+      "summary": "code, 3 symbols, 3 imports",
       "dependents": [
         "core/execution_service.py",
         "tests/test_bot_bootstrap.py",
@@ -2311,8 +2312,8 @@
     {
       "path": "core/active_trade_store.py",
       "ext": ".py",
-      "size": 2628,
-      "sha256": "7131f962e00420254b22395fab4f7c413bb84c95435c779d668059c9c1b1a7e3",
+      "size": 2645,
+      "sha256": "6246ca07e1bc63299de3b9a602aef1d837e58aea4f67d7e11108478679daeaec",
       "kind": "code",
       "symbols": [
         "delete_active_trade_state",
@@ -2449,8 +2450,8 @@
     {
       "path": "core/execution_service.py",
       "ext": ".py",
-      "size": 40045,
-      "sha256": "4e6e3553ffe0eabba7625a4825e09fc2b8a03076a96e1ce021aad53d1c95e521",
+      "size": 40484,
+      "sha256": "73385ed2dbcc83bee9f6bf28e3d3307b510635349b2eb3febe097f5301ad8cc9",
       "kind": "code",
       "symbols": [
         "ExecutionService",
@@ -2514,10 +2515,11 @@
         "random",
         "threading",
         "time",
-        "tools.notifier"
+        "tools.notifier",
+        "typing"
       ],
       "headings": [],
-      "summary": "code, 48 symbols, 12 imports",
+      "summary": "code, 48 symbols, 13 imports",
       "dependents": [
         "core/bot_core_setup.py",
         "tests/integration/test_binance_testnet_execution_flow.py",
@@ -2598,8 +2600,8 @@
     {
       "path": "core/reconciliation.py",
       "ext": ".py",
-      "size": 29362,
-      "sha256": "13c6d3d29ecd01a8f62d9b5fd0ba64d7c406eba2eff1b5ca207baea17761da30",
+      "size": 29374,
+      "sha256": "062a5669a18803106305ab8fe03ab9517b4c6dabc74b521ddd84d328451f8bc8",
       "kind": "code",
       "symbols": [
         "_build_open_order_index",
@@ -3036,8 +3038,8 @@
     {
       "path": "core/shadow_logger.py",
       "ext": ".py",
-      "size": 6540,
-      "sha256": "79f89b0a4910b3da4e4ed55874da00cdab57af80c3054dc158f4f5142a8ba4be",
+      "size": 6637,
+      "sha256": "82ca6178ca704964a273e8aa40dcd4e52f003c8b70f329d79c2de206e0408d93",
       "kind": "code",
       "symbols": [
         "AsyncShadowLogger",
@@ -3286,8 +3288,8 @@
     {
       "path": "core/bot_app.py",
       "ext": ".py",
-      "size": 27019,
-      "sha256": "1420c55758876e76985eba5c8a2ecf9db622e212b08be415028c22a205416b85",
+      "size": 27143,
+      "sha256": "da240f573c7c9b32f4ceb6bfd6e9ce488f41a9c89bae18cbc23efe4ec475709d",
       "kind": "code",
       "symbols": [
         "Bot",
@@ -3679,8 +3681,8 @@
     {
       "path": "core/commands/ops.py",
       "ext": ".py",
-      "size": 20861,
-      "sha256": "c04158860adc1b10b76682b8d6910f7983b44ef7eb7f28911490a1a23caa8e6d",
+      "size": 20883,
+      "sha256": "29a236755404de4003279823673731c485b60966982810c8fc0cea4cf11d6b58",
       "kind": "code",
       "symbols": [
         "_handle_misc_commands",
@@ -4293,8 +4295,8 @@
     {
       "path": "core/signals/mtf/analyzer.py",
       "ext": ".py",
-      "size": 3999,
-      "sha256": "8f29f1f939094164ad44caf25e67f11218741697cb6ca80e3f6b70983cf02453",
+      "size": 4025,
+      "sha256": "4c1670f15badb339ce41b96c706f222860c917639d777cc32e3b2a18a25a4444",
       "kind": "code",
       "symbols": [
         "_confirms_signal",
@@ -4327,8 +4329,8 @@
     {
       "path": "core/risk/exit_engine_v1.py",
       "ext": ".py",
-      "size": 10191,
-      "sha256": "175a1fa5a0671dbf37fbef0b105174e581dedb6edb88f96b67f9d997095833be",
+      "size": 10198,
+      "sha256": "40c2df77122e5d77ab160e9cfcbde539ea93658dffec66db19a77918604dfc56",
       "kind": "code",
       "symbols": [
         "ExitEngineV1",
@@ -4433,8 +4435,8 @@
     {
       "path": "core/strategy/regime_hmm.py",
       "ext": ".py",
-      "size": 8688,
-      "sha256": "d7851604f48a65774f4bad7053319f153f85173e78bdfe3e07c71c1720d0abf9",
+      "size": 8720,
+      "sha256": "b4f9c5f31c2186b270ef47710e71e4eab1ef7aef221c3427cf36e673ec7610fc",
       "kind": "code",
       "symbols": [
         "DynamicHMMRegime",
@@ -4577,8 +4579,8 @@
     {
       "path": "core/strategy/consensus_nn.py",
       "ext": ".py",
-      "size": 5493,
-      "sha256": "f358348a7c29f04206b424f3408eb8424a269da1f154cd04cdc9a143c9b7e78d",
+      "size": 5536,
+      "sha256": "802d9d1cc08e62d25ef0cd2d8f27aa4ba9b775f2c4cb7d851bbfcb387ae30054",
       "kind": "code",
       "symbols": [
         "AgentConsensusNN",
@@ -4773,8 +4775,8 @@
     {
       "path": "core/strategy/agents/ghost_agent.py",
       "ext": ".py",
-      "size": 8503,
-      "sha256": "d85a3e682d14a1e2e90afd2316125afa214fe8e45c39eb10899ec1c669065c58",
+      "size": 8613,
+      "sha256": "98623d9a5dd80d3a948c1f7a877aa489a0fddc347a2306609065f991f4e6f7f0",
       "kind": "code",
       "symbols": [
         "GhostAgent",
@@ -9207,8 +9209,8 @@
     {
       "path": "tools/learning.py",
       "ext": ".py",
-      "size": 117774,
-      "sha256": "6a8a14ca9b685ec18bed6972b9eb05a0c85b1c29a867ee1bdb4d24437fdec309",
+      "size": 117808,
+      "sha256": "f5c54f279365a4c7dc1c42c40f2d8f56ec923c38d240709c8901c41ba8f57892",
       "kind": "code",
       "symbols": [
         "Brain",
@@ -9927,8 +9929,8 @@
     {
       "path": "tools/data_utility_audit.py",
       "ext": ".py",
-      "size": 12514,
-      "sha256": "76e70e7e42aef2cf4aa95a04452c18ddcbc22f9baa2bf2080bc39776d57f0a44",
+      "size": 12538,
+      "sha256": "a7b12e0c19269b836d8766a71e89ed8775ab0429f9bfd9f40e806e350ca781b3",
       "kind": "code",
       "symbols": [
         "_check_constant",
@@ -10323,8 +10325,8 @@
     {
       "path": "tools/pandas_ta.py",
       "ext": ".py",
-      "size": 8471,
-      "sha256": "0ad58be7c006287110b5e9efa6ede83e05e05748721869e8883e00cbc4826eef",
+      "size": 8505,
+      "sha256": "f4c2926146290802188035c629259c479876baf02d31840a8b12b501a0c5d36e",
       "kind": "code",
       "symbols": [
         "CompatTA",
@@ -11041,8 +11043,8 @@
     {
       "path": "tools/github_projects_kanban.py",
       "ext": ".py",
-      "size": 25732,
-      "sha256": "209e2becf512cf241ffc8b0aef6ceac48e9ef492edbd12a2615f375699d599e5",
+      "size": 25739,
+      "sha256": "bf3102f21213d306c90bc7b7bcc4372bb0aca5e060d2c062764502ddc7ee815d",
       "kind": "code",
       "symbols": [
         "GitHubProjectActionResult",

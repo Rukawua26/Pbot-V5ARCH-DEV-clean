@@ -8,7 +8,7 @@
 ## High-signal files
 - `core/bot_app.py` - code, 96 symbols, 69 imports
 - `tools/learning.py` - code, 91 symbols, 15 imports
-- `core/execution_service.py` - code, 48 symbols, 12 imports
+- `core/execution_service.py` - code, 48 symbols, 13 imports
 - `tests/test_regime_hmm.py` - code, 43 symbols, 11 imports
 - `tools/shadow_stress_injector.py` - code, 31 symbols, 16 imports
 - `tests/test_filters_pure_functions.py` - code, 41 symbols, 6 imports

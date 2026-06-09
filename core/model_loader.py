@@ -17,6 +17,25 @@ class ModelHashMismatchError(ValueError):
     """Raised when a model sidecar hash does not match file contents."""
 
 
+class UnsafeScriptPathError(ValueError):
+    """Raised when a script path is not safe to execute."""
+
+
+def resolve_script_path(path: str | os.PathLike[str]) -> Path:
+    """Resolve and validate a script path is within the repo root.
+
+    Prevents path traversal when executing tools via subprocess.
+    """
+    resolved = Path(path).resolve()
+    try:
+        resolved.relative_to(ROOT)
+    except ValueError as error:
+        raise UnsafeScriptPathError(f"Script path outside repo root: {resolved}") from error
+    if resolved.is_symlink():
+        raise UnsafeScriptPathError(f"Script path must not be a symlink: {resolved}")
+    return resolved
+
+
 def _resolve_model_path(path: str | os.PathLike[str]) -> Path:
     resolved = Path(path).resolve()
     try:

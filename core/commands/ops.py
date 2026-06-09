@@ -1,11 +1,13 @@
 import asyncio
 import json
+import sys
 import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from config import Config
 from core.cooldown_state import persist_cooldowns
+from core.model_loader import ROOT, resolve_script_path
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import monotonic_now
 from tools.notifier import send_telegram_msg
@@ -249,14 +251,13 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
 
         async def run_training():
             try:
-                # 1. Ejecución desacoplada con Prioridad Baja (nice -n 15)
-                # Esto evita que el entrenamiento asfixie al bot_guardian
+                ghost_trainer = resolve_script_path(ROOT / "tools" / "ghost_trainer.py")
                 process = await asyncio.create_subprocess_exec(
                     "nice",
                     "-n",
                     "15",
-                    "python3",
-                    "tools/ghost_trainer.py",
+                    sys.executable,
+                    str(ghost_trainer),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                 )

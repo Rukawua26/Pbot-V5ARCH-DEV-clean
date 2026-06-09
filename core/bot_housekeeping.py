@@ -1,8 +1,8 @@
-import os
 import subprocess
 import sys
 import time
 
+from core.model_loader import ROOT, resolve_script_path
 from tools.notifier import send_telegram_msg
 
 
@@ -37,16 +37,24 @@ def run_periodic_housekeeping(bot, now, last_report_time, last_coach_time, last_
         last_report_time = time.time()
 
     if time.time() - last_coach_time > 3600:
-        project_root = os.path.dirname(os.path.dirname(__file__))
-        coach_path = os.path.join(project_root, "tools", "ai_coach.py")
-        if os.path.exists(coach_path):
-            bot.log("🧠 Ejecutando AI Coach programado...")
-            try:
-                subprocess.run([sys.executable, coach_path, "--silent"], check=False, timeout=900)
-                bot.log("✅ AI Coach finalizado.")
-            except Exception as error:
-                bot.log(f"⚠️ Error AI Coach auto: {error}")
-        else:
+        try:
+            coach_path = resolve_script_path(ROOT / "tools" / "ai_coach.py")
+            if coach_path.exists():
+                bot.log("🧠 Ejecutando AI Coach programado...")
+                try:
+                    subprocess.run(
+                        [sys.executable, str(coach_path), "--silent"],
+                        check=False,
+                        timeout=900,
+                    )
+                    bot.log("✅ AI Coach finalizado.")
+                except Exception as error:
+                    bot.log(f"⚠️ Error AI Coach auto: {error}")
+            else:
+                if not getattr(bot, "_ai_coach_missing_logged", False):
+                    bot.log("ℹ️ AI Coach auto desactivado: tools/ai_coach.py no encontrado.")
+                    bot._ai_coach_missing_logged = True
+        except Exception:
             if not getattr(bot, "_ai_coach_missing_logged", False):
                 bot.log("ℹ️ AI Coach auto desactivado: tools/ai_coach.py no encontrado.")
                 bot._ai_coach_missing_logged = True
