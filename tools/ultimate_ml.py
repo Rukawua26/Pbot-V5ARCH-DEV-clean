@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
-import json
 import warnings
 from core.model_loader import safe_pickle_load
 
@@ -21,7 +20,6 @@ from lightgbm import LGBMClassifier, LGBMRegressor
 from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,
-    GradientBoostingRegressor,
 )
 from sklearn.model_selection import (
     cross_val_score,
@@ -29,7 +27,6 @@ from sklearn.model_selection import (
     StratifiedKFold,
     KFold,
 )
-from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import mean_squared_error, r2_score
 
 
@@ -192,7 +189,7 @@ class UltimateMLSystem:
         self.save()
         self.is_trained = True
 
-        print(f"\n✅ ULTIMATE ML TRAINED (Dynamic Z-Score)")
+        print("\n✅ ULTIMATE ML TRAINED (Dynamic Z-Score)")
         return self.models
 
     def predict(self, features_dict):

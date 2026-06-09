@@ -390,10 +390,16 @@ def sync_wallet(bot):
         if real_active_on_binance:
             bot.log(f"🔍 Wallet Sync: Binance reporta {list(real_active_on_binance.keys())}")
 
+        current_balance = bot.get_current_balance()
+        balance_lock = getattr(bot, "balance_lock", None)
+        if balance_lock:
+            with balance_lock:
+                bot.balance = current_balance
+        else:
+            bot.balance = current_balance
+
         with bot.lock:
             emergency_closed_symbols = set()
-            # Aseguramos actualización de saldo (ATÓMICO v106.0)
-            bot.balance = bot.get_current_balance()
 
             # A. ACTUALIZACIÓN DE PRECIOS REALES (Corrige el PnL)
             for symbol, info in real_active_on_binance.items():

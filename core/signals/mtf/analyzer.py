@@ -10,9 +10,8 @@ def _is_usable_df(df: pd.DataFrame | None, min_rows: int = 5) -> bool:
 
 
 def _infer_direction(df: pd.DataFrame | None, min_candles: int = 20) -> str:
-    if not _is_usable_df(df, min_rows=min_candles):
+    if not _is_usable_df(df, min_rows=min_candles) or df is None:
         return "UNKNOWN"
-    assert df is not None
     closes = pd.to_numeric(df["close"], errors="coerce").dropna()
     if len(closes) < min_candles:
         return "UNKNOWN"

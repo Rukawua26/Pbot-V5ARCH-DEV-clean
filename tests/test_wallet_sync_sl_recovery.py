@@ -11,6 +11,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
     def _base_bot(self):
         bot = SimpleNamespace()
         bot.lock = RLock()
+        bot.balance_lock = RLock()
         bot.db_lock = RLock()
         bot.log = MagicMock()
         bot.balance = 100.0

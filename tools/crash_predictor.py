@@ -6,9 +6,7 @@ SNIPER AI v118.0 - CRASH PREDICTOR MODULE
 - Usa: Funding Rate, Order Book, RSI Divergence, Volumen, BTC Delta
 """
 
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
 class CrashPredictor:
@@ -126,8 +124,6 @@ class CrashPredictor:
 
             if bids_vol == 0 or asks_vol == 0:
                 return None, 0
-
-            total = bids_vol + asks_vol
 
             if side == "BUY":
                 if asks_vol > bids_vol * 5:

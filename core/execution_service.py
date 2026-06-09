@@ -97,7 +97,7 @@ class ExecutionService:
                     self.logger.warning(
                         f"⚠️ {op_name} network timeout/retry {attempt}/{retries}: {error}"
                     )
-                except (ccxt.ExchangeError, Exception) as error:
+                except Exception as error:
                     last_error = error
                     break
                 finally:
@@ -985,9 +985,9 @@ class ExecutionService:
                 amount,
                 emergency_op_name="close_position_emergency_create_order",
             )
-        except Exception as e:
-            self.logger.error(f"❌ Error cerrando posición {symbol}: {e}")
-            raise e
+        except Exception:
+            self.logger.exception(f"❌ Error cerrando posición {symbol}:")
+            raise
 
     def close_due_to_degradation(self, symbol: str, side: str, amount: float) -> CCXTOrder | None:
         """

@@ -7,16 +7,14 @@ SNIPER AI v118-PRO - STRATEGY ENGINE (MODULAR ARCHITECTURE)
 - Utilidades centralizadas en StrategyUtils
 """
 
-import pandas as pd
 import numpy as np
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any
 
 from config import Config
 from core.strategy.orchestrator import StrategyOrchestrator
 from core.strategy.utils import StrategyUtils
-from core.strategy.consensus_nn import AgentConsensusNN
 
 # Imports condicionales para plugins externos
 try:
@@ -306,7 +304,6 @@ class Strategy:
     @classmethod
     def prepare_ghost_features(cls, rsi, adx, vol_rel):
         """Retro-compatibilidad para el módulo Trailing Dinámico en main.py."""
-        import numpy as np
 
         # Asumimos 20 features como base genérica para RandomForest
         return np.zeros((1, 20))

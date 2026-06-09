@@ -1,4 +1,3 @@
-import sys
 from core.bot_app import run_entrypoint
 
 print("--- TEST START ---")

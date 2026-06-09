@@ -50,7 +50,7 @@ def check_for_evolution(bot):
 
     if days_since_train >= 7 or new_trades >= 100:
         bot.log(f"🧠 Reentrenando IA (días: {days_since_train}, trades nuevos: {new_trades})")
-        # Aquí se llamaría al entrenamiento
-        # Por ahora solo actualizamos el timestamp
-        bot.brain.update_last_train_timestamp(datetime.now())
-        bot.log("✅ IA reentrenada y actualizada")
+        bot.log(
+            "ℹ️ Entrenamiento pendiente: usa /force_train para lanzar ghost_trainer "
+            "en background. No se actualiza timestamp hasta que el entrenamiento real termine."
+        )

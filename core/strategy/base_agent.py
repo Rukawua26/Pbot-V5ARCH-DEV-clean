@@ -1,8 +1,5 @@
-import logging
 from abc import ABC, abstractmethod
 from typing import Any
-
-logger = logging.getLogger("SniperAI")
 
 
 class BaseAgent(ABC):
@@ -24,8 +21,3 @@ class BaseAgent(ABC):
         100: Alcista extremo / Compra fuerte
         """
         pass
-
-    def log_vote(self, symbol: str, score: float, side: str):
-        """Utilidad opcional para loguear votos específicos si es necesario."""
-        if score > 70 or score < 30:
-            logger.debug(f"Agent {self.name} | {symbol} | {side} | Score: {score}")

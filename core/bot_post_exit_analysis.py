@@ -20,7 +20,7 @@ def load_local_candles(symbol, timeframe="1h"):
         return None
 
 
-def calc_post_exit_drift(bot, symbol, side, exit_ts_iso, exit_price, lookahead_bars=4):
+def calc_post_exit_drift(symbol, side, exit_ts_iso, exit_price, lookahead_bars=4):
     try:
         if not exit_ts_iso or float(exit_price) <= 0:
             return None

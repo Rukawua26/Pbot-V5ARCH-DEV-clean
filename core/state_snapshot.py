@@ -40,7 +40,12 @@ def _write_state_snapshot(bot):
     try:
         ts = time.time()
         mode = "REAL" if not Config.PAPER_MODE else "PAPER"
-        with bot.balance_lock:
+        balance_lock = getattr(bot, "balance_lock", None)
+        if balance_lock:
+            with balance_lock:
+                bal = float(getattr(bot, "balance", 0.0) or 0.0)
+                avail = float(getattr(bot, "available_balance", 0.0) or 0.0)
+        else:
             bal = float(getattr(bot, "balance", 0.0) or 0.0)
             avail = float(getattr(bot, "available_balance", 0.0) or 0.0)
         with bot.lock:

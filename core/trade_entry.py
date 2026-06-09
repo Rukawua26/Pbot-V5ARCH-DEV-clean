@@ -899,8 +899,7 @@ def execute_order(
             }
 
             if symbol not in bot.active_trades:
-                with bot.lock:
-                    bot.active_trades[symbol] = trade_state
+                bot.active_trades[symbol] = trade_state
                 with bot.db_lock:
                     persisted = bot.brain.save_active_trade_state(symbol, trade_state)
                 if not persisted:
@@ -937,8 +936,7 @@ def execute_order(
                     is_shadow=is_shadow,
                 )
             else:
-                with bot.lock:
-                    bot.active_trades[symbol].update(trade_state)
+                bot.active_trades[symbol].update(trade_state)
 
             cooldown_minutes = (
                 Config.SHADOW_COOLDOWN_MINUTES if is_shadow else Config.TRADE_COOLDOWN_MINUTES

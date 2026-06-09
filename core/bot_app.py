@@ -24,6 +24,9 @@ try:
 except ImportError:
     BinanceWeightTracker = None  # type: ignore[assignment, misc]
     HAS_WEIGHT_TRACKER = False
+    logging.getLogger("SniperAI").warning(
+        "BinanceWeightTracker no disponible — límites de API weight no se aplicarán."
+    )
 
 try:
     import tensorflow as tf
@@ -337,8 +340,6 @@ class Bot:
 
     def log(self, msg):
         self.logs.append(msg)
-        if len(self.logs) > Config.LOG_LIMIT:
-            self.logs.pop(0)
         logger.info(msg)
 
     def _get_rss_mb(self) -> float:
@@ -450,7 +451,6 @@ class Bot:
 
     def _calc_post_exit_drift(self, symbol, side, exit_ts_iso, exit_price, lookahead_bars=4):
         return calc_post_exit_drift(
-            self,
             symbol=symbol,
             side=side,
             exit_ts_iso=exit_ts_iso,

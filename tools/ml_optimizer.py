@@ -11,9 +11,7 @@ import sqlite3
 import pandas as pd
 import numpy as np
 import json
-import pickle
 from datetime import datetime
-from sklearn.model_selection import train_test_split
 from tools.ultimate_ml import UltimateMLSystem
 # Importamos la clase desde strategy para mantener compatibilidad actual
 from tools.strategy import AgentConsensusNN
@@ -81,7 +79,7 @@ class MLOptimizer:
                 y_reg.append(pnl)
                 y_class.append(1 if pnl > 0 else 0)
                 
-            except Exception as e:
+            except Exception:
                 continue
 
         return (pd.DataFrame(ultimate_features), 

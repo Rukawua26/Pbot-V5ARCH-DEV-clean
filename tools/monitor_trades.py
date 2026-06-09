@@ -8,8 +8,8 @@ Detiene bot si >3 pérdidas en 5 trades
 
 import sqlite3
 import time
-import sys
 import os
+import signal
 import json
 from datetime import datetime
 
@@ -50,7 +50,7 @@ def parse_votos(market_context):
     try:
         ctx = json.loads(market_context)
         return ctx.get("votos", {})
-    except:
+    except (json.JSONDecodeError, TypeError, ValueError):
         return {}
 
 
@@ -130,7 +130,7 @@ def stop_bot():
         with open(BOT_PID_FILE) as f:
             pid = int(f.read().strip())
         try:
-            os.kill(pid, 9)
+            os.kill(pid, signal.SIGTERM)
             print(f"✅ Bot PID {pid} detenido")
         except Exception as error:
             print(f"⚠️ No se pudo detener PID {pid}: {error}")
@@ -145,8 +145,6 @@ def stop_bot():
         for pid in result.stdout.strip().split("\n"):
             if pid:
                 try:
-                    import signal
-
                     os.kill(int(pid), signal.SIGINT)
                     print(f"✅ Solicitado cierre gracioso a Bot PID {pid}")
                 except Exception as error:
@@ -177,7 +175,7 @@ def print_votes_dump(trades):
 
         votos = parse_votos(trade.get("market_context", ""))
         if votos:
-            print(f"  Votos Agentes:")
+            print("  Votos Agentes:")
             for agent, score in sorted(votos.items()):
                 print(f"    {agent}: {score:.1f}")
 

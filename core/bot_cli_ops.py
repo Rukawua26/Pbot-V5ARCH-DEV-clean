@@ -27,6 +27,7 @@ def terminal_command_listener(bot):
                 print("\nComandos de consola: audit, help, exit\n")
             elif cmd == "exit":
                 bot.is_running = False
+                bot._shutdown_event.set()
                 break
         except EOFError:
             break

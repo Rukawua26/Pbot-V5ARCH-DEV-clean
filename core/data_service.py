@@ -404,6 +404,14 @@ class DataService:
 
         return updated
 
+    def shutdown(self, wait: bool = True):
+        if wait:
+            self._cache_save_executor.shutdown(wait=True)
+            self._maturity_save_executor.shutdown(wait=True)
+        else:
+            self._cache_save_executor.shutdown(wait=False)
+            self._maturity_save_executor.shutdown(wait=False)
+
     def sanitize_context(self, context: dict | None) -> dict:
         """Elimina objetos no serializables (DataFrames) del contexto para guardar en DB."""
         if not context:

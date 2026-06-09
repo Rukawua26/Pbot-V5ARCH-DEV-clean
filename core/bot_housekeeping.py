@@ -45,7 +45,7 @@ def run_periodic_housekeeping(bot, now, last_report_time, last_coach_time, last_
                     subprocess.run(
                         [sys.executable, str(coach_path), "--silent"],
                         check=False,
-                        timeout=900,
+                        timeout=300,
                     )
                     bot.log("✅ AI Coach finalizado.")
                 except Exception as error:

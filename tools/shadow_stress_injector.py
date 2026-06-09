@@ -92,12 +92,10 @@ class SqliteStressBrain:
         conn.commit()
 
     def _with_backoff(self, write_fn):
-        last_error = None
         for attempt in range(3):
             try:
                 return write_fn()
             except sqlite3.OperationalError as error:
-                last_error = error
                 if "locked" in str(error).lower():
                     self.sqlite_locked_errors += 1
                     if attempt < 2:

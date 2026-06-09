@@ -19,7 +19,6 @@ from tests.mocks.binance_chaos import (
     ClientOrderLookupExchange,
     ConcurrentTimeoutExchange,
     NoPriceExchange,
-    TimeoutProbeExchange,
 )
 
 

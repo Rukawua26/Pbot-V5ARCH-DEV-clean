@@ -10,7 +10,6 @@
 import sqlite3
 import shutil
 import os
-import time
 from datetime import datetime
 
 DB_PATH = "sniper_brain.db"

@@ -117,18 +117,21 @@ def _get_db():
 @app.get("/api/v1/trades")
 def get_trades(limit: int = 100, type: str = "all", _=Depends(verify_key)):
     conn = _get_db()
-    where = ""
-    if type == "real":
-        where = " WHERE is_shadow = 0"
-    elif type == "shadow":
-        where = " WHERE is_shadow = 1"
     try:
+        where_clause = ""
+        params: tuple = ()
+        if type == "real":
+            where_clause = " WHERE is_shadow = ?"
+            params = (0,)
+        elif type == "shadow":
+            where_clause = " WHERE is_shadow = ?"
+            params = (1,)
         total = conn.execute(
-            f"SELECT COUNT(*) FROM trades{where}"
+            f"SELECT COUNT(*) FROM trades{where_clause}", params
         ).fetchone()[0]
         rows = conn.execute(
-            f"SELECT * FROM trades{where} ORDER BY timestamp DESC LIMIT ?",
-            (limit,),
+            f"SELECT * FROM trades{where_clause} ORDER BY timestamp DESC LIMIT ?",
+            params + (limit,),
         ).fetchall()
         trades = [{k: r[k] for k in r.keys()} for r in rows]
         return {"trades": trades, "total": total}
@@ -211,10 +214,19 @@ def get_blocked(limit: int = 100, _=Depends(verify_key)):
 def get_trade_stats(_=Depends(verify_key)):
     conn = _get_db()
     try:
-        # (Lógica simplificada para brevedad, igual a la original)
-        stats = {"total": 0} 
-        # ... resto de la implementación ...
-        return stats
+        total = conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
+        wins = conn.execute("SELECT COUNT(*) FROM trades WHERE pnl > 0").fetchone()[0]
+        losses = conn.execute("SELECT COUNT(*) FROM trades WHERE pnl < 0").fetchone()[0]
+        shadow = conn.execute("SELECT COUNT(*) FROM trades WHERE is_shadow = 1").fetchone()[0]
+        real = conn.execute("SELECT COUNT(*) FROM trades WHERE is_shadow = 0").fetchone()[0]
+        return {
+            "total": total,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round((wins / total * 100), 1) if total > 0 else 0.0,
+            "shadow": shadow,
+            "real": real,
+        }
     finally:
         conn.close()
 
@@ -240,6 +252,7 @@ def get_exec_events(event_type: str = "", event_limit: int = 200, _=Depends(veri
                 e = json.loads(line)
                 if not event_type or e.get("event") == event_type:
                     matches.append(e)
-            except: continue
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                continue
     matches.reverse()
     return {"events": matches[:event_limit], "total": len(matches)}

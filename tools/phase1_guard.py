@@ -45,8 +45,8 @@ def _load_state(horizon_hours: int) -> dict[str, Any]:
     if STATE_PATH.exists():
         try:
             return json.loads(STATE_PATH.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            print(f"⚠️ No se pudo cargar estado guardado ({exc}), creando nuevo.")
 
     now = _now_utc()
     state = {

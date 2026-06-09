@@ -190,54 +190,53 @@ class BinanceWeightTracker:
         usage_pct = current_weight / self.WEIGHT_LIMIT_PER_MINUTE
         order_usage_pct = current_orders / self.ORDER_LIMIT_PER_10S
 
-        # Emergency mode check
-        if usage_pct >= self.EMERGENCY_THRESHOLD:
-            if not self._emergency_mode:
-                self._emergency_mode = True
-                self._emergency_since = now
-                self._blocks_issued += 1
+        with self._lock:
+            # Emergency mode check
+            if usage_pct >= self.EMERGENCY_THRESHOLD:
+                if not self._emergency_mode:
+                    self._emergency_mode = True
+                    self._emergency_since = now
+                    self._blocks_issued += 1
+                    self._alert(
+                        "EMERGENCY",
+                        f"API Weight EMERGENCY: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} "
+                        f"({usage_pct * 100:.1f}%) - Non-essential calls blocked!",
+                    )
+                return
+
+            # Clear emergency mode if below critical
+            if self._emergency_mode and usage_pct < self.CRITICAL_THRESHOLD:
+                duration = now - self._emergency_since
+                self._emergency_mode = False
                 self._alert(
-                    "EMERGENCY",
-                    f"API Weight EMERGENCY: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} "
-                    f"({usage_pct * 100:.1f}%) - Non-essential calls blocked!",
+                    "WARNING",
+                    f"API Weight recovered from emergency after {duration:.0f}s. "
+                    f"Current: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} ({usage_pct * 100:.1f}%)",
                 )
-            return
 
-        # Clear emergency mode if below critical
-        if self._emergency_mode and usage_pct < self.CRITICAL_THRESHOLD:
-            duration = now - self._emergency_since
-            self._emergency_mode = False
-            self._alert(
-                "WARNING",
-                f"API Weight recovered from emergency after {duration:.0f}s. "
-                f"Current: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} ({usage_pct * 100:.1f}%)",
-            )
+            # Critical threshold
+            if usage_pct >= self.CRITICAL_THRESHOLD:
+                self._warnings_issued += 1
+                self._alert(
+                    "CRITICAL",
+                    f"API Weight CRITICAL: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} "
+                    f"({usage_pct * 100:.1f}%) - Reduce non-essential calls!",
+                )
+            elif usage_pct >= self.WARNING_THRESHOLD:
+                self._warnings_issued += 1
+                self._alert(
+                    "WARNING",
+                    f"API Weight WARNING: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} "
+                    f"({usage_pct * 100:.1f}%)",
+                )
 
-        # Critical threshold
-        if usage_pct >= self.CRITICAL_THRESHOLD:
-            self._warnings_issued += 1
-            self._alert(
-                "CRITICAL",
-                f"API Weight CRITICAL: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} "
-                f"({usage_pct * 100:.1f}%) - Reduce non-essential calls!",
-            )
-
-        # Warning threshold
-        elif usage_pct >= self.WARNING_THRESHOLD:
-            self._warnings_issued += 1
-            self._alert(
-                "WARNING",
-                f"API Weight WARNING: {current_weight}/{self.WEIGHT_LIMIT_PER_MINUTE} "
-                f"({usage_pct * 100:.1f}%)",
-            )
-
-        # Order rate check
-        if order_usage_pct >= 0.8:
-            self._alert(
-                "CRITICAL",
-                f"Order rate CRITICAL: {current_orders}/{self.ORDER_LIMIT_PER_10S} per 10s "
-                f"({order_usage_pct * 100:.1f}%)",
-            )
+            # Order rate check
+            if order_usage_pct >= 0.8:
+                self._alert(
+                    "CRITICAL",
+                    f"Order rate CRITICAL: {current_orders}/{self.ORDER_LIMIT_PER_10S} per 10s "
+                    f"({order_usage_pct * 100:.1f}%)",
+                )
 
     def should_block(self, category: str = "market") -> bool:
         """
@@ -258,9 +257,9 @@ class BinanceWeightTracker:
             if category not in ("essential", "trading"):
                 return True
 
-        # Critical: block non-essential market data
+        # Critical: block non-essential categories
         if usage_pct >= self.CRITICAL_THRESHOLD:
-            if category == "market" and category not in ("essential",):
+            if category not in ("essential", "trading"):
                 return True
 
         return False

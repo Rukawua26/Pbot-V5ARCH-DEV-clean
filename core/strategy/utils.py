@@ -109,6 +109,7 @@ class StrategyUtils:
 
             return result
         except Exception:
+            logger.warning("StrategyUtils snapshot falló", exc_info=True)
             return None
 
     @staticmethod
@@ -130,6 +131,7 @@ class StrategyUtils:
             z = (returns.iloc[-1] - rolling_mean.iloc[-1]) / rolling_std.iloc[-1]
             return float(z)
         except Exception:
+            logger.debug("Z-score calculation falló", exc_info=True)
             return 0.0
 
     @staticmethod

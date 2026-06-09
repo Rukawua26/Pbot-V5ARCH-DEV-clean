@@ -201,7 +201,7 @@ def main():
     args = parser.parse_args()
 
     print(f"\n{'=' * 55}")
-    print(f"  SNIPER AI — Auditoría de Correlación v118")
+    print("  SNIPER AI — Auditoría de Correlación v118")
     print(f"{'=' * 55}")
     print(f"  DB       : {args.db}")
     print(f"  Muestra  : últimos {args.limit} votos")
@@ -245,7 +245,7 @@ def main():
         print("     Accion: Diversificar features de G o degradar peso de consenso.")
         is_critical = True
 
-    print(f"  Accion recomendada: revisar ghost_agent.py y mt_agent.py.")
+    print("  Accion recomendada: revisar ghost_agent.py y mt_agent.py.")
 
     print(f"\n{'=' * 55}\n")
 

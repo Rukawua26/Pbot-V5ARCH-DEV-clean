@@ -1,13 +1,10 @@
 """
 Compatibility layer for pandas_ta using the ta package
 """
-import ta
 import ta.trend as ta_trend
 import ta.momentum as ta_momentum
 import ta.volatility as ta_volatility
-import ta.volume as ta_volume
 import pandas as pd
-import numpy as np
 
 class CompatTA:
     """Compatibility class that mimics pandas_ta API using ta package"""

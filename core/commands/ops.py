@@ -192,12 +192,24 @@ def _handle_misc_commands(bot, text: str) -> bool:
         return True
 
     if text == "/tiers":
-        if not bot.scanner_history:
+        slock = getattr(bot, "scanner_lock", None)
+        if slock:
+            with slock:
+                has_history = bool(bot.scanner_history)
+        else:
+            has_history = bool(bot.scanner_history)
+        if not has_history:
             send_telegram_msg("🕵️ *TIERS:* No hay señales en el radar todavía.")
             return True
 
         tiers: dict[str, list[str]] = {"ELITE": [], "GOLD": [], "SILVER": [], "IRON": []}
-        for item in bot.scanner_history:
+        hist = []
+        if slock:
+            with slock:
+                hist = list(bot.scanner_history) if bot.scanner_history else []
+        else:
+            hist = list(bot.scanner_history) if bot.scanner_history else []
+        for item in hist:
             tier = item.get("tier", "IRON")
             if tier in tiers:
                 tiers[tier].append(f"{item['symbol']} ({item['ia_prob']})")
@@ -262,8 +274,10 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                     stderr=asyncio.subprocess.PIPE,
                 )
 
-                # 2. Espera no bloqueante del Event Loop
-                stdout, stderr = await process.communicate()
+                # 2. Espera no bloqueante del Event Loop (máx 10 min)
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), timeout=600
+                )
 
                 if process.returncode == 0:
                     # 3. Notificación de Disponibilidad (No recarga inmediata)

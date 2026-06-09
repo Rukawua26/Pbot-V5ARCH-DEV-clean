@@ -101,6 +101,11 @@ def _shutdown_sequence(bot, reason: str, logger):
 
     # 1) Bloquear nuevos trabajos y loops.
     bot.is_running = False
+    shutdown_event = getattr(bot, "_shutdown_event", None)
+    if shutdown_event is None:
+        shutdown_event = threading.Event()
+        bot._shutdown_event = shutdown_event
+    shutdown_event.set()
 
     # 2) Purgar book no-protectivo.
     canceled = _safe_cancel_open_orders(bot)
@@ -115,6 +120,13 @@ def _shutdown_sequence(bot, reason: str, logger):
             bot.save_cache(blocking=True)
     except Exception as error:
         bot.log(f"⚠️ SHUTDOWN: save_cache falló: {error}")
+
+    try:
+        ds = getattr(bot, "data_service", None)
+        if ds is not None:
+            ds.shutdown(wait=True)
+    except Exception as error:
+        bot.log(f"⚠️ SHUTDOWN: data_service shutdown falló: {error}")
 
     try:
         if getattr(bot, "ws_manager", None):

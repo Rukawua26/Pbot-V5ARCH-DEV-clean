@@ -545,15 +545,16 @@ def run_guardian_loop(bot):
 
             # 15s: Trailing pesado
             if now_mono - last_heavy > 15:
+                # Usar snapshot ya capturado bajo lock (línea 41)
                 # --- OPTIMIZACIÓN VIP: Primero REALES, luego SHADOW ---
                 # Esto evita que el procesamiento de 30 trades shadow bloquee la protección de tu dinero real.
                 sorted_trades = sorted(
-                    list(bot.active_trades.keys()),
-                    key=lambda k: bot.active_trades.get(k, {}).get("is_shadow", True),
+                    list(snapshot.keys()),
+                    key=lambda k: snapshot.get(k, {}).get("is_shadow", True),
                 )
 
                 for s in sorted_trades:
-                    t = bot.active_trades.get(s)
+                    t = snapshot.get(s)
                     if not t or not t.get("trailing_active"):
                         continue
 
@@ -604,7 +605,7 @@ def run_guardian_loop(bot):
             bot.log(f"Err Guardián: {e}")
 
         # MODULACIÓN DE FRECUENCIA v118: 0.1s para dominio < 500ms (trades activos), 2s tranquilo
-        sleep_for = 0.1 if bot.active_trades else 2.0
+        sleep_for = 0.1 if snapshot else 2.0
         work_s = max(time.perf_counter() - loop_started, 0.0)
         bot._guardian_stats["loops"] += 1
         bot._guardian_stats["work_s"] += work_s

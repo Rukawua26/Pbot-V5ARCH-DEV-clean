@@ -1,3 +1,4 @@
+import atexit
 import os
 import sys
 
@@ -61,4 +62,5 @@ def acquire_single_instance_lock(logger, lock_filename: str = ".sniperai.lock") 
     lock_file.write(str(os.getpid()))
     lock_file.flush()
     _single_instance_lock = lock_file
+    atexit.register(lambda: lock_file.close())
     return True

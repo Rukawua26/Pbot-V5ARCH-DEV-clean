@@ -103,10 +103,18 @@ def _execute_and_update_symbol(
             if "DEGRADED" in exec_result:
                 deg_msg = exec_result.split(": ")[1] if ": " in exec_result else "PROTECTION"
                 audit_verdict = f"🧪 SHADOW (PROT: {deg_msg})"
-                for item in bot.scanner_history:
-                    if item["symbol"] == symbol:
-                        item["result"] = audit_verdict
-                        break
+                slock = getattr(bot, "scanner_lock", None)
+                if slock:
+                    with slock:
+                        for item in bot.scanner_history:
+                            if item["symbol"] == symbol:
+                                item["result"] = audit_verdict
+                                break
+                else:
+                    for item in bot.scanner_history:
+                        if item["symbol"] == symbol:
+                            item["result"] = audit_verdict
+                            break
         elif exec_result not in ["COOLDOWN", "ALREADY_ACTIVE"]:
             error_msg = exec_result.split(": ")[0] if ": " in exec_result else exec_result
             bot.log(f"❌ FALLO EJECUCIÓN {symbol}: {exec_result}")
@@ -114,12 +122,22 @@ def _execute_and_update_symbol(
                 final_verdict_for_ui = f"⛔ VETO: {veto_codes[error_msg]}"
             else:
                 final_verdict_for_ui = f"❌ ERR: {error_msg}"
-            for item in bot.scanner_history:
-                if item["symbol"] == symbol:
-                    item["result"] = final_verdict_for_ui
-                    item["ia_real"] = "❌"
-                    item["ia_shadow"] = "❌"
-                    break
+            slock = getattr(bot, "scanner_lock", None)
+            if slock:
+                with slock:
+                    for item in bot.scanner_history:
+                        if item["symbol"] == symbol:
+                            item["result"] = final_verdict_for_ui
+                            item["ia_real"] = "❌"
+                            item["ia_shadow"] = "❌"
+                            break
+            else:
+                for item in bot.scanner_history:
+                    if item["symbol"] == symbol:
+                        item["result"] = final_verdict_for_ui
+                        item["ia_real"] = "❌"
+                        item["ia_shadow"] = "❌"
+                        break
         else:
             final_verdict_for_ui = (
                 "❄️ COOLDOWN" if exec_result == "COOLDOWN" else "🔒 OPERACIÓN ACTIVA"

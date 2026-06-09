@@ -40,7 +40,9 @@ def run_initial_load(bot, dashboard_module):
             )
 
         if not isinstance(bot.balance, (int, float)) or pd.isna(bot.balance):
-            bot.balance = 0.0
+            blk = getattr(bot, "balance_lock", bot.lock)
+            with blk:
+                bot.balance = 0.0
 
         bot.init_complete.set()
         bot.log("🚀 Sistema inicializado. Iniciando bucles de trabajo...")
@@ -56,6 +58,9 @@ def run_initial_load(bot, dashboard_module):
         bot.startup_error = error
         bot.log(f"❌ FALLO CRÍTICO EN CARGA: {error}")
         bot.is_running = False
+        shutdown_event = getattr(bot, "_shutdown_event", None)
+        if shutdown_event is not None:
+            shutdown_event.set()
         bot.init_complete.set()
 
 
@@ -101,15 +106,20 @@ def run_bot_runtime_loop(bot, dashboard_module, logger, shadow_logger):
                     except Exception as error_ml:
                         logger.warning(f"⚠️ Error en métricas ML: {error_ml}")
 
+                with bot.lock:
+                    trades_snapshot = list(bot.active_trades.values()) if hasattr(bot, "active_trades") else []
+                closed_snapshot = list(bot.recent_closed_trades) if hasattr(bot, "recent_closed_trades") else []
+                slock = getattr(bot, "scanner_lock", None)
+                if slock:
+                    with slock:
+                        scanner_snapshot = bot.scanner_history[:50] if hasattr(bot, "scanner_history") else []
+                else:
+                    scanner_snapshot = bot.scanner_history[:50] if hasattr(bot, "scanner_history") else []
                 bot.ui.update(
                     balance=bot.balance,
-                    trades=list(bot.active_trades.values())
-                    if hasattr(bot, "active_trades")
-                    else [],
-                    recent_closed_trades=list(bot.recent_closed_trades)
-                    if hasattr(bot, "recent_closed_trades")
-                    else [],
-                    scanner=bot.scanner_history[:50] if hasattr(bot, "scanner_history") else [],
+                    trades=trades_snapshot,
+                    recent_closed_trades=closed_snapshot,
+                    scanner=scanner_snapshot,
                     db_stats=telemetry,
                     sentiment=getattr(bot, "current_sentiment", "NEUTRAL"),
                     ml_metrics=ml_metrics,
@@ -127,6 +137,9 @@ def run_bot_runtime_loop(bot, dashboard_module, logger, shadow_logger):
             time.sleep(1)
     except KeyboardInterrupt:
         bot.is_running = False
+        shutdown_event = getattr(bot, "_shutdown_event", None)
+        if shutdown_event is not None:
+            shutdown_event.set()
         bot.ui.stop()
         bot.log("🛑 Guardando caché y forzando flasheo de Shadow Logs...")
         bot.save_cache(blocking=True)

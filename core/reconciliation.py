@@ -567,7 +567,8 @@ def reconcile_bootstrap_state(bot):
         # En PAPER_MODE el balance es virtual; no se compara contra custodia real.
         if Config.PAPER_MODE:
             if not float(getattr(bot, "balance", 0.0) or 0.0):
-                bot.balance = Config.PAPER_INITIAL_BALANCE
+                with bot.balance_lock:
+                    bot.balance = Config.PAPER_INITIAL_BALANCE
             if not float(getattr(bot, "available_balance", 0.0) or 0.0):
                 bot.available_balance = Config.PAPER_INITIAL_BALANCE
             if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
@@ -645,7 +646,7 @@ def recover_halt_if_exchange_consistent(bot, required_snapshots: int = 2) -> tup
             continue
         amount = pos.get("contracts")
         if amount is None:
-            amount = (pos.get("info") or {}).get("positionAmt", 0)
+            amount = (pos.get("info") or {}).get("positionAmt", 0) if isinstance(pos.get("info"), dict) else 0
         if abs(float(amount or 0.0)) > 0.0:
             exchange_symbols.append(normalize_position_symbol(pos.get("symbol", "")))
     exchange_symbols = sorted(symbol for symbol in exchange_symbols if symbol)
@@ -696,9 +697,16 @@ def recover_halt_if_exchange_consistent(bot, required_snapshots: int = 2) -> tup
     if count < required:
         return False, f"RECOVERY_PENDING_CONSISTENT_SNAPSHOTS: {count}/{required}"
 
-    with bot.lock:
+    balance_lock = getattr(bot, "balance_lock", None)
+    if balance_lock:
+        with balance_lock:
+            bot.balance = exchange_balance
+            bot.daily_initial_balance = exchange_balance
+    else:
         bot.balance = exchange_balance
         bot.daily_initial_balance = exchange_balance
+
+    with bot.lock:
         bot.integrity_lock_active = False
         bot.halt_system_active = False
         bot.is_paused = False

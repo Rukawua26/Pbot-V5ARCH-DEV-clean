@@ -9,6 +9,7 @@ SNIPER AI v118 - LEARNING MODULE (KNN VECTORIAL)
 import sqlite3
 from datetime import UTC, datetime, timedelta
 import json
+import os
 import random
 import numpy as np
 import pandas as pd
@@ -25,10 +26,12 @@ from core.rag_cache import (
     update_rag_cache as run_update_rag_cache,
 )
 from core.shadow_logger import (
-    AsyncShadowLogger as AsyncShadowLogger,
-    LazyShadowLogger as LazyShadowLogger,
+    AsyncShadowLogger,
+    LazyShadowLogger,
     shadow_logger as shadow_logger,
 )
+
+__all__ = ["AsyncShadowLogger", "LazyShadowLogger", "shadow_logger"]
 
 try:
     from config import Config
@@ -819,7 +822,6 @@ class Brain:
         try:
             symbol = trade_data.get("symbol")
             is_shadow = trade_data.get("is_shadow", False)
-            pnl_percent = trade_data.get("pnl_percent", 0)
 
             # Solo clasificamos trades reales
             if is_shadow:
@@ -1083,7 +1085,7 @@ class Brain:
             rows = c.fetchall()
             conn.close()
             return [dict(row) for row in rows]
-        except:
+        except Exception:
             return []
 
     def recalculate_elite_patterns(self):
@@ -1175,7 +1177,7 @@ class Brain:
             rows = c.fetchall()
             conn.close()
             return [dict(row) for row in rows]
-        except:
+        except Exception:
             return []
 
     def cleanup_old_patterns(self, days=30):
@@ -1234,7 +1236,7 @@ class Brain:
                 return 0.30  # 30% peso para experimental
 
             return 0.15  # Default si no hay historial
-        except:
+        except Exception:
             return 0.15
 
     def get_agent_reputation(self, context_type=None):
@@ -1439,7 +1441,7 @@ class Brain:
                                 if (pnl > 0 and voto >= 50) or (pnl < 0 and voto < 50):
                                     hits[a] += 1
                                 break  # prefer first match in priority order
-                except:
+                except Exception:
                     continue
 
             # 3. Calcular Score (Basado en Win Rate reciente)
@@ -1561,7 +1563,7 @@ class Brain:
                 "shadow_win_rate": swr,
                 "real_win_rate": rwr,
             }
-        except Exception as e:
+        except Exception:
             return {
                 "total_trades": 0,
                 "shadow_trades": 0,
@@ -2154,7 +2156,7 @@ class Brain:
                 "avg_pnl": row[3] or 0,
                 "drift": drift,
             }
-        except Exception as e:
+        except Exception:
             return {"wr": 0, "pnl": 0, "trades": 0, "drift": "ERROR"}
 
     def get_monthly_stats(self):
@@ -2240,7 +2242,7 @@ class Brain:
                 "best_symbols": best,
                 "worst_symbols": worst,
             }
-        except Exception as e:
+        except Exception:
             return {
                 "wr": 0,
                 "pnl": 0,
@@ -2416,7 +2418,7 @@ class Brain:
                     "avg_pnl": round(avg_pnl, 2),
                 }
             return stats
-        except Exception as e:
+        except Exception:
             return {}
 
     def rotate_history(self, days_to_keep=90):
@@ -3047,7 +3049,7 @@ class Brain:
                 float(context.get("heuristic_confidence", 50.0)) / 100.0,
                 min(float(context.get("spread", 0.0)) * 1000.0, 1.0),
             ]
-        except:
+        except Exception:
             return []
 
     @staticmethod

@@ -6,11 +6,9 @@ Monitor de métricas de Machine Learning en tiempo real.
 
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
 from datetime import datetime
 import threading
 import time
-import numpy as np
 
 
 class MLMonitor:

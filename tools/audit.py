@@ -1,4 +1,3 @@
-import sys
 from tools.learning import Brain
 from tools.reporter import generate_terminal_audit_table
 from rich.console import Console

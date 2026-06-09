@@ -366,7 +366,15 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
             bot.log(f"❌ ERROR en {symbol}: {error_str} | {traceback.format_exc(limit=3)}")
 
             # Reportar el crash en el radar.
-            for item in bot.scanner_history:
-                if item["symbol"] == symbol:
-                    item["result"] = f"❌ CRASH: {str(e)[:15]}"
-                    break
+            slock = getattr(bot, "scanner_lock", None)
+            if slock:
+                with slock:
+                    for item in bot.scanner_history:
+                        if item["symbol"] == symbol:
+                            item["result"] = f"❌ CRASH: {str(e)[:15]}"
+                            break
+            else:
+                for item in bot.scanner_history:
+                    if item["symbol"] == symbol:
+                        item["result"] = f"❌ CRASH: {str(e)[:15]}"
+                        break

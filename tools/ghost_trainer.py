@@ -1,10 +1,7 @@
 import sqlite3
-import pickle
-import os
 import pandas as pd
 import numpy as np
 from tools.ultimate_ml import UltimateMLSystem
-from tools.notifier import send_telegram_msg
 
 
 def train_ghost_brain():

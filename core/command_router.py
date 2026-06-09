@@ -73,9 +73,15 @@ def handle_basic_command(bot, text: str) -> bool:
 
         try:
             current = float(bot.get_current_balance() or 0.0)
-            with bot.lock:
+            balance_lock = getattr(bot, "balance_lock", None)
+            if balance_lock:
+                with balance_lock:
+                    bot.balance = current
+                    bot.daily_initial_balance = current
+            else:
                 bot.balance = current
                 bot.daily_initial_balance = current
+            with bot.lock:
                 bot.peak_pnl = 0.0
                 bot.integrity_lock_active = False
                 bot.circuit_breaker_active = False

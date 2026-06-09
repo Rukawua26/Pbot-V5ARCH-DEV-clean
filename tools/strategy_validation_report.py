@@ -122,6 +122,7 @@ def evaluate_strategy_report(
 
 
 def main() -> int:
+    root = Path(__file__).resolve().parent.parent
     parser = argparse.ArgumentParser(description="Combined strategy validation report")
     parser.add_argument("--candles", required=True)
     parser.add_argument("--db", default="sniper_brain.db")

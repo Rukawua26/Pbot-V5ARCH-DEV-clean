@@ -67,7 +67,6 @@ def load_active_trades(conn: sqlite3.Connection):
         last_price = float(st.get("last_price", 0.0) or 0.0)
         mfe_price = float(st.get("mfe_price", entry) or entry)
         shock = st.get("entry_shock_level")
-        atr = float(st.get("entry_atr", 0.0) or 0.0)
 
         mfe_pct = 0.0
         if entry > 0:

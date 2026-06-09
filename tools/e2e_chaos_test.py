@@ -14,19 +14,16 @@ import argparse
 import json
 import os
 import random
-import sqlite3
 import sys
 import threading
 import time
 from datetime import UTC, datetime
-from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-from config import Config
 
 
 class ChaosExecutionAdapter:
@@ -211,9 +208,6 @@ class ChaosBotBuilder:
 
     @staticmethod
     def build():
-        from core.execution_service import ExecutionService
-        from core.bot_guardian import run_guardian_loop
-
         # Stub de execution
         class StubExchange:
             def fetch_ticker(self, symbol):
@@ -342,7 +336,7 @@ def run_e2e_chaos_test(minutes: int = 60):
     print("E2E CHAOS INJECTION TEST - Sniper AI v1.0-ARCH")
     print("=" * 60)
     print(f"Duration: {minutes} minutes")
-    print(f"Chaos events: 15min(Timeout), 30min(WS Disconnect), 45min(Hard Floor)")
+    print("Chaos events: 15min(Timeout), 30min(WS Disconnect), 45min(Hard Floor)")
     print("-" * 60)
 
     bot = ChaosBotBuilder.build()

@@ -476,6 +476,7 @@ class BalanceOpsPressureTests(unittest.TestCase):
             available_balance=0.0,
             daily_initial_balance=0.0,
             lock=threading.RLock(),
+            balance_lock=threading.RLock(),
             log=MagicMock(),
         )
 

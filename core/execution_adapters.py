@@ -42,6 +42,7 @@ class ShadowExecutionAdapter:
         self._executor = executor or ThreadPoolExecutor(
             max_workers=4, thread_name_prefix="shadow-exec"
         )
+        self._own_executor = executor is None
         self._lock = threading.RLock()
         self._orders_by_id: dict[str, dict] = {}
 
@@ -248,6 +249,10 @@ class ShadowExecutionAdapter:
             self._orders_by_id[order["id"]] = order
 
         return dict(order)
+
+    def shutdown(self):
+        if self._own_executor:
+            self._executor.shutdown(wait=False)
 
     def fetch_open_orders(self, symbol: str | None = None):
         with self._lock:

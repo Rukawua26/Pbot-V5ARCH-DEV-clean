@@ -1,3 +1,4 @@
+from collections import deque
 import os
 import threading
 import uuid
@@ -12,11 +13,12 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
     bot.active_trades = {}
     bot.recent_closed_trades = []
     bot.scanner_history = []
-    bot.logs = []
+    bot.logs = deque(maxlen=Config.LOG_LIMIT)
     bot.balance = 0.0
     bot.available_balance = 0.0
     bot.pairs_to_scan = []
     bot.is_running = True
+    bot._shutdown_event = threading.Event()
     bot.stop_requested = False
     bot.shutdown_in_progress = False
     bot.shutdown_complete = threading.Event()

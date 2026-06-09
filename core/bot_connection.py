@@ -104,7 +104,12 @@ def connect_to_binance(bot):
 
         if Config.PAPER_MODE:
             if not float(getattr(bot, "balance", 0.0) or 0.0):
-                bot.balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
+                balance_lock = getattr(bot, "balance_lock", None)
+                if balance_lock:
+                    with balance_lock:
+                        bot.balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
+                else:
+                    bot.balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
             if not float(getattr(bot, "available_balance", 0.0) or 0.0):
                 bot.available_balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
             if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):

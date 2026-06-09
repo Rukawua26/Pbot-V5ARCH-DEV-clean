@@ -107,7 +107,7 @@ class UI:
         print("=" * 70)
 
         # Balance y stats
-        print(f"\n📊 CUENTA")
+        print("\n📊 CUENTA")
         print(f"   Balance: ${balance:.2f}")
         print(f"   SHADOW WR: {shadow_wr:.1f}%")
         print(f"   REAL WR: {real_wr_str}")
@@ -180,7 +180,6 @@ class UI:
                 result = item.get("result", "") or ""
                 ia_shadow = item.get("ia_shadow", "")
                 ia_real = item.get("ia_real", "")
-                ob = item.get("ob", "⚪")
 
                 # Abreviar signal
                 sig_map = {
@@ -219,7 +218,7 @@ class UI:
         # ML Metrics (v118-PRO)
         ml = st.get("ml_metrics", {})
         if ml:
-            print(f"\n🧠 MACHINE LEARNING")
+            print("\n🧠 MACHINE LEARNING")
             perf = ml.get("performance", {})
             if perf:
                 print(
