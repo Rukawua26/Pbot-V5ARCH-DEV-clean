@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🤖 Sniper AI — Pbot V5ARCH DEV
+# 🤖 Sniper AI — Pbot V5ARCH DEV Clean
 
-### *Bot cuantitativo runtime-first para Binance Futures*
+### *Bot cuantitativo runtime-first para Binance Futures, endurecido para operación segura*
 
 > Inteligencia de mercado con HMM Markov · Escaneo dinámico 1H · Ejecución segura · Shadow Lab · Reconciliación defensiva
 
@@ -11,16 +11,16 @@
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![Binance](https://img.shields.io/badge/Exchange-Binance_Futures-F3BA2F?style=for-the-badge&logo=binance&logoColor=black)](https://binance.com)
 [![Estado](https://img.shields.io/badge/Estado-Activo-22c55e?style=for-the-badge&logo=statuspage&logoColor=white)]()
-[![CI](https://img.shields.io/github/actions/workflow/status/Rukawua26/Pbot-V5ARCH-DEV/ci.yml?branch=master&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV/actions)
+[![CI](https://img.shields.io/github/actions/workflow/status/Rukawua26/Pbot-V5ARCH-DEV-clean/ci.yml?branch=master&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean/actions)
 
-[![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Phase_19-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV)
+[![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Runtime_Clean-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean)
 [![Modos](https://img.shields.io/badge/Modos-PAPER_%7C_REAL_%7C_SHADOW-0ea5e9?style=flat-square)]()
 [![HMM](https://img.shields.io/badge/HMM-Markov_Intelligence-f97316?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/Tests-623_ok_%7C_2_skipped-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-838_ok_%7C_2_skipped-22c55e?style=flat-square)]()
 [![Shadow](https://img.shields.io/badge/Shadow_Capacity-20_trades-9333ea?style=flat-square)]()
 [![Deploy](https://img.shields.io/badge/Deploy-systemd_%7C_Docker-111827?style=flat-square)]()
 [![Risk](https://img.shields.io/badge/Risk_Engine-v118.7-ef4444?style=flat-square)]()
-[![Cobertura](https://img.shields.io/badge/Cobertura-47%25-16a34a?style=flat-square)]()
+[![Runtime](https://img.shields.io/badge/Runtime-Hardened-16a34a?style=flat-square)]()
 
 </div>
 
@@ -31,6 +31,19 @@
 **Sniper AI** es un bot de trading cuantitativo diseñado para operar en **Binance Futures** con un enfoque *runtime-first*: cada decisión, ejecución y reconciliación ocurre en una arquitectura modular, trazable y segura.
 
 Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, motor de agentes y un laboratorio *shadow* para explorar sin arriesgar capital real.
+
+### ✅ Estado Actual del Build
+
+| Check | Estado |
+|---|---|
+| `unittest discover` | ✅ `838 tests OK` · `2 skipped` |
+| `ruff --select F,E9` | ✅ Sin errores fatales |
+| `compileall main.py core tools` | ✅ OK |
+| `check_no_silent_pass.py` | ✅ OK |
+| `mypy --explicit-package-bases core` | ✅ OK |
+| Runtime safety | ✅ Locks, shutdown, subprocess y pickle hardening revisados |
+
+> Esta rama limpia elimina módulos huérfanos, corrige riesgos de concurrencia y deja el runtime preparado para validación CI/producción.
 
 ```
 Binance Futures → Triage Dinámico → HMM BTC → Agentes MT/SR/G
@@ -52,6 +65,17 @@ Integración **async no-bloqueante** con GitHub Projects v2 para el ciclo de vid
 | 🟢 `Posiciones Abiertas` | Trade activo con PnL en vivo |
 | ⚫ `Historial de Cierre` | Operación finalizada con resultado |
 
+### 🟢 Runtime Clean — Dead Code + Safety Sweep (Junio 2026)
+Limpieza profunda orientada a estabilidad operativa:
+
+| Área | Resultado |
+|---|---|
+| Código muerto | Eliminados módulos/agentes huérfanos no registrados |
+| Concurrencia | Protegidos accesos a `active_trades`, `scanner_history`, cooldowns y balance |
+| Shutdown | Señalización defensiva con `_shutdown_event` y cierre de executors |
+| Seguridad | Pickle seguro, subprocess con path validado y timeout |
+| Validación | 838 tests OK · `ruff F/E9` OK · mypy core OK |
+
 ### 🟣 Phase 18 — Hardening Técnico (Junio 2026)
 Consolidación del runtime sin deuda legacy:
 
@@ -62,7 +86,7 @@ Consolidación del runtime sin deuda legacy:
 | 🧠 RAG Memory | `find_similar_contexts` vectorizado con NumPy |
 | 💾 Maturity cache | Hash-debounce + persistencia async |
 | 🗄️ DB path | `core.learning_paths.DEFAULT_DB_PATH` como fuente única |
-| ✅ Validación | 623 tests · compileall · smoke imports · silent-pass guard |
+| ✅ Validación | 838 tests · compileall · fatal ruff · mypy core · silent-pass guard |
 
 ### 🟡 Phase 17 — Recalibración SHADOW (Mayo 2026)
 Ajuste de umbrales para operar en régimen RANGE:
@@ -136,8 +160,8 @@ El motor HMM clasifica el régimen de BTC y publica un snapshot en memoria con p
 
 ```bash
 # 1. Clonar el repositorio
-git clone https://github.com/Rukawua26/Pbot-V5ARCH-DEV.git
-cd Pbot-V5ARCH-DEV
+git clone https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean.git
+cd Pbot-V5ARCH-DEV-clean
 
 # 2. Crear entorno virtual e instalar dependencias
 python3 -m venv .venv
