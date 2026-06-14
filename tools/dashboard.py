@@ -48,6 +48,12 @@ def start_dashboard(bot=None) -> DashboardHandle:
     host = os.getenv("SNIPER_DASHBOARD_HOST", "127.0.0.1").strip() or "127.0.0.1"
     port = int(os.getenv("SNIPER_DASHBOARD_PORT", "8000"))
 
+    if host == "0.0.0.0":
+        expose_enabled = _env_bool("SNIPER_DASHBOARD_EXPOSE", False)
+        if not expose_enabled:
+            _log(bot, "🚨 SECURITY WARNING: SNIPER_DASHBOARD_HOST=0.0.0.0 requiere SNIPER_DASHBOARD_EXPOSE=1 para exponer el dashboard.")
+            return DashboardHandle(host="127.0.0.1", port=port, thread=None, enabled=False)
+
     if not enabled:
         _log(bot, "🖥️ Dashboard localhost deshabilitado por SNIPER_DASHBOARD_AUTOSTART.")
         return DashboardHandle(host=host, port=port, thread=None, enabled=False)

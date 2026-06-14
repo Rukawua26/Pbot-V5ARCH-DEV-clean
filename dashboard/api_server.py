@@ -9,6 +9,7 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+import threading
 
 API_KEY = os.getenv("SNIPER_API_KEY")
 if not API_KEY:
@@ -18,6 +19,25 @@ if not API_KEY:
     )
 if len(API_KEY) < 16:
     raise RuntimeError("SNIPER_API_KEY debe tener al menos 16 caracteres.")
+
+RATE_LIMIT_REQUESTS = 30
+RATE_LIMIT_WINDOW_SECONDS = 60
+_rate_limit_state: dict[str, list[float]] = {}
+_rate_limit_lock = threading.Lock()
+
+def _check_rate_limit(client_ip: str) -> None:
+    now = time.time()
+    with _rate_limit_lock:
+        timestamps = _rate_limit_state.get(client_ip, [])
+        timestamps = [t for t in timestamps if now - t < RATE_LIMIT_WINDOW_SECONDS]
+        if len(timestamps) >= RATE_LIMIT_REQUESTS:
+            raise HTTPException(429, "Rate limit exceeded")
+        timestamps.append(now)
+        _rate_limit_state[client_ip] = timestamps
+
+def rate_limited(req: Request):
+    client_ip = req.client.host if req.client else "unknown"
+    _check_rate_limit(client_ip)
 STATE_FILE = "/dev/shm/sniper_state.json"
 CMD_DIR = "/dev/shm/sniper_cmd"
 LOG_FILE = "sniper.log"
@@ -42,6 +62,7 @@ class Command(BaseModel):
 
 
 def verify_key(req: Request):
+    _check_rate_limit(req.client.host if req.client else "unknown")
     supplied = str(req.headers.get("X-API-Key") or "")
     if not hmac.compare_digest(supplied, API_KEY):
         raise HTTPException(401, "Unauthorized")
