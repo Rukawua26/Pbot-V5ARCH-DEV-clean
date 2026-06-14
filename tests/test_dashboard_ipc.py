@@ -3,6 +3,7 @@ import os
 import tempfile
 import threading
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from fastapi import HTTPException
@@ -12,6 +13,7 @@ os.environ.setdefault("SNIPER_API_KEY", "test-key-for-tests")
 import tools.dashboard as dashboard
 from core import cmd_consumer, state_snapshot
 from tools.dashboard import api_server
+from tools.intelligence.storage import ensure_intelligence_tables, save_advisory_snapshot
 
 
 class _DummyBot:
@@ -154,6 +156,47 @@ class DashboardIpcTest(unittest.TestCase):
 
         self.assertFalse(handle.enabled)
         self.assertTrue(any("deshabilitado" in message for message in bot.logs))
+
+    def test_dashboard_exposes_intelligence_advisories_and_annotations(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "brain.db")
+            ensure_intelligence_tables(db_path)
+            save_advisory_snapshot(
+                "shadow_real_gap",
+                "Comparativa SHADOW vs REAL",
+                {"shadow": {"trades": 3}, "real": {"trades": 1}},
+                db_path=db_path,
+            )
+            with patch.object(api_server, "DB_PATH", db_path):
+                advisories = api_server.get_intelligence_advisories(limit=10, _=None)
+
+        self.assertEqual(advisories["total"], 1)
+        self.assertEqual(advisories["advisories"][0]["advisory_type"], "shadow_real_gap")
+
+    def test_dashboard_can_trigger_intelligence_generation(self):
+        with patch.object(
+            api_server,
+            "generate_full_intelligence_cycle",
+            return_value={
+                "daily_path": "reports/intelligence/daily_report.json",
+                "weekly_path": "reports/intelligence/weekly_report.json",
+                "advisories": [{"advisory_type": "shadow_real_gap"}],
+            },
+        ):
+            result = api_server.generate_intelligence(_=None)
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["advisories"], 1)
+
+    def test_dashboard_static_includes_intelligence_tab(self):
+        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('data-tab="intelligence"', html)
+        self.assertIn('id="intel-advisories"', html)
+        self.assertIn('id="intel-postmortem"', html)
+        self.assertIn('generateIntelligence()', html)
+        self.assertIn('openTradePostmortem', html)
 
 
 if __name__ == "__main__":

@@ -10,8 +10,13 @@ import threading
 import time
 from dataclasses import dataclass
 
+from core.learning_paths import DEFAULT_DB_PATH
+from tools.intelligence.report_builder import generate_full_intelligence_cycle
+
 _dashboard_lock = threading.Lock()
 _dashboard_thread: threading.Thread | None = None
+_intelligence_lock = threading.Lock()
+_intelligence_thread: threading.Thread | None = None
 
 @dataclass(frozen=True)
 class DashboardHandle:
@@ -41,6 +46,39 @@ def _is_port_open(host: str, port: int) -> bool:
 def _log(bot, message: str) -> None:
     logger = getattr(bot, "log", None)
     if callable(logger): logger(message)
+
+
+def _run_intelligence_refresh(bot=None) -> None:
+    interval = max(300, int(os.getenv("SNIPER_INTELLIGENCE_REFRESH_SECONDS", "1800")))
+    startup_delay = max(1, int(os.getenv("SNIPER_INTELLIGENCE_STARTUP_DELAY_SECONDS", "12")))
+    time.sleep(startup_delay)
+    while True:
+        try:
+            result = generate_full_intelligence_cycle(db_path=DEFAULT_DB_PATH)
+            daily_path = result.get("daily_path") or "reports/intelligence/daily_report.json"
+            _log(bot, f"🧠 Intelligence actualizada: {daily_path}")
+        except Exception as error:
+            _log(bot, f"⚠️ Intelligence refresh failed: {error}")
+        time.sleep(interval)
+
+
+def start_intelligence_refresh(bot=None) -> threading.Thread | None:
+    enabled = _env_bool("SNIPER_INTELLIGENCE_AUTOSTART", True)
+    if not enabled:
+        _log(bot, "🧠 Intelligence autorefresh deshabilitado por SNIPER_INTELLIGENCE_AUTOSTART.")
+        return None
+    with _intelligence_lock:
+        global _intelligence_thread
+        if _intelligence_thread and _intelligence_thread.is_alive():
+            return _intelligence_thread
+        _intelligence_thread = threading.Thread(
+            target=_run_intelligence_refresh,
+            args=(bot,),
+            name="sniper-intelligence-refresh",
+            daemon=True,
+        )
+        _intelligence_thread.start()
+        return _intelligence_thread
 
 def start_dashboard(bot=None) -> DashboardHandle:
     """Start the canonical FastAPI dashboard."""
@@ -99,5 +137,7 @@ def start_dashboard(bot=None) -> DashboardHandle:
         time.sleep(0.1)
     else:
         _log(bot, f"⚠️ Dashboard localhost arrancando lento en http://{host}:{port}")
+
+    start_intelligence_refresh(bot)
 
     return DashboardHandle(host=host, port=port, thread=_dashboard_thread)

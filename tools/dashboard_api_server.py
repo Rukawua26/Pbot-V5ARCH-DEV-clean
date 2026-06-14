@@ -11,6 +11,12 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from core.learning_paths import DEFAULT_DB_PATH
+from tools.intelligence.report_builder import (
+    build_postmortem_report,
+    generate_full_intelligence_cycle,
+    read_report_artifact,
+)
+from tools.intelligence.storage import list_advisory_snapshots, fetch_trade_annotations, ensure_intelligence_tables
 
 API_KEY = os.getenv("SNIPER_API_KEY")
 if not API_KEY:
@@ -30,6 +36,7 @@ ALLOWED_ORIGINS = os.getenv("SNIPER_DASHBOARD_ORIGINS", "http://127.0.0.1:8000")
 ALLOWED_COMMANDS = frozenset({"/pause", "/resume", "/panic", "/recover_halt"})
 
 app = FastAPI(title="Sniper AI API")
+ensure_intelligence_tables(DB_PATH)
 
 app.add_middleware(
     CORSMiddleware,
@@ -257,3 +264,50 @@ def get_exec_events(event_type: str = "", event_limit: int = 200, _=Depends(veri
                 continue
     matches.reverse()
     return {"events": matches[:event_limit], "total": len(matches)}
+
+
+@app.get("/api/v1/intelligence/daily")
+def get_intelligence_daily(_=Depends(verify_key)):
+    report = read_report_artifact("daily_report.json")
+    if report is None:
+        raise HTTPException(404, "Daily intelligence report not available")
+    return report
+
+
+@app.get("/api/v1/intelligence/weekly")
+def get_intelligence_weekly(_=Depends(verify_key)):
+    report = read_report_artifact("weekly_report.json")
+    if report is None:
+        raise HTTPException(404, "Weekly intelligence report not available")
+    return report
+
+
+@app.get("/api/v1/intelligence/advisories")
+def get_intelligence_advisories(advisory_type: str = "", limit: int = 20, _=Depends(verify_key)):
+    advisories = list_advisory_snapshots(DB_PATH, advisory_type=advisory_type, limit=limit)
+    return {"advisories": advisories, "total": len(advisories)}
+
+
+@app.get("/api/v1/intelligence/annotations")
+def get_intelligence_annotations(trade_id: int | None = None, limit: int = 50, _=Depends(verify_key)):
+    annotations = fetch_trade_annotations(DB_PATH, trade_id=trade_id, limit=limit)
+    return {"annotations": annotations, "total": len(annotations)}
+
+
+@app.get("/api/v1/intelligence/postmortem/{trade_id}")
+def get_intelligence_postmortem(trade_id: int, _=Depends(verify_key)):
+    report = build_postmortem_report(trade_id, db_path=DB_PATH)
+    if report is None:
+        raise HTTPException(404, "Trade not found")
+    return report
+
+
+@app.post("/api/v1/intelligence/generate")
+def generate_intelligence(_=Depends(verify_key)):
+    result = generate_full_intelligence_cycle(db_path=DB_PATH)
+    return {
+        "ok": True,
+        "daily_path": result.get("daily_path"),
+        "weekly_path": result.get("weekly_path"),
+        "advisories": len(result.get("advisories") or []),
+    }

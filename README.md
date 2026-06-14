@@ -55,6 +55,19 @@ Binance Futures → Triage Dinámico → HMM BTC → Agentes MT/SR/G
 
 ## ✨ Últimas Fases
 
+### 🧠 Phase 20 — Intelligence Layer + Dashboard Consultivo (Junio 2026)
+Nueva capa consultiva, separada del runtime crítico, integrada en el dashboard:
+
+| Área | Resultado |
+|---|---|
+| `tools/intelligence/` | Ingesta read-only de `execution_events`, `state_snapshot` y DB del bot |
+| Reportes | `daily_report`, `weekly_report`, `postmortem` y `advisories` persistidos |
+| Dashboard | Nueva pestaña `Intelligence` con KPIs, advisories, annotations y lookup de postmortem |
+| SHADOW | Comparativa `SHADOW vs REAL` para calibración consultiva |
+| Seguridad | Sin impacto sobre órdenes, SL, reconciliación, watchdog ni recovery |
+
+> Esta capa no participa en el path de ejecución. Si falla, el bot sigue operando igual.
+
 ### 🔵 Phase 19 — Kanban GitHub Projects (Junio 2026)
 Integración **async no-bloqueante** con GitHub Projects v2 para el ciclo de vida completo de operaciones:
 
@@ -183,11 +196,50 @@ cp .env.example .env
 ## 📊 Dashboard
 
 El bot arranca automáticamente el dashboard en `http://127.0.0.1:8000`.  
-Muestra: estado runtime · trades activos · radar de señales · logs en vivo.
+Muestra: estado runtime · trades activos · radar de señales · logs en vivo · intelligence consultiva.
+
+### Dashboard + Intelligence
+
+- Pestaña `🧠 Intelligence` con resumen diario y semanal.
+- `Advisories` persistidos desde la capa consultiva.
+- `Trade annotations` generadas desde histórico + contexto.
+- `Postmortem lookup` por `trade_id`.
+- Botón `⚙ Generar` para regenerar reportes desde la UI.
+- Botón `PM` en el historial de trades para abrir el postmortem del trade.
+
+Variables útiles:
+
+```bash
+export SNIPER_API_KEY="tu_clave_larga_y_segura"
+export SNIPER_DASHBOARD_AUTOSTART=1
+export SNIPER_INTELLIGENCE_AUTOSTART=1
+export SNIPER_INTELLIGENCE_STARTUP_DELAY_SECONDS=12
+export SNIPER_INTELLIGENCE_REFRESH_SECONDS=1800
+```
+
+Arranque recomendado:
+
+```bash
+SNIPER_API_KEY="tu_clave_larga_y_segura" ./.venv/bin/python main.py
+```
+
+URL local:
+
+```text
+http://127.0.0.1:8000
+```
 
 ```bash
 # Iniciar manualmente
 bash dashboard/run.sh
+```
+
+Generación manual por CLI:
+
+```bash
+./.venv/bin/python -m tools.intelligence.report_daily
+./.venv/bin/python -m tools.intelligence.report_weekly
+./.venv/bin/python -m tools.intelligence.postmortem 123
 ```
 
 ---
