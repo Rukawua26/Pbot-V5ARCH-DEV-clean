@@ -344,7 +344,7 @@ class Strategy:
                 genes=genes,
             )
             sl_dist_pct = abs(entry_price - sl_price) / entry_price * 100
-            max_entry_sl_pct = float(getattr(Config, "MAX_ENTRY_SL_PCT", 1.2) or 1.2)
+            max_entry_sl_pct = float(getattr(Config, "MAX_ENTRY_SL_PCT", 3.0) or 3.0)
 
             # --- VETO KAVA: Hard-Cap configurable ---
             if sl_dist_pct > max_entry_sl_pct:

@@ -170,7 +170,7 @@ class RiskEngine:
 
         try:
             # --- 1. Límites absolutos ---
-            base_notional = Config.MIN_NOTIONAL_VALUE  # e.g. $12
+            base_notional = Config.MIN_NOTIONAL_VALUE  # e.g. $5.0
             margin_fraction = float(getattr(Config, "MAX_MARGIN_PERCENT", 5.0))
             if margin_fraction > 1.0:
                 margin_fraction = margin_fraction / 100.0
