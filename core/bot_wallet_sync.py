@@ -2,7 +2,7 @@ from datetime import datetime
 
 from config import Config
 from core.execution_telemetry import append_execution_event
-from core.reconciliation import generate_child_client_order_id
+from core.reconciliation import generate_child_client_order_id, generate_order_ids
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import parse_datetime_utc, utc_now
 from core.trade_helpers import _emergency_market_close
@@ -554,6 +554,11 @@ def sync_wallet(bot):
                     )
                     sl = info["entry"] * 0.95 if info["side"] == "BUY" else info["entry"] * 1.05
 
+                    # Generate stable client order IDs for this adopted position
+                    entry_coid, sl_coid, _tp_coid = generate_order_ids(
+                        symbol, info["side"], utc_now().timestamp(), "wallet-sync"
+                    )
+
                     bot.active_trades[symbol] = {
                         "symbol": symbol,
                         "side": info["side"],
@@ -577,6 +582,8 @@ def sync_wallet(bot):
                             "is_adopted": True,
                         },
                         "status": "OPEN",
+                        "entry_client_order_id": entry_coid,
+                        "sl_client_order_id": sl_coid,
                         "sl_exchange_order_id": None,
                     }
                     with bot.db_lock:

@@ -177,9 +177,14 @@ def close_trade(
                 elif not _order_looks_filled(order):
                     bot.log(f"⚠️ Close order para {symbol} no confirmado como filled")
                     close_failed = True
-                elif not _exchange_position_is_flat(bot, symbol):
-                    bot.log(f"⚠️ Posición remota no está plana tras close para {symbol}")
-                    close_failed = True
+                else:
+                    try:
+                        if not _exchange_position_is_flat(bot, symbol):
+                            bot.log(f"⚠️ Posición remota no está plana tras close para {symbol}")
+                            close_failed = True
+                    except Exception as flat_error:
+                        bot.log(f"⚠️ No se pudo verificar posición plana tras close para {symbol}: {flat_error}")
+                        close_failed = True
 
                 if close_failed:
                     bot.is_paused = True

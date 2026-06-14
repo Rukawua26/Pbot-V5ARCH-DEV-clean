@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import hashlib
-import logging
 import os
 import pickle
 from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-logger = logging.getLogger(__name__)
 
 
 class UnsafeModelPathError(ValueError):
@@ -69,14 +67,10 @@ def verify_model_hash(path: str | os.PathLike[str]) -> None:
     resolved = _resolve_model_path(path)
     expected = _read_expected_sha256(resolved)
     if not expected:
-        actual = _sha256_file(resolved)
-        sidecar = resolved.with_suffix(resolved.suffix + ".sha256")
-        sidecar.write_text(actual + "  " + resolved.name, encoding="utf-8")
-        logger.warning(
-            "Auto-generated missing SHA-256 sidecar for %s (%s)",
-            resolved, actual[:16] + "...",
+        raise ModelHashMismatchError(
+            f"No SHA-256 sidecar found for {resolved}. "
+            f"Create {resolved}.sha256 with the expected hash to load this model securely."
         )
-        return
     actual = _sha256_file(resolved)
     if actual.lower() != expected:
         raise ModelHashMismatchError(

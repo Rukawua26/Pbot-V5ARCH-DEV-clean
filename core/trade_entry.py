@@ -1017,6 +1017,31 @@ def execute_order(
     except Exception as e:
         if simulated_margin_state is not None:
             _release_simulated_margin(bot, simulated_margin_state, 0.0)
+        # CRITICAL: If we got to this point with a REAL order that may have filled,
+        # we must HALT to prevent inconsistent state.
+        if not is_shadow and order is not None:
+            bot.is_paused = True
+            bot.integrity_lock_active = True
+            setattr(bot, "halt_system_active", True)
+            with bot.db_lock:
+                bot.brain.save_error_snapshot(
+                    symbol,
+                    "EXEC_EXCEPTION_POST_FILL_HALT",
+                    {
+                        "error": str(e)[:200],
+                        "order": str(order)[:200],
+                        "side": str(trade_state.get("side")),
+                    },
+                )
+            send_telegram_msg(
+                f"🛑 *EXEC_EXCEPTION_POST_FILL_HALT*\n{symbol} falló tras orden aceptada/consumo de margen. HALT activado.",
+                Priority.CRITICAL,
+            )
+            append_execution_event(
+                bot,
+                "EXEC_EXCEPTION_POST_FILL_HALT",
+                {"symbol": symbol, "error": str(e)[:200]},
+            )
         bot.log(f"❌ RECHAZO {symbol}: {e}")
         if not is_shadow:
             send_telegram_msg(
