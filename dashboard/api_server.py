@@ -1,11 +1,13 @@
 import json
 import hmac
+import logging
 import os
 import time
 import sqlite3
 from collections import deque
+from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -24,6 +26,14 @@ RATE_LIMIT_REQUESTS = 30
 RATE_LIMIT_WINDOW_SECONDS = 60
 _rate_limit_state: dict[str, list[float]] = {}
 _rate_limit_lock = threading.Lock()
+
+SECURITY_LOG = "logs/security_audit.log"
+MAX_BODY_BYTES = 64 * 1024  # 64 KB max request body
+_audit_logger = logging.getLogger("sniper_security")
+_audit_handler = logging.FileHandler(SECURITY_LOG)
+_audit_handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+_audit_logger.addHandler(_audit_handler)
+_audit_logger.setLevel(logging.INFO)
 
 def _check_rate_limit(client_ip: str) -> None:
     now = time.time()
@@ -57,6 +67,27 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def add_security_headers(req: Request, call_next):
+    content_length = req.headers.get("content-length")
+    if content_length and req.method in ("POST", "PUT", "PATCH"):
+        try:
+            if int(content_length) > MAX_BODY_BYTES:
+                client_ip = req.client.host if req.client else "unknown"
+                _audit_logger.warning("BODY_TOO_LARGE %s %s %sB", client_ip, req.url.path, content_length)
+                return Response(status_code=413, content='{"error":"Request too large"}', media_type="application/json")
+        except ValueError:
+            pass
+    response = await call_next(req)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' https://cdn.tailwindcss.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"] = "0"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+
 class Command(BaseModel):
     action: str = Field(min_length=1, max_length=64)
 
@@ -65,6 +96,8 @@ def verify_key(req: Request):
     _check_rate_limit(req.client.host if req.client else "unknown")
     supplied = str(req.headers.get("X-API-Key") or "")
     if not hmac.compare_digest(supplied, API_KEY):
+        client_ip = req.client.host if req.client else "unknown"
+        _audit_logger.warning("AUTH_FAIL %s %s %s", client_ip, req.method, req.url.path)
         raise HTTPException(401, "Unauthorized")
 
 
