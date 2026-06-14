@@ -16,7 +16,7 @@
 [![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Runtime_Clean-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean)
 [![Modos](https://img.shields.io/badge/Modos-PAPER_%7C_REAL_%7C_SHADOW-0ea5e9?style=flat-square)]()
 [![HMM](https://img.shields.io/badge/HMM-Markov_Intelligence-f97316?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/Tests-838_ok_%7C_2_skipped-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-873_ok_%7C_2_skipped-22c55e?style=flat-square)]()
 [![Shadow](https://img.shields.io/badge/Shadow_Capacity-20_trades-9333ea?style=flat-square)]()
 [![Deploy](https://img.shields.io/badge/Deploy-systemd_%7C_Docker-111827?style=flat-square)]()
 [![Risk](https://img.shields.io/badge/Risk_Engine-v118.7-ef4444?style=flat-square)]()
@@ -36,7 +36,7 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 
 | Check | Estado |
 |---|---|
-| `unittest discover` | ✅ `838 tests OK` · `2 skipped` |
+| `unittest discover` | ✅ `873 tests OK` · `2 skipped` |
 | `ruff --select F,E9` | ✅ Sin errores fatales |
 | `compileall main.py core tools` | ✅ OK |
 | `check_no_silent_pass.py` | ✅ OK |
@@ -74,7 +74,7 @@ Limpieza profunda orientada a estabilidad operativa:
 | Concurrencia | Protegidos accesos a `active_trades`, `scanner_history`, cooldowns y balance |
 | Shutdown | Señalización defensiva con `_shutdown_event` y cierre de executors |
 | Seguridad | Pickle seguro, subprocess con path validado y timeout |
-| Validación | 838 tests OK · `ruff F/E9` OK · mypy core OK |
+| Validación | 873 tests OK · `ruff F/E9` OK · mypy core OK |
 
 ### 🟣 Phase 18 — Hardening Técnico (Junio 2026)
 Consolidación del runtime sin deuda legacy:
@@ -86,18 +86,18 @@ Consolidación del runtime sin deuda legacy:
 | 🧠 RAG Memory | `find_similar_contexts` vectorizado con NumPy |
 | 💾 Maturity cache | Hash-debounce + persistencia async |
 | 🗄️ DB path | `core.learning_paths.DEFAULT_DB_PATH` como fuente única |
-| ✅ Validación | 838 tests · compileall · fatal ruff · mypy core · silent-pass guard |
+| ✅ Validación | 873 tests · compileall · fatal ruff · mypy core · silent-pass guard |
 
 ### 🟡 Phase 17 — Recalibración SHADOW (Mayo 2026)
 Ajuste de umbrales para operar en régimen RANGE:
 
 | Parámetro | Antes | Después | Efecto |
 |---|---|---|---|
-| `SHADOW_MODE_MIN` | 50% | **40%** | +10% señales que pasan |
-| `SHOCK_MIN_DIST_PCT` | 0.40% | **0.15%** | Menos vetos en mercado lateral |
+| `SHADOW_MODE_MIN` | 50% | **55%** | Umbral shadow más selectivo |
+| `SHOCK_MIN_DIST_PCT` | 0.40% | **0.20%** | Menos vetos en mercado lateral |
 | `HMM_RANGE_PENALTY` | 0.50x | **0.80x** | Penalización más suave en RANGE |
 | Breakout penalty | 0.85x | **0.95x** | Mínima penalización sin breakout |
-| `MAX_ENTRY_SL_PCT` | 2.50% | **4.0%** | Menos vetos en pares volátiles |
+| `MAX_ENTRY_SL_PCT` | 2.50% | **3.0%** | Límite operativo balanceado |
 
 ---
 
@@ -266,8 +266,8 @@ PENDING_SEND → PENDING_EXCHANGE_OPEN → ENTRY_FILLED_AWAITING_POSITION_SYNC �
 | 14 | Emergency close unificado + limpieza código muerto | ✅ |
 | 15 | MTF regime-aware + spread dinámico por régimen | ✅ |
 | 16 | Kinetic SR: boost ×1.3 absorción · penalty ×0.7 falling knife | ✅ |
-| 17 | Recalibración SHADOW: umbrales 40% · SHOCK 0.15% · RANGE 0.80x | ✅ |
-| 18 | Hardening técnico: legacy retirado · RAG NumPy · 623 tests | ✅ |
+| 17 | Recalibración SHADOW: umbrales 55% · SHOCK 0.20% · RANGE 0.80x | ✅ |
+| 18 | Hardening técnico: legacy retirado · RAG NumPy · 873 tests | ✅ |
 | 19 | GitHub Projects v2 Kanban async — ciclo vida de operaciones | ✅ |
 
 ---
@@ -298,7 +298,7 @@ Funciones disponibles en `tools/github_projects_kanban.py`:
 | `MAX_SHADOW_TRADES` | Máx. trades shadow concurrentes | `20` |
 | `HMM_REGIME_ENABLED` | Filtro de régimen BTC HMM | `true` |
 | `MTF_FILTER_ENABLED` | Confirmación 15m/5m | `false` |
-| `OI_FILTER_ENABLED` | Filtro Open Interest Delta | `false` |
+| `OI_FILTER_ENABLED` | Filtro Open Interest Delta | `true` |
 | `CVD_FILTER_ENABLED` | CVD rolling por aggTrade | `false` |
 | `CORRELATION_RISK_ENABLED` | Reducer por correlación | `false` |
 | `REGIME_TUNING_ENABLED` | Auto-tuning SL/TP | `true` |
@@ -374,7 +374,7 @@ SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest discover -s tests
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest tests/test_temporal_invariance.py
 ```
 
-**Estado verificado:** `623` tests OK · `2` skipped (hmmlearn env + testnet E2E opt-in)
+**Estado verificado:** `873` tests OK · `2` skipped (hmmlearn env + testnet E2E opt-in)
 
 ---
 
@@ -419,9 +419,10 @@ Pbot-V5ARCH-DEV/
 │   │   └── thresholds.py       # 30+ umbrales tipados
 │   ├── signals/                # Filtros y ejecución de señales
 │   └── strategy/               # Agentes MT · SR · G
-├── tests/                      # 623 tests unittest
+├── tests/                      # 873 tests unittest
 ├── tools/                      # Herramientas de análisis y validación
-├── deploy/systemd/             # Plantillas de servicio
+├── sniper-ai.service           # Servicio systemd principal
+├── sniper-ai-watchdog.service  # Watchdog systemd
 ├── docs/runbooks/              # Guías operativas
 └── docker-compose.yml
 ```

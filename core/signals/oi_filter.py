@@ -20,7 +20,7 @@ from config import Config
 
 logger = logging.getLogger("SniperAI")
 
-# Cache interno: {symbol: {"oi": float, "ts": float}}
+# Cache interno: {symbol: {"oi": float, "previous_oi": float | None, "ts": float}}
 _oi_cache: dict = {}
 
 
@@ -41,9 +41,21 @@ def _get_cached_oi(symbol: str, ttl_multiplier: float = 1.0) -> float | None:
     return entry["oi"]
 
 
+def _get_previous_cached_oi(symbol: str, ttl_multiplier: float = 3.0) -> float | None:
+    entry = _oi_cache.get(symbol)
+    if not entry:
+        return None
+    ttl = float(getattr(Config, "OI_CACHE_TTL_SECONDS", 60)) * ttl_multiplier
+    if time.time() - entry["ts"] > ttl:
+        return None
+    previous = entry.get("previous_oi")
+    return float(previous) if previous is not None else None
+
+
 def _update_oi_cache(symbol: str, oi_value: float):
     """Actualiza el cache con el OI actual."""
-    _oi_cache[symbol] = {"oi": oi_value, "ts": time.time()}
+    previous = _oi_cache.get(symbol, {}).get("oi")
+    _oi_cache[symbol] = {"oi": oi_value, "previous_oi": previous, "ts": time.time()}
 
 
 def fetch_oi_delta(bot, symbol: str) -> tuple[float | None, float | None]:
@@ -67,7 +79,7 @@ def fetch_oi_delta(bot, symbol: str) -> tuple[float | None, float | None]:
         # API-level TTL cache: evitar fetch si ya tenemos OI reciente
         oi_cached = _get_cached_oi(symbol, ttl_multiplier=1.0)
         if oi_cached is not None:
-            oi_previous = _get_cached_oi(symbol, ttl_multiplier=3.0)
+            oi_previous = _get_previous_cached_oi(symbol, ttl_multiplier=3.0)
             if oi_previous is None or oi_previous <= 0:
                 return None, oi_cached
             oi_delta_pct = (oi_cached - oi_previous) / oi_previous

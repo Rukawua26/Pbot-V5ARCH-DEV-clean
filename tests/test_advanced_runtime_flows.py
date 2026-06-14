@@ -223,6 +223,7 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
             "INTENT_EXPIRED",
         )
 
+    @patch("core.trade_entry.Config.MAX_RISK_USD", 20.0)
     @patch("core.trade_entry.Config.PAPER_MODE", False)
     @patch("core.trade_entry.send_telegram_msg")
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)

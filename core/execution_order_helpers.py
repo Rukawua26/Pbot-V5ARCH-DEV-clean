@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import cast
 
 from core.types import CCXTOrder
@@ -30,6 +31,12 @@ def _parse_order_float(order: CCXTOrder | dict | None, *keys: str) -> float | No
     return None
 
 
+def _exit_client_order_id(symbol: str, exit_side: str, label: str, step_idx: int) -> str:
+    raw = f"{symbol}|{exit_side}|{label}|{step_idx}"
+    digest = hashlib.blake2s(raw.encode("utf-8"), digest_size=10).hexdigest().upper()
+    return f"X_{digest}"
+
+
 def _execute_chase_limit_steps(
     execution_service,
     symbol: str,
@@ -37,6 +44,7 @@ def _execute_chase_limit_steps(
     amount: float,
     current_price: float,
     params: dict,
+    client_order_label: str = "close",
 ) -> CCXTOrder | None:
     chase_steps = [0.98, 0.97, 0.96, 0.95]
     timeout_per_step = 2
@@ -48,10 +56,15 @@ def _execute_chase_limit_steps(
         )
         try:
             limit_price = execution_service.exchange.price_to_precision(symbol, limit_price)
+            step_params = dict(params or {})
+            step_params.setdefault(
+                "newClientOrderId",
+                _exit_client_order_id(symbol, exit_side, client_order_label, step_idx),
+            )
             order = execution_service._call_exchange(
                 "close_position_create_order",
                 lambda: execution_service.exchange.create_order(
-                    symbol, "limit", exit_side, amount, limit_price, params
+                    symbol, "limit", exit_side, amount, limit_price, step_params
                 ),
                 retries=3,
                 timeout_s=20.0,

@@ -115,6 +115,46 @@ class TradeContextSnapshotsTest(unittest.TestCase):
         self.assertEqual(len(similar), 1)
         self.assertEqual(similar[0]["is_winner"], 1)
 
+    def test_find_similar_contexts_excludes_unresolved_snapshots(self):
+        self.brain.save_trade_context_snapshot(
+            symbol="BTC/USDT",
+            side="BUY",
+            context_json=self._fake_context(rsi=60, adx=30, vol_rel=1.5),
+            entry_timestamp="2026-01-01T00:00:00",
+            is_shadow=True,
+        )
+        conn = self.brain._get_conn()
+        conn.execute("UPDATE trade_context_snapshots SET is_winner=0")
+        conn.commit()
+        conn.close()
+
+        similar = self.brain.find_similar_contexts(self._fake_context(rsi=58, adx=28), limit=5)
+
+        self.assertEqual(similar, [])
+
+    def test_find_similar_contexts_filters_by_side_when_present(self):
+        ctx_sell = self._fake_context(rsi=60, adx=30, vol_rel=1.5)
+        self.brain.save_trade_context_snapshot(
+            symbol="BTC/USDT",
+            side="SELL",
+            context_json=ctx_sell,
+            entry_timestamp="2026-01-01T00:00:00",
+            is_shadow=True,
+        )
+        conn = self.brain._get_conn()
+        conn.execute(
+            "UPDATE trade_context_snapshots SET pnl_percent=3.0, is_winner=1, "
+            "exit_timestamp='2026-01-02T00:00:00', trade_id=1"
+        )
+        conn.commit()
+        conn.close()
+
+        query = self._fake_context(rsi=58, adx=28)
+        query["side"] = "BUY"
+        similar = self.brain.find_similar_contexts(query, limit=5)
+
+        self.assertEqual(similar, [])
+
     def test_cleanup_stale_snapshots(self):
         ctx = self._fake_context()
         self.brain.save_trade_context_snapshot(

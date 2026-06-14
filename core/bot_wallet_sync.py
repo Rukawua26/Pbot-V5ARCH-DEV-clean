@@ -19,6 +19,23 @@ def _bool_reduce_only(order: dict) -> bool:
     return str(raw).lower() in {"true", "1", "yes"}
 
 
+def _order_amount(order: dict) -> float:
+    info = order.get("info") or {}
+    for key in ("amount", "origQty", "quantity", "qty"):
+        value = order.get(key, info.get(key))
+        if value is not None:
+            try:
+                return abs(float(value or 0.0))
+            except (TypeError, ValueError):
+                return 0.0
+    return 0.0
+
+
+def _order_client_id(order: dict) -> str:
+    info = order.get("info") or {}
+    return str(order.get("clientOrderId") or info.get("clientOrderId") or "")
+
+
 def _is_protective_stop_for_trade(order: dict, trade: dict) -> bool:
     order_type = str(order.get("type") or (order.get("info") or {}).get("type") or "").upper()
     if "STOP" not in order_type:
@@ -34,6 +51,31 @@ def _is_protective_stop_for_trade(order: dict, trade: dict) -> bool:
     return False
 
 
+def _hard_sl_order_covers_trade(order: dict, trade: dict, info: dict | None = None) -> bool:
+    if not _is_protective_stop_for_trade(order, trade):
+        return False
+
+    order_id = str(order.get("id") or "")
+    known_order_id = str(trade.get("sl_exchange_order_id") or "")
+    if known_order_id and order_id and order_id != known_order_id:
+        return False
+
+    known_client_id = str(trade.get("sl_client_order_id") or "")
+    if known_client_id and _order_client_id(order) and _order_client_id(order) != known_client_id:
+        return False
+
+    order_info = order.get("info") or {}
+    close_position_raw = order.get("closePosition", order_info.get("closePosition", False))
+    close_position = str(close_position_raw).lower() in {"true", "1", "yes"}
+    if close_position:
+        return True
+
+    trade_amount = float((info or {}).get("amount") or trade.get("amount") or 0.0)
+    if trade_amount <= 0:
+        return False
+    return _order_amount(order) >= trade_amount * 0.999
+
+
 def _find_existing_hard_sl_order(bot, symbol: str, trade: dict):
     fetch_open_orders = getattr(bot.execution, "fetch_open_orders", None)
     if not callable(fetch_open_orders):
@@ -42,10 +84,38 @@ def _find_existing_hard_sl_order(bot, symbol: str, trade: dict):
         open_orders = fetch_open_orders(symbol) or []
         orders_iter = open_orders if isinstance(open_orders, (list, tuple)) else []
         for order in orders_iter:
-            if _is_protective_stop_for_trade(order, trade):
+            if _hard_sl_order_covers_trade(order, trade):
                 return order
     except Exception as error:
         bot.log(f"⚠️ No se pudo inspeccionar open orders de {symbol} para SL: {error}")
+    return None
+
+
+def _find_verified_hard_sl_order(bot, symbol: str, trade: dict, info: dict):
+    if Config.PAPER_MODE or trade.get("is_shadow", False):
+        return None
+    fetch_open_orders = getattr(bot.execution, "fetch_open_orders", None)
+    if not callable(fetch_open_orders):
+        return None
+    try:
+        open_orders = fetch_open_orders(symbol) or []
+    except Exception as error:
+        bot.is_paused = True
+        bot.integrity_lock_active = True
+        setattr(bot, "halt_system_active", True)
+        with bot.db_lock:
+            bot.brain.save_error_snapshot(symbol, "SL_VERIFY_FAILED_HALT", {"error": str(error)})
+        bot.log(f"🛑 SL_VERIFY_FAILED_HALT {symbol}: {error}. No se pudo verificar HARD SL.")
+        append_execution_event(
+            bot,
+            "SL_VERIFY_FAILED_HALT",
+            {"symbol": symbol, "error": str(error)},
+        )
+        return "HALT"
+    orders_iter = open_orders if isinstance(open_orders, (list, tuple)) else []
+    for order in orders_iter:
+        if _hard_sl_order_covers_trade(order, trade, info):
+            return order
     return None
 
 
@@ -112,7 +182,16 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
     if trade.get("is_shadow") or Config.PAPER_MODE:
         return False
     if trade.get("sl_exchange_order_id"):
-        return False
+        verified_sl = _find_verified_hard_sl_order(bot, symbol, trade, info)
+        if verified_sl and verified_sl != "HALT":
+            return False
+        if verified_sl == "HALT":
+            bot.log(f"🛑 HARD_SL_VERIFICATION_HALTED {symbol}: wallet sync aborted due to verification failure")
+            return False
+        bot.log(
+            f"⚠️ HARD_SL_MISSING_ON_EXCHANGE {symbol}: id local {trade.get('sl_exchange_order_id')} no está abierto/cubriendo. Re-adjuntando."
+        )
+        trade["sl_exchange_order_id"] = None
 
     existing_sl = _find_existing_hard_sl_order(bot, symbol, trade)
     if existing_sl:
@@ -161,6 +240,7 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
             return True
         fail_count = int(trade.get("hard_sl_attach_fail_count") or 0) + 1
         trade["hard_sl_attach_fail_count"] = fail_count
+        trade["status"] = "HARD_SL_UNPROTECTED"
         with bot.db_lock:
             bot.brain.save_active_trade_state(symbol, trade)
         max_retries = int(getattr(Config, "HARD_SL_ATTACH_MAX_RETRIES", 3) or 3)
@@ -176,7 +256,13 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
                 sl_error or "HARD_SL_ATTACH_FAILED_PERSISTENT",
             )
             return True
+        _halt_wallet_sync(
+            bot,
+            "HARD_SL_ATTACH_FAILED_UNPROTECTED",
+            {"symbol": symbol, "fail_count": fail_count, "sl_error": sl_error[:180]},
+        )
         bot.log(f"⚠️ Riesgo crítico: {symbol} sigue sin HARD SL en exchange")
+        return True
     return False
 
 
@@ -429,9 +515,19 @@ def sync_wallet(bot):
                     and symbol not in real_active_on_binance
                     and not Config.PAPER_MODE
                 ):
-                    # PROTECCIÓN DE LATENCIA: No purgar si el trade tiene menos de 60 segundos
+                    # PROTECCIÓN DE LATENCIA: No purgar si el trade tiene menos de 120 segundos
                     open_time = parse_datetime_utc(trade.get("open_time") or utc_now())
                     if (utc_now() - open_time).total_seconds() < 120:
+                        continue
+
+                    # No purgar si el estado es ambiguo (orden no confirmada, cierre en curso, etc.)
+                    ambiguous_statuses = {
+                        "PENDING_SEND", "ENTRY_ACK_UNKNOWN", "EXIT_STUCK",
+                        "CLOSING_INITIATED", "PARTIAL_FILL_PENDING",
+                    }
+                    status = trade.get("status", "")
+                    if status in ambiguous_statuses:
+                        bot.log(f"⏳ Wallet sync: {symbol} tiene estado ambiguo ({status}), no purgando")
                         continue
 
                     bot.log(f"🧹 Purgando manual: {symbol}")

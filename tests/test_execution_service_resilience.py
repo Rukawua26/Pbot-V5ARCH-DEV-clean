@@ -180,6 +180,20 @@ class _ChaseLimitNoFillExchange:
         return {"id": order_id, "symbol": symbol, "status": "canceled"}
 
 
+class _RetryCreateOrderExchange:
+    def __init__(self):
+        self.timeout = 9000
+        self.params_seen = []
+        self.create_attempts = 0
+
+    def create_order(self, symbol, order_type, side, amount, price, params):
+        self.create_attempts += 1
+        self.params_seen.append(dict(params or {}))
+        if self.create_attempts == 1:
+            raise ccxt.RequestTimeout("timeout after accept")
+        return {"id": "ro-1", "symbol": symbol, "status": "closed", "params": params}
+
+
 class _ConcurrentTimeoutExchange:
     def __init__(self):
         self.timeout = 9000
@@ -241,6 +255,30 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         self.assertIsNone(result)
         self.assertIn("finite", service.last_hard_sl_error)
         self.assertEqual(service.exchange.create_attempts, 0)
+
+    @patch("core.execution_service.time.sleep", return_value=None)
+    def test_reduce_only_market_retry_reuses_client_order_id(self, _sleep_mock):
+        service = ExecutionService("k", "s")
+        service.exchange = _RetryCreateOrderExchange()
+        service.set_weight_tracker(None)
+
+        result = service.create_reduce_only_market_order("BTC/USDT", "sell", 0.1)
+
+        self.assertEqual(result.get("status"), "closed")
+        self.assertEqual(service.exchange.create_attempts, 2)
+        first = service.exchange.params_seen[0].get("newClientOrderId")
+        second = service.exchange.params_seen[1].get("newClientOrderId")
+        self.assertTrue(first)
+        self.assertEqual(first, second)
+
+    @patch("core.execution_service.Config.PAPER_MODE", False)
+    def test_real_get_balance_raises_instead_of_returning_cached_balance(self):
+        service = ExecutionService("k", "s")
+        service._last_valid_balance = 123.0
+
+        with patch.object(service, "_call_exchange_account", side_effect=RuntimeError("auth down")):
+            with self.assertRaisesRegex(RuntimeError, "REAL_BALANCE_UNAVAILABLE"):
+                service.get_balance()
 
     def test_call_exchange_restores_timeout_after_operation(self):
         service = ExecutionService("k", "s")

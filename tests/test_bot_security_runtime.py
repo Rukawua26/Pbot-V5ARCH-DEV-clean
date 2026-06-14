@@ -1,8 +1,10 @@
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from core.bot_connection import connect_to_binance
+from core.command_router import handle_basic_command
 from core.bot_io_loops import telegram_listener
 
 
@@ -29,9 +31,19 @@ class BotSecurityRuntimeTest(unittest.TestCase):
             }
 
         mocked_updates.side_effect = _updates
-        telegram_listener(bot)
+        with patch("core.bot_io_loops.append_execution_event") as mocked_event:
+            telegram_listener(bot)
 
         bot.handle_command.assert_not_called()
+        mocked_event.assert_called_once_with(
+            bot,
+            "TELEGRAM_COMMAND_REJECTED",
+            {
+                "command": "/panic",
+                "chat_id_hash": "83cf8b609de6",
+                "reason": "unauthorized_chat",
+            },
+        )
 
     @patch("core.bot_io_loops.time.sleep", return_value=None)
     @patch("core.bot_io_loops.telegram_get_json")
@@ -56,9 +68,70 @@ class BotSecurityRuntimeTest(unittest.TestCase):
             ]
         }
 
-        telegram_listener(bot)
+        with patch("core.bot_io_loops.append_execution_event") as mocked_event:
+            telegram_listener(bot)
 
         bot.handle_command.assert_called_once_with("/status")
+        mocked_event.assert_called_once_with(
+            bot,
+            "TELEGRAM_COMMAND_ACCEPTED",
+            {"command": "/status", "chat_id_hash": "a665a4592042"},
+        )
+
+    def test_dockerignore_excludes_env_variants(self):
+        dockerignore = Path(__file__).resolve().parents[1] / ".dockerignore"
+        patterns = dockerignore.read_text(encoding="utf-8").splitlines()
+
+        self.assertIn(".env", patterns)
+        self.assertIn(".env.*", patterns)
+
+    def test_dockerignore_keeps_runtime_tools_package(self):
+        dockerignore = Path(__file__).resolve().parents[1] / ".dockerignore"
+        patterns = dockerignore.read_text(encoding="utf-8").splitlines()
+
+        self.assertNotIn("tools/", patterns)
+
+    def test_rebase_capital_does_not_release_halt_or_real_exposure(self):
+        bot = SimpleNamespace(
+            lock=__import__("threading").RLock(),
+            halt_system_active=True,
+            integrity_lock_active=True,
+            circuit_breaker_active=True,
+            is_paused=True,
+            daily_drawdown_alert_sent=True,
+            active_trades={
+                "BTC/USDT": {"symbol": "BTC/USDT", "is_shadow": False, "status": "ENTRY_ACK_UNKNOWN"}
+            },
+            execution=SimpleNamespace(
+                fetch_positions=MagicMock(return_value=[]),
+                fetch_open_orders=MagicMock(return_value=[]),
+            ),
+            get_current_balance=MagicMock(return_value=123.0),
+        )
+
+        with patch("tools.notifier.send_telegram_msg") as mocked_tg:
+            handled = handle_basic_command(bot, "/rebase_capital")
+
+        self.assertTrue(handled)
+        self.assertTrue(bot.halt_system_active)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.is_paused)
+        bot.get_current_balance.assert_not_called()
+        self.assertIn("BLOQUEADO", mocked_tg.call_args[0][0])
+
+    @patch("core.config.manager.Config.USE_TESTNET", True)
+    @patch("core.config.manager.Config.ALLOW_REAL_TRADING", True)
+    @patch("core.config.manager.Config.PAPER_MODE", False)
+    @patch("core.config.manager.Config.BINANCE_API_KEY", "key")
+    @patch("core.config.manager.Config.BINANCE_API_SECRET", "secret")
+    @patch("core.config.manager.Config.TELEGRAM_TOKEN", "token")
+    @patch("core.config.manager.Config.TELEGRAM_CHAT_ID", "chat")
+    def test_real_config_rejects_testnet(self):
+        from core.config.manager import Config
+
+        errors = Config.validate()
+
+        self.assertTrue(any("REAL_MODE_TESTNET_BLOCKED" in error for error in errors))
 
     @patch("core.bot_connection.Config.ALLOW_REAL_TRADING", True)
     @patch("core.bot_connection.Config.PAPER_MODE", False)

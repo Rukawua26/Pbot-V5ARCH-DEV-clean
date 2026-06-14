@@ -58,6 +58,29 @@ class TestPlanExecutionMode(unittest.TestCase):
         self.assertTrue(ok)
         self.assertFalse(shadow)
 
+    def test_veto_verdict_blocks_execution_even_when_confidence_is_real(self):
+        bot = _make_bot()
+        with (
+            patch.object(Config, "REAL_CONFIDENCE_MIN", 0.75),
+            patch.object(Config, "SHADOW_PROB_MIN", 0.50),
+            patch.object(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False),
+        ):
+            ok, shadow, verdict, fp, fr = _plan_execution_mode(
+                bot,
+                "BTC/USDT",
+                "BUY",
+                96.0,
+                "⛔ VETO: ML_CONF 96.0%",
+                True,
+                "",
+                _ctx(),
+            )
+        self.assertFalse(ok)
+        self.assertTrue(shadow)
+        self.assertFalse(fp)
+        self.assertIn("ML_CONF", fr)
+
     def test_prob_below_shadow_min_no_execution(self):
         bot = _make_bot()
         with (

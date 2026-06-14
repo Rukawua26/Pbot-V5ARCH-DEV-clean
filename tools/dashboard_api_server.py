@@ -96,7 +96,7 @@ def send_command(cmd: Command, _=Depends(verify_key)):
     action = cmd.action.strip()
     if action not in ALLOWED_COMMANDS:
         raise HTTPException(400, "Command not allowed")
-    os.makedirs(CMD_DIR, exist_ok=True)
+    os.makedirs(CMD_DIR, mode=0o700, exist_ok=True)
     path = os.path.join(CMD_DIR, "command.json")
     data = {"commands": [{"action": action, "ts": time.time()}]}
     tmp = path + ".tmp"
@@ -104,6 +104,7 @@ def send_command(cmd: Command, _=Depends(verify_key)):
         json.dump(data, f)
         f.flush()
         os.fsync(f.fileno())
+    os.chmod(tmp, 0o600)
     os.replace(tmp, path)
     return {"ok": True, "action": action}
 

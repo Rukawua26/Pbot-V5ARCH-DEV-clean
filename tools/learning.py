@@ -3074,6 +3074,7 @@ class Brain:
 
             conn = self._get_conn()
             c = conn.cursor()
+            query_side = str(context.get("side") or "").upper()
             c.execute(
                 """
                 SELECT id, symbol, side, pnl_percent, is_winner,
@@ -3081,12 +3082,16 @@ class Brain:
                 FROM trade_context_snapshots
                 WHERE context_json IS NOT NULL
                   AND is_winner IS NOT NULL
+                  AND exit_timestamp IS NOT NULL
+                  AND pnl_percent IS NOT NULL
                 ORDER BY id DESC LIMIT 500
                 """,
             )
             rows_meta = []
             stored_vectors = []
             for row in c.fetchall():
+                if query_side and str(row["side"] or "").upper() != query_side:
+                    continue
                 try:
                     stored = json.loads(row["context_json"])
                 except (json.JSONDecodeError, TypeError):

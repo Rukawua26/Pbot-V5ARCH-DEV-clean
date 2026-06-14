@@ -16,7 +16,11 @@ class ModelLoaderTest(unittest.TestCase):
     def test_safe_pickle_load_allows_repo_local_model(self):
         with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
             model_path = Path(tmp) / "model.pkl"
-            model_path.write_bytes(pickle.dumps({"ok": True}))
+            payload = pickle.dumps({"ok": True})
+            model_path.write_bytes(payload)
+            model_path.with_suffix(".pkl.sha256").write_text(
+                hashlib.sha256(payload).hexdigest(), encoding="utf-8"
+            )
 
             model = safe_pickle_load(model_path)
 
@@ -30,7 +34,21 @@ class ModelLoaderTest(unittest.TestCase):
             with self.assertRaises(UnsafeModelPathError):
                 safe_pickle_load(model_path)
 
-    def test_safe_pickle_load_validates_optional_sha256_sidecar(self):
+    def test_safe_pickle_load_autogenerates_missing_sidecar(self):
+        with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
+            model_path = Path(tmp) / "model.pkl"
+            payload = pickle.dumps({"ok": True})
+            model_path.write_bytes(payload)
+
+            model = safe_pickle_load(model_path)
+
+            self.assertEqual(model, {"ok": True})
+            sidecar = model_path.with_suffix(".pkl.sha256")
+            self.assertTrue(sidecar.exists())
+            expected_hash = hashlib.sha256(payload).hexdigest()
+            self.assertIn(expected_hash, sidecar.read_text(encoding="utf-8"))
+
+    def test_safe_pickle_load_validates_sha256_sidecar(self):
         with tempfile.TemporaryDirectory(dir=ROOT) as tmp:
             model_path = Path(tmp) / "model.pkl"
             payload = pickle.dumps({"ok": True})

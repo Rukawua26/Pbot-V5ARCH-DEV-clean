@@ -90,6 +90,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                     "id": "existing-sl",
                     "type": "STOP_MARKET",
                     "side": "sell",
+                    "amount": 0.5,
                     "info": {"reduceOnly": True, "type": "STOP_MARKET"},
                 }
             ],
@@ -100,6 +101,84 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
 
         self.assertEqual(bot.active_trades["ETH/USDT"].get("sl_exchange_order_id"), "existing-sl")
         bot.execution.place_hard_sl.assert_not_called()
+
+    @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
+    def test_replaces_stale_local_sl_id_when_exchange_order_is_missing(self):
+        bot = self._base_bot()
+        bot.active_trades = {
+            "ETH/USDT": {
+                "symbol": "ETH/USDT",
+                "side": "BUY",
+                "entry": 2000.0,
+                "amount": 0.5,
+                "sl": 1980.0,
+                "is_shadow": False,
+                "open_time": datetime.now(),
+                "sl_exchange_order_id": "stale-sl",
+            }
+        }
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "ETH/USDT:USDT",
+                    "contracts": 0.5,
+                    "side": "long",
+                    "entryPrice": 2000.0,
+                    "unrealizedPnl": 0.0,
+                    "info": {},
+                }
+            ],
+            fetch_open_orders=lambda _symbol=None: [],
+            place_hard_sl=MagicMock(return_value={"id": "new-sl"}),
+        )
+
+        sync_wallet(bot)
+
+        self.assertEqual(bot.active_trades["ETH/USDT"].get("sl_exchange_order_id"), "new-sl")
+        bot.execution.place_hard_sl.assert_called_once()
+
+    @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
+    def test_ignores_partial_unrelated_stop_as_hard_sl_coverage(self):
+        bot = self._base_bot()
+        bot.active_trades = {
+            "ETH/USDT": {
+                "symbol": "ETH/USDT",
+                "side": "BUY",
+                "entry": 2000.0,
+                "amount": 0.5,
+                "sl": 1980.0,
+                "is_shadow": False,
+                "open_time": datetime.now(),
+                "sl_exchange_order_id": None,
+            }
+        }
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "ETH/USDT:USDT",
+                    "contracts": 0.5,
+                    "side": "long",
+                    "entryPrice": 2000.0,
+                    "unrealizedPnl": 0.0,
+                    "info": {},
+                }
+            ],
+            fetch_open_orders=lambda _symbol=None: [
+                {
+                    "id": "partial-stop",
+                    "type": "STOP_MARKET",
+                    "side": "sell",
+                    "amount": 0.1,
+                    "info": {"reduceOnly": True, "type": "STOP_MARKET"},
+                }
+            ],
+            place_hard_sl=MagicMock(return_value={"id": "full-sl"}),
+        )
+
+        sync_wallet(bot)
+
+        self.assertEqual(bot.active_trades["ETH/USDT"].get("sl_exchange_order_id"), "full-sl")
+        bot.execution.place_hard_sl.assert_called_once()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
     def test_emergency_market_close_when_sl_is_rejected_by_gap(self):

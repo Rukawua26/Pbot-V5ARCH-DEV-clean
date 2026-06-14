@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 
 from core.market_breadth import calculate_market_breadth
+from core.signals.context import _build_symbol_context
 from core.signals.filters import _apply_entry_filters_and_adjust_prob
 
 
@@ -54,6 +55,31 @@ class MarketBreadthTest(unittest.TestCase):
 
         self.assertEqual(breadth.sentiment, "NEUTRAL")
         self.assertEqual(breadth.total_count, 0)
+
+    @patch("core.signals.context.Strategy.detect_order_block", return_value="⚪")
+    @patch(
+        "core.signals.context.Strategy.compute_runtime_snapshot",
+        return_value={"rows": 200, "ema": 99.0, "adx": 30.0, "rsi": 55.0, "atr": 1.0},
+    )
+    def test_symbol_context_propagates_market_breadth_and_hmm(self, _snapshot, _ob):
+        hmm = {"is_ready": True, "state": "RANGE", "ts": "2026-06-11T00:00:00+00:00"}
+        bot = SimpleNamespace(
+            market_breadth={"sentiment": "FEAR", "dump_ratio": 0.75, "pump_ratio": 0.10},
+            hmm_markov_snapshot=hmm,
+            _snapshot_tickers={},
+            _get_cached_funding_rate=MagicMock(return_value=0.0),
+            _raw_snapshot_log_count=99,
+            log=MagicMock(),
+        )
+        df = pd.DataFrame({"close": [100.0], "volume": [10.0], "volume_ma": [5.0]})
+
+        _decision, ctx, _ob_status, _vol_rel = _build_symbol_context(
+            bot, "BTC/USDT", "BTC/USDT", df, 100.0, {"mode": "X"}, "BUY"
+        )
+
+        self.assertEqual(ctx["market_breadth_sentiment"], "FEAR")
+        self.assertEqual(ctx["market_breadth_dump_ratio"], 0.75)
+        self.assertIs(ctx["hmm_data"], hmm)
 
     @patch("core.signals.filters.Config.BREAKOUT_WATCH_ENABLED", False)
     @patch("core.signals.filters.Strategy.check_entry_filters")

@@ -12,6 +12,7 @@ import ccxt
 from config import Config
 from core.execution_order_helpers import (
     _execute_chase_limit_steps,
+    _exit_client_order_id,
     _parse_order_float,
     _with_exit_state,
 )
@@ -653,7 +654,14 @@ class ExecutionService:
         self._track_api_weight("fetch_order_book", 1, "market")
         return ob
 
-    def create_reduce_only_market_order(self, symbol: str, side: str, amount: float, params=None):
+    def create_reduce_only_market_order(
+        self, symbol: str, side: str, amount: float, params=None, client_order_id: str | None = None
+    ):
+        order_params = dict(params or {"reduceOnly": True})
+        order_params.setdefault("reduceOnly", True)
+        order_params["newClientOrderId"] = client_order_id or _exit_client_order_id(
+            symbol, side.lower(), f"market:{int(time.time() * 1000)}", 0
+        )
         order = self._call_exchange(
             "create_reduce_only_market_order",
             lambda: self.exchange.create_order(
@@ -662,7 +670,7 @@ class ExecutionService:
                 side.lower(),
                 amount,
                 None,
-                params=(params or {"reduceOnly": True}),
+                params=order_params,
             ),
             retries=3,
             timeout_s=25.0,
@@ -838,6 +846,8 @@ class ExecutionService:
                 break
 
         self.logger.error(f"Error fetching balance: {last_error}")
+        if not Config.PAPER_MODE:
+            raise RuntimeError(f"REAL_BALANCE_UNAVAILABLE: {last_error}")
         if self._last_valid_balance is not None:
             self.logger.warning(
                 f"⚠️ Usando último balance válido en caché: ${self._last_valid_balance:.2f}"
@@ -854,6 +864,10 @@ class ExecutionService:
         client_order_id: str | None = None,
     ) -> CCXTOrder | None:
         """Coloca un STOP_MARKET real en Binance para seguridad extrema."""
+        if client_order_id is None and not Config.PAPER_MODE:
+            self.last_hard_sl_error = "REAL HARD SL requires stable client_order_id for idempotency"
+            self.logger.error(self.last_hard_sl_error)
+            return None
         try:
             stop_price_float = float(stop_price)
         except (TypeError, ValueError):
@@ -925,8 +939,9 @@ class ExecutionService:
         )
 
         if current_price > 0:
+            exit_label = f"{context_label or 'close'}:{int(time.time() * 1000)}"
             last_order = _execute_chase_limit_steps(
-                self, symbol, exit_side, amount, current_price, params
+                self, symbol, exit_side, amount, current_price, params, exit_label
             )
 
             if last_order and last_order.get("exit_state") == "FILLED":
@@ -946,6 +961,11 @@ class ExecutionService:
                 )
                 try:
                     emergency_price = self.exchange.price_to_precision(symbol, current_price)
+                    emergency_params = dict(params)
+                    emergency_params.setdefault(
+                        "newClientOrderId",
+                        _exit_client_order_id(symbol, exit_side, f"{exit_label}:emergency", 0),
+                    )
                     order = self._call_exchange(
                         emergency_op_name,
                         lambda: self.exchange.create_order(
@@ -954,7 +974,7 @@ class ExecutionService:
                             exit_side,
                             amount,
                             emergency_price,
-                            params,
+                            emergency_params,
                         ),
                         retries=3,
                         timeout_s=20.0,

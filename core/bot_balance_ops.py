@@ -48,6 +48,11 @@ def get_current_balance(bot):
         return bot.execution.get_balance()
     except Exception as error:
         bot.log(f"⚠️ Error obteniendo balance: {error}")
+        if not Config.PAPER_MODE:
+            bot.is_paused = True
+            bot.integrity_lock_active = True
+            setattr(bot, "halt_system_active", True)
+            raise RuntimeError(f"REAL_BALANCE_UNAVAILABLE: {error}") from error
         return getattr(bot, "available_balance", 0.0)
 
 

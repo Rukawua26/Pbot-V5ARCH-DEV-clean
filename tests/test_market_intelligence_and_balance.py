@@ -375,6 +375,26 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
         self.assertEqual([item["symbol"] for item in targets], ["HEALTHY/USDT"])
         bot.log.assert_any_call("⚠️ Error en filtros duros para BROKEN/USDT: maturity down")
 
+    @patch("core.bot_balance_ops.Config.PAPER_MODE", False)
+    def test_real_balance_failure_halts_and_raises(self):
+        from core.bot_balance_ops import get_current_balance
+
+        bot = SimpleNamespace(
+            execution=SimpleNamespace(get_balance=MagicMock(side_effect=RuntimeError("auth down"))),
+            log=MagicMock(),
+            is_paused=False,
+            integrity_lock_active=False,
+            halt_system_active=False,
+            available_balance=42.0,
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "REAL_BALANCE_UNAVAILABLE"):
+            get_current_balance(bot)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+
     @patch.object(bot_main_loop.Config, "BREAKOUT_WATCH_ENABLED", False)
     @patch.object(bot_main_loop.Config, "ML_HEALTH_VETO_ENABLED", False)
     def test_main_loop_does_not_reacquire_after_empty_triage_targets(self):

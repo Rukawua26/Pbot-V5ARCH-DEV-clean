@@ -123,6 +123,7 @@ def _write_state_snapshot(bot):
             json.dump(snapshot, f)
             f.flush()
             os.fsync(f.fileno())
+        os.chmod(tmp, 0o600)
         os.replace(tmp, STATE_FILE)
     except Exception as error:
         logger.warning("state snapshot write failed: %s", error)

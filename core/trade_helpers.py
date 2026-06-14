@@ -66,6 +66,19 @@ def _emergency_market_close(
         "close_ok": False,
     }
 
+    exit_side = "SELL" if str(side).upper() == "BUY" else "BUY"
+
+    def _close_result_confirmed(order_result) -> bool:
+        if verify_flat:
+            return _emergency_close_verify_flat(bot, symbol)
+        if not isinstance(order_result, dict):
+            return bool(order_result)
+        exit_state = str(order_result.get("exit_state") or "").upper()
+        status = str(order_result.get("status") or "").lower()
+        if exit_state == "FILLED" or status in {"closed", "filled"}:
+            return True
+        return False
+
     if persist_state and trade:
         trade["status"] = "CLOSING_INITIATED"
         trade["closing_in_progress"] = True
@@ -74,14 +87,11 @@ def _emergency_market_close(
 
     for attempt in range(1, 4):
         try:
-            bot.execution.close_position(symbol, side, amount)
-            if not verify_flat:
+            close_result = bot.execution.close_position(symbol, side, amount)
+            if _close_result_confirmed(close_result):
                 close_ok = True
                 break
-            if _emergency_close_verify_flat(bot, symbol):
-                close_ok = True
-                break
-            last_close_error = "close order accepted but exchange position still open"
+            last_close_error = "close order not confirmed flat"
             bot.log(f"⚠️ EMERGENCY_CLOSE {symbol}: cierre no confirmado, exposición sigue abierta")
         except Exception as close_error:
             last_close_error = str(close_error)
@@ -95,13 +105,13 @@ def _emergency_market_close(
         for attempt in range(1, 3):
             try:
                 bot.log(f"🧯 EMERGENCY_CLOSE intento MARKET {attempt}/2 en {symbol}")
-                bot.execution.create_reduce_only_market_order(symbol, side, amount)
-                if not verify_flat:
+                market_result = bot.execution.create_reduce_only_market_order(
+                    symbol, exit_side, amount
+                )
+                if _close_result_confirmed(market_result):
                     close_ok = True
                     break
-                if _emergency_close_verify_flat(bot, symbol):
-                    close_ok = True
-                    break
+                last_close_error = "market close not confirmed flat"
             except Exception as close_error:
                 last_close_error = str(close_error)
                 bot.log(
@@ -184,7 +194,7 @@ def _fail_safe_close_when_sl_missing(bot, symbol: str, side: str, amount: float)
         symbol=symbol,
         side=side,
         amount=amount,
-        verify_flat=False,
+        verify_flat=True,
         persist_state=False,
         halt_on_failure=False,
     )

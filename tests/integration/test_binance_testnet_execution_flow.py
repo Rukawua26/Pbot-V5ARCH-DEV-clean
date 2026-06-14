@@ -56,10 +56,10 @@ class BinanceTestnetExecutionFlowTest(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        api_key = os.getenv("BINANCE_TESTNET_API_KEY") or os.getenv("BINANCE_API_KEY")
-        api_secret = os.getenv("BINANCE_TESTNET_API_SECRET") or os.getenv("BINANCE_API_SECRET")
+        api_key = os.getenv("BINANCE_TESTNET_API_KEY")
+        api_secret = os.getenv("BINANCE_TESTNET_API_SECRET")
         if not api_key or not api_secret:
-            raise unittest.SkipTest("Binance testnet API credentials are required")
+            raise unittest.SkipTest("Binance testnet API credentials are required (set BINANCE_TESTNET_API_KEY and BINANCE_TESTNET_API_SECRET)")
 
         cls.symbol = os.getenv("BINANCE_TESTNET_SYMBOL", "BTC/USDT")
         cls.amount = float(os.getenv("BINANCE_TESTNET_ORDER_AMOUNT", "0.001"))

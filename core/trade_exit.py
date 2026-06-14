@@ -120,6 +120,8 @@ def close_trade(
 
     try:
         fees = 0
+        close_failed = False
+        order = None
         if not trade.get("is_shadow", False) and not Config.PAPER_MODE:
             try:
                 bot.log(
@@ -167,33 +169,33 @@ def close_trade(
 
             except Exception as e:
                 bot.log(f"❌ ERROR CRÍTICO CERRANDO {symbol}: {e}")
+                close_failed = False
 
-                if any(x in str(e).lower() for x in ["notional", "-4164", "insufficient"]):
-                    try:
-                        if not _exchange_position_is_flat(bot, symbol):
-                            raise RuntimeError(
-                                f"{symbol}: error de dust/min notional pero exposición remota sigue abierta"
-                            )
-                    except Exception as verify_error:
-                        bot.log(f"\U0001f6a8 DUST_VERIFY_FAILED {symbol}: {verify_error}")
-                        send_telegram_msg(
-                            f"⚠️ *FALLO DE CIERRE REAL*\n{symbol}: no se pudo confirmar exposición cero tras error dust/minNotional. {verify_error}"
-                        )
-                        raise verify_error
+                if "notional" in str(e).lower() or "-4164" in str(e) or "insufficient" in str(e).lower():
+                    bot.log(f"⚠️ Error de min notional/dust detectado para {symbol}")
+                    close_failed = True
+                elif not _order_looks_filled(order):
+                    bot.log(f"⚠️ Close order para {symbol} no confirmado como filled")
+                    close_failed = True
+                elif not _exchange_position_is_flat(bot, symbol):
+                    bot.log(f"⚠️ Posición remota no está plana tras close para {symbol}")
+                    close_failed = True
 
-                    bot.log(f"⚠️ {symbol} descartado localmente (Dust/Min Notional).")
-                    send_telegram_msg(
-                        f"⚠️ *AVISO DUST*\n{symbol} cerrado virtualmente por monto bajo."
+                if close_failed:
+                    bot.is_paused = True
+                    bot.integrity_lock_active = True
+                    setattr(bot, "halt_system_active", True)
+                    if symbol in bot.active_trades:
+                        bot.active_trades[symbol]["status"] = TradeStatus.EXIT_STUCK.value
+                        bot.active_trades[symbol]["closing_in_progress"] = False
+                    with bot.db_lock:
+                        bot.brain.save_active_trade_state(symbol, bot.active_trades.get(symbol, {}))
+                    append_execution_event(
+                        bot,
+                        "REAL_CLOSE_FAILED_HALT",
+                        {"symbol": symbol, "error": str(e), "closing_in_progress": False},
                     )
-                    with bot.lock:
-                        if symbol in bot.active_trades:
-                            del bot.active_trades[symbol]
                     return
-                else:
-                    send_telegram_msg(
-                        f"⚠️ *FALLO DE CIERRE REAL*\n{symbol} falló en Binance. Error: {e}"
-                    )
-                    raise e
 
             time.sleep(1)
             try:

@@ -811,7 +811,7 @@ class RegimePreVetoTests(unittest.TestCase):
         self.assertEqual(result, expected)
         analyze_mock.assert_called_once()
 
-    def test_pre_veto_range_blocks_real_when_markov_bearish_extreme(self):
+    def test_pre_veto_range_allows_directional_strategy_when_markov_bearish_extreme(self):
         bot = self._build_bot("RANGE")
         bot.hmm_markov_snapshot = {
             "ts": datetime.now(UTC).isoformat(),
@@ -820,19 +820,22 @@ class RegimePreVetoTests(unittest.TestCase):
             "bearish_reversal_prob": 90.0,
         }
         df = self._build_df()
+        expected = ("SELL", "NONE", 100.0, 10.0, {}, {})
 
         with patch.object(signal_analyze.Config, "HMM_RANGE_VETO", True):
             with patch.object(signal_analyze.Config, "PAPER_MODE", False):
                 with patch.object(
                     signal_analyze.Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0
                 ):
-                    with patch.object(signal_analyze.Strategy, "analyze") as analyze_mock:
+                    with patch.object(
+                        signal_analyze.Strategy, "analyze", return_value=expected
+                    ) as analyze_mock:
                         result = signal_analyze._analyze_symbol_candidate(
                             bot, "TEST/USDT", "TEST/USDT", df, df, elapsed=12
                         )
 
-        self.assertIsNone(result)
-        analyze_mock.assert_not_called()
+        self.assertEqual(result, expected)
+        analyze_mock.assert_called_once()
 
     def test_pre_veto_disabled_allows_strategy_analyze(self):
         bot = self._build_bot("RANGE")

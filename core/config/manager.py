@@ -231,6 +231,11 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append(
                 "REAL_MODE_SIN_KEYS: modo REAL requiere BINANCE_API_KEY y BINANCE_API_SECRET."
             )
+        if cls.USE_TESTNET:
+            errors.append(
+                "REAL_MODE_TESTNET_BLOCKED: modo REAL requiere USE_TESTNET=false. "
+                "Use PAPER_MODE=true para pruebas o desactive testnet antes de operar con capital real."
+            )
         if cls.MAX_OPEN_TRADES < 1 or cls.MAX_OPEN_TRADES > 5:
             errors.append(
                 "REAL_MODE_MAX_TRADES: en modo REAL, MAX_OPEN_TRADES debe estar entre 1 y 5."

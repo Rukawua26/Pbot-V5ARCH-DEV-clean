@@ -1,11 +1,14 @@
 """Tests para el filtro de Open Interest Delta v118.3."""
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from core.signals.oi_filter import (
     _get_cached_oi,
     _oi_cache,
     _update_oi_cache,
+    fetch_oi_delta,
     validate_signal_with_oi,
 )
 
@@ -68,6 +71,17 @@ class OICacheTests(unittest.TestCase):
     def test_cache_expired_returns_none(self):
         _oi_cache["BTC/USDT"] = {"oi": 50000.0, "ts": 0.0}  # Timestamp antiguo
         self.assertIsNone(_get_cached_oi("BTC/USDT"))
+
+    @patch("core.signals.oi_filter.Config.OI_CACHE_TTL_SECONDS", 180)
+    def test_fetch_oi_delta_uses_previous_cache_not_current_value(self):
+        _update_oi_cache("BTC/USDT", 100.0)
+        _update_oi_cache("BTC/USDT", 110.0)
+        bot = SimpleNamespace(execution=object(), weight_tracker=None)
+
+        delta, current = fetch_oi_delta(bot, "BTC/USDT")
+
+        self.assertAlmostEqual(delta, 0.10)
+        self.assertEqual(current, 110.0)
 
 
 if __name__ == "__main__":

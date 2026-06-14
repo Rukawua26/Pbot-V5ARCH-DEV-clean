@@ -70,15 +70,18 @@ def compute_correlation_reduction(
     if not correlations:
         return 1.0, []
 
-    mean_corr = sum(item["correlation"] for item in correlations) / len(correlations)
+    positive_corrs = [item["correlation"] for item in correlations if item["correlation"] > 0]
+    mean_corr = sum(positive_corrs) / len(positive_corrs) if positive_corrs else 0.0
+    max_corr = max(positive_corrs) if positive_corrs else 0.0
+    effective_corr = max(mean_corr, max_corr)
 
-    if mean_corr < threshold:
+    if effective_corr < threshold:
         return 1.0, correlations
 
-    if mean_corr >= 1.0:
+    if effective_corr >= 1.0:
         reduction = max_reduction
     else:
-        delta = mean_corr - threshold
+        delta = effective_corr - threshold
         span = 1.0 - threshold
         reduction = 1.0 - ((1.0 - max_reduction) * delta / span)
 

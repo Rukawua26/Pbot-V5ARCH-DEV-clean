@@ -100,6 +100,7 @@ class DashboardIpcTest(unittest.TestCase):
                     {"commands": [{"action": "/pause"}, {"action": "/dump_db"}]},
                     handle,
                 )
+            os.chmod(path, 0o600)
 
             with patch.object(cmd_consumer, "CMD_FILE", path):
                 cmd_consumer.consume_command_file(bot)

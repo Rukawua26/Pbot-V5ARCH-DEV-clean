@@ -3,6 +3,7 @@ import time
 import unittest
 from unittest.mock import MagicMock, patch
 
+import tools.notifier as notifier
 from tools.notifier import NotificationQueue, Priority, send_telegram_photo
 
 
@@ -134,6 +135,24 @@ class BootAndNotifierTest(unittest.TestCase):
         self.assertEqual(second_item[3]["json"]["text"], "first")
         self.assertEqual(third_item[3]["json"]["text"], "second")
         queue.stop()
+
+    @patch("tools.notifier.Config.TELEGRAM_CHAT_ID", "")
+    @patch("tools.notifier.Config.TELEGRAM_TOKEN", "")
+    @patch("builtins.print")
+    @patch("tools.notifier.threading.Thread")
+    def test_missing_telegram_config_warns_once(self, _mocked_thread, mocked_print):
+        notifier._telegram_config_warning_sent = False
+        queue = NotificationQueue(max_retries=1, rate_limit_seconds=0)
+        queue.running = False
+
+        queue.send("first", Priority.INFO)
+        queue.send("second", Priority.INFO)
+
+        self.assertEqual(mocked_print.call_count, 1)
+        self.assertIn("Telegram no configurado", mocked_print.call_args.args[0])
+        self.assertTrue(queue.queue.empty())
+        queue.stop()
+        notifier._telegram_config_warning_sent = False
 
     def test_shadow_logger_does_not_start_until_used(self):
         from tools.learning import LazyShadowLogger

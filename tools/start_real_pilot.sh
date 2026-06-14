@@ -20,10 +20,12 @@ if [ ! -f .env.real ]; then
     echo "ERROR: .env.real no encontrado. Cópialo desde .env.real.template primero."
     exit 1
 fi
+chmod 600 .env.real
 
 # 2. Backup current .env if not already done
 if [ ! -f .env.paper.backup ]; then
     cp .env .env.paper.backup
+    chmod 600 .env.paper.backup
     echo "✓ Backup .env → .env.paper.backup"
 fi
 
@@ -64,10 +66,8 @@ fi
 echo ""
 echo "=== Validation ==="
 PYTHONPATH="." python -c "
-import os
-os.environ['PAPER_MODE'] = 'false'
-os.environ['ALLOW_REAL_TRADING'] = 'true'
-os.environ['USE_TESTNET'] = 'false'
+from dotenv import load_dotenv
+load_dotenv('.env.real', override=True)
 from core.config.manager import Config
 errors = Config.validate()
 if errors:
@@ -93,7 +93,9 @@ PYTHONPATH="." python tools/regression_contracts.py 2>&1 && echo "✓ Contracts 
 # 7. Activate REAL env
 echo ""
 echo "=== Starting REAL pilot ==="
+mkdir -p logs
 cp .env.real .env
+chmod 600 .env
 echo "✓ .env.real → .env"
 
 # 8. Start bot in background

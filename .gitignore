@@ -1,6 +1,7 @@
 # Secrets
 .env
 .env.*
+!.env.example
 *.key
 *.pem
 
@@ -38,6 +39,8 @@ data_storage/
 backups/
 docs/reports/*.csv
 reports/
+audit_report.json
+.opencode/node_modules/
 
 # OS/editor
 .DS_Store

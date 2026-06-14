@@ -30,6 +30,74 @@ def _prioritize_symbols(snapshot: dict) -> list:
     return real_syms + shadow_syms
 
 
+def _sl_tightened(side: str, previous_sl: float, new_sl: float) -> bool:
+    if previous_sl <= 0.0 or new_sl <= 0.0:
+        return False
+    if str(side).upper() == "BUY":
+        return new_sl > previous_sl
+    return new_sl < previous_sl
+
+
+def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -> None:
+    if Config.PAPER_MODE or trade.get("is_shadow", False):
+        return
+    new_sl = float(trade.get("sl") or 0.0)
+    if not _sl_tightened(str(trade.get("side") or "BUY"), previous_sl, new_sl):
+        return
+
+    old_order_id = str(trade.get("sl_exchange_order_id") or "")
+    if not old_order_id:
+        return
+
+    amend_count = int(trade.get("sl_amend_count") or 0) + 1
+    base_coid = str(trade.get("sl_client_order_id") or "SL")
+    new_coid = f"{base_coid[:28]}A{amend_count:03d}"
+    amount = float(trade.get("amount") or 0.0)
+    if amount <= 0.0:
+        return
+
+    new_order = bot.execution.place_hard_sl(
+        symbol,
+        str(trade.get("side") or "BUY"),
+        amount,
+        new_sl,
+        client_order_id=new_coid,
+    )
+    if not new_order:
+        bot.is_paused = True
+        bot.integrity_lock_active = True
+        setattr(bot, "halt_system_active", True)
+        trade["status"] = "HARD_SL_AMEND_FAILED"
+        with bot.db_lock:
+            bot.brain.save_active_trade_state(symbol, trade)
+        append_execution_event(
+            bot,
+            "HARD_SL_AMEND_FAILED_HALT",
+            {"symbol": symbol, "old_sl": previous_sl, "new_sl": new_sl},
+        )
+        bot.log(f"🛑 HARD_SL_AMEND_FAILED {symbol}: SL local {previous_sl} -> {new_sl}")
+        return
+
+    cancel_order = getattr(bot.execution, "cancel_order", None)
+    if callable(cancel_order):
+        try:
+            cancel_order(symbol, old_order_id)
+        except Exception as error:
+            bot.log(f"⚠️ No se pudo cancelar HARD SL anterior {symbol}/{old_order_id}: {error}")
+
+    trade["sl_exchange_order_id"] = new_order.get("id")
+    trade["sl_client_order_id"] = new_coid
+    trade["hard_sl_price"] = new_sl
+    trade["sl_amend_count"] = amend_count
+    with bot.db_lock:
+        bot.brain.save_active_trade_state(symbol, trade)
+    append_execution_event(
+        bot,
+        "HARD_SL_AMENDED",
+        {"symbol": symbol, "old_sl": previous_sl, "new_sl": new_sl, "old_order_id": old_order_id},
+    )
+
+
 def run_guardian_loop(bot):
     bot.log("🛡️ Guardián OK.")
     last_heavy = 0.0
@@ -306,6 +374,7 @@ def run_guardian_loop(bot):
                             or 0.0
                         )
 
+                        previous_sl = float(t.get("sl") or 0.0)
                         exit_eval = bot.exit_engine.evaluate_exit(
                             trade=t,
                             current_price=curr,
@@ -316,6 +385,7 @@ def run_guardian_loop(bot):
                                 else Config.SMART_EXIT_THRESHOLD_REAL
                             ),
                         )
+                        _sync_tightened_hard_sl(bot, s, t, previous_sl)
                         now_ts = monotonic_now()
                         last_log_ts = float(bot._exit_eval_last_log.get(s, 0.0))
                         if now_ts - last_log_ts >= 120:
@@ -326,6 +396,16 @@ def run_guardian_loop(bot):
                         if bool(exit_eval.get("should_exit", False)):
                             exit_reason = str(exit_eval.get("reason", "EXIT_ENGINE"))
                             bot.close_trade(s, exit_reason, curr)
+                            continue
+
+                    tp_price = float(t.get("tp") or 0.0)
+                    if tp_price > 0.0:
+                        if (t["side"] == "BUY" and curr >= tp_price) or (
+                            t["side"] == "SELL" and curr <= tp_price
+                        ):
+                            t["tp_triggered"] = True
+                            t["tp_trigger_price"] = curr
+                            bot.close_trade(s, "TAKE_PROFIT", curr)
                             continue
 
                     # Fallback legacy de break-even (solo si Exit Engine v1 está desactivado).
@@ -344,7 +424,9 @@ def run_guardian_loop(bot):
                             should_tighten = be_sl < current_sl
 
                         if should_tighten:
+                            previous_be_sl = float(t.get("sl") or 0.0)
                             t["sl"] = be_sl
+                            _sync_tightened_hard_sl(bot, s, t, previous_be_sl)
                         t["early_be_armed"] = True
                         bot.log(
                             f"🛡️ EARLY BE {s}: PnL {t['pnl']:.2f}% >= {Config.EARLY_BREAKEVEN_ACTIVATION_PNL:.2f}% | "
@@ -422,9 +504,11 @@ def run_guardian_loop(bot):
                                     bot.log(
                                         f"👻 GHOST ALERT {s}: Probabilidad cayó a {prob:.2f} (Umbral 0.48). Apretando SL a Break Even."
                                     )
+                                    previous_ghost_sl = float(t.get("sl") or 0.0)
                                     t["sl"] = t["entry"] * (
                                         1.001 if t["side"] == "BUY" else 0.999
                                     )  # Asegurar fees
+                                    _sync_tightened_hard_sl(bot, s, t, previous_ghost_sl)
                                     t["ghost_checked"] = (
                                         True  # Solo chequear una vez para no saturar
                                     )

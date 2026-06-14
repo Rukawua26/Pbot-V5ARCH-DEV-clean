@@ -97,6 +97,128 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         bot.close_trade.assert_not_called()
 
     @patch("core.bot_guardian.time.sleep", return_value=None)
+    def test_guardian_closes_when_configured_tp_price_is_hit(self, _sleep_mock):
+        trade = {
+            "symbol": "XPL/USDT",
+            "side": "BUY",
+            "entry": 1.0,
+            "amount": 1.0,
+            "sl": 0.9,
+            "tp": 1.1,
+            "pnl": 0.0,
+            "peak_pnl": 0.0,
+            "open_time": utc_now_iso(),
+            "is_shadow": True,
+            "entry_confidence": 80.0,
+            "leverage": 10,
+            "market_snapshot": {},
+            "trailing_active": False,
+        }
+
+        bot = SimpleNamespace()
+        bot.is_running = True
+        bot.lock = threading.Lock()
+        bot.price_lock = threading.Lock()
+        bot.active_trades = {"XPL/USDT": trade}
+        bot.live_prices = {"XPLUSDT": 1.12}
+        bot.log = MagicMock()
+        bot.close_trade = MagicMock()
+        bot.sync_wallet = MagicMock()
+        bot._guardian_stats = {"bailout_count": 0, "loops": 0, "work_s": 0.0, "sleep_s": 0.0}
+        bot._exit_eval_last_log = {}
+        bot.execution = SimpleNamespace(fetch_ticker=MagicMock(return_value={"last": 1.12}))
+        bot.exit_engine = SimpleNamespace(
+            evaluate_exit=MagicMock(return_value={"should_exit": False, "reason": "HOLD"})
+        )
+        bot.risk_engine = SimpleNamespace(
+            should_abort_trade=MagicMock(return_value=(False, "CONF_OK")),
+            should_defer_confidence_exit_for_fee_noise=MagicMock(
+                return_value=(False, "NOT_FEE_NOISE_REASON")
+            ),
+        )
+        bot.brain = SimpleNamespace(
+            pending_model_update=False,
+            upsert_confidence_exit_audit=MagicMock(return_value=1),
+        )
+
+        def _monitor_once():
+            bot.is_running = False
+
+        bot.monitor_open_trades = _monitor_once
+
+        run_guardian_loop(bot)
+
+        bot.close_trade.assert_called_once_with("XPL/USDT", "TAKE_PROFIT", 1.12)
+
+    @patch("core.bot_guardian.Config.PAPER_MODE", False)
+    @patch("core.bot_guardian.time.sleep", return_value=None)
+    def test_guardian_amends_exchange_hard_sl_after_local_tighten(self, _sleep_mock):
+        trade = {
+            "symbol": "XPL/USDT",
+            "side": "BUY",
+            "entry": 1.0,
+            "amount": 1.0,
+            "sl": 0.9,
+            "tp": 0.0,
+            "pnl": 1.5,
+            "peak_pnl": 1.5,
+            "open_time": utc_now_iso(),
+            "is_shadow": False,
+            "entry_confidence": 80.0,
+            "leverage": 10,
+            "market_snapshot": {},
+            "trailing_active": False,
+            "sl_exchange_order_id": "old-sl",
+            "sl_client_order_id": "SL_OLD",
+        }
+
+        def _tighten(trade, **_kwargs):
+            trade["sl"] = 1.01
+            return {"should_exit": False, "reason": "BREAKEVEN_GUARD_ARMED"}
+
+        bot = SimpleNamespace()
+        bot.is_running = True
+        bot.lock = threading.Lock()
+        bot.db_lock = threading.Lock()
+        bot.price_lock = threading.Lock()
+        bot.active_trades = {"XPL/USDT": trade}
+        bot.live_prices = {"XPLUSDT": 1.02}
+        bot.log = MagicMock()
+        bot.close_trade = MagicMock()
+        bot.sync_wallet = MagicMock()
+        bot._guardian_stats = {"bailout_count": 0, "loops": 0, "work_s": 0.0, "sleep_s": 0.0}
+        bot._exit_eval_last_log = {}
+        bot.execution = SimpleNamespace(
+            fetch_ticker=MagicMock(return_value={"last": 1.02}),
+            place_hard_sl=MagicMock(return_value={"id": "new-sl"}),
+            cancel_order=MagicMock(return_value={"id": "old-sl", "status": "canceled"}),
+        )
+        bot.exit_engine = SimpleNamespace(evaluate_exit=MagicMock(side_effect=_tighten))
+        bot.risk_engine = SimpleNamespace(
+            should_abort_trade=MagicMock(return_value=(False, "CONF_OK")),
+            should_defer_confidence_exit_for_fee_noise=MagicMock(
+                return_value=(False, "NOT_FEE_NOISE_REASON")
+            ),
+        )
+        bot.brain = SimpleNamespace(
+            pending_model_update=False,
+            upsert_confidence_exit_audit=MagicMock(return_value=1),
+            save_active_trade_state=MagicMock(return_value=True),
+        )
+
+        def _monitor_once():
+            bot.is_running = False
+
+        bot.monitor_open_trades = _monitor_once
+
+        run_guardian_loop(bot)
+
+        bot.execution.place_hard_sl.assert_called_once()
+        bot.execution.cancel_order.assert_called_once_with("XPL/USDT", "old-sl")
+        self.assertEqual(trade["sl_exchange_order_id"], "new-sl")
+        self.assertEqual(trade["hard_sl_price"], 1.01)
+
+    @patch("core.bot_guardian.time.sleep", return_value=None)
     def test_guardian_passes_shadow_threshold_after_cooldown(self, _sleep_mock):
         trade = {
             "symbol": "XPL/USDT",

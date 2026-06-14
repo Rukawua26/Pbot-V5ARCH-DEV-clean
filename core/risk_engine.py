@@ -211,10 +211,11 @@ class RiskEngine:
                 sl_dist = max(atr_pct * Config.STOP_LOSS_ATR_MODIFIER, 0.005)
             real_risk_usd = final_notional * sl_dist
 
-            if not is_shadow and real_risk_usd > Config.MAX_RISK_USD:
+            max_risk_usd = float(getattr(Config, "MAX_RISK_USD", 0.0) or 0.0)
+            if not is_shadow and max_risk_usd > 0 and real_risk_usd > max_risk_usd:
                 self.logger.warning(
                     f"🚫 VETO_RIESGO {symbol}: arriesga ${real_risk_usd:.2f} "
-                    f"(Límite: ${Config.MAX_RISK_USD:.2f})"
+                    f"(Límite: ${max_risk_usd:.2f})"
                 )
                 return 0, -4  # -4: Riesgo excesivo
 
@@ -257,6 +258,15 @@ class RiskEngine:
 
             if amount <= 0:
                 return 0, -2  # -2: Cálculo inválido
+
+            final_notional = amount * price
+            real_risk_usd = final_notional * sl_dist
+            if not is_shadow and max_risk_usd > 0 and real_risk_usd > max_risk_usd:
+                self.logger.warning(
+                    f"🚫 VETO_RIESGO {symbol}: ajuste mínimo arriesga "
+                    f"${real_risk_usd:.2f} > límite ${max_risk_usd:.2f}"
+                )
+                return 0, -4
 
             return amount, final_notional
 
@@ -319,6 +329,16 @@ class RiskEngine:
             min_notional = float(getattr(Config, "MIN_NOTIONAL_VALUE", 0.0) or 0.0)
             if raw_notional < min_notional:
                 affordable_notional = balance * lev
+                if (
+                    not is_shadow
+                    and max_notional_allowed > 0
+                    and min_notional > max_notional_allowed
+                ):
+                    self.logger.warning(
+                        f"🚫 RISK_SIZE_MIN_MARGIN {symbol}: min notional ${min_notional:.2f} "
+                        f"> margen permitido ${max_notional_allowed:.2f}"
+                    )
+                    return 0.0, -6
                 min_amount = min_notional / entry if entry > 0 else 0.0
                 min_risk_usd = min_amount * stop_distance
                 if affordable_notional < min_notional:
@@ -364,6 +384,12 @@ class RiskEngine:
                 return 0.0, -1
 
             actual_risk = amount * stop_distance
+            if not is_shadow and max_risk_usd > 0 and actual_risk > max_risk_usd:
+                self.logger.warning(
+                    f"🚫 RISK_SIZE_POST_PRECISION_RISK {symbol}: post-round risk "
+                    f"${actual_risk:.2f} > límite ${max_risk_usd:.2f}"
+                )
+                return 0.0, -4
             self.logger.info(
                 f"📊 RISK SIZING: {symbol} | risk=${actual_risk:.2f} "
                 f"({risk_fraction * 100:.2f}%) | stop_dist=${stop_distance:.6f} | "

@@ -181,6 +181,18 @@ def execute_order(
         or (get_market_regime() if callable(get_market_regime) else None)
         or getattr(bot, "market_regime", "RANGE")
     )
+
+    try:
+        ticker = bot.execution.fetch_ticker(symbol)
+        current_price = float(ticker.get("last") or ticker.get("markPrice") or 0.0)
+        if current_price > 0:
+            price = current_price
+    except Exception as error:
+        bot.log(f"⚠️ No se pudo refrescar precio para {symbol}: {error}")
+        if not getattr(Config, "PAPER_MODE", True) and not is_shadow:
+            bot.log(f"🚫 ABORTO {symbol}: fallo refresh precio en modo REAL")
+            return _discard_pending_signal(f"STALE_PRICE_ABORT ({error})")
+
     with bot.db_lock:
         genes = (context or {}).get("sl_genes")
         sl_modifier = float((context or {}).get("sl_modifier", 1.0) or 1.0)
@@ -217,6 +229,7 @@ def execute_order(
     bot.log(f"\U0001f9e9 Exit mode {symbol}: {exit_mode}")
 
     clean_snapshot = (context or {}).copy()
+    clean_snapshot.setdefault("side", side)
     for heavy_key in ("df_1h", "df_4h", "df"):
         if heavy_key in clean_snapshot:
             del clean_snapshot[heavy_key]
@@ -227,14 +240,16 @@ def execute_order(
     if clean_snapshot:
         try:
             similar = bot.brain.find_similar_contexts(clean_snapshot, limit=5)
+            winners = []
+            total_sim = len(similar or [])
+            avg_pnl = 0.0
             if similar:
                 winners = [s for s in similar if s.get("is_winner")]
-                total_sim = len(similar)
+                avg_pnl = sum(s.get("pnl_percent", 0.0) or 0.0 for s in similar) / total_sim
             n_winners = len(winners)
             n_losers = total_sim - n_winners
-            avg_pnl = sum(s.get("pnl_percent", 0.0) or 0.0 for s in similar) / total_sim
 
-            if is_shadow:
+            if is_shadow and total_sim > 0:
                 if n_winners >= 3 and avg_pnl > 1.0:
                     similarity_boost = min(5.0, avg_pnl * 0.5)
                     similarity_verdict = "BULLISH"
@@ -283,6 +298,15 @@ def execute_order(
             exchange=bot.execution.exchange,
         )
         sizing_label = "KELLY SIZING"
+
+    try:
+        override_size = float(override_usd_size or 0.0)
+    except (TypeError, ValueError):
+        override_size = 0.0
+    if override_size > 0.0:
+        calculated_position_size = override_size
+        amount = calculated_position_size / price if price > 0 else amount
+        sizing_label = "OVERRIDE SIZING"
 
     if sizing_multiplier != 1.0 and calculated_position_size > 0:
         prev_notional = calculated_position_size
@@ -497,11 +521,6 @@ def execute_order(
             bot.brain.delete_active_trade_state(symbol)
 
     try:
-        ticker = bot.execution.fetch_ticker(symbol)
-        current_price = float(ticker["last"])
-        if current_price > 0:
-            price = current_price
-
         regime_spreads = getattr(Config, "REGIME_SPREAD_THRESHOLDS", {})
         spread_veto_pct = regime_spreads.get(
             entry_market_regime,
@@ -567,6 +586,31 @@ def execute_order(
             _drop_pending_intent()
             return "SIZE_ERROR"
 
+        min_notional_final = float(getattr(Config, "MIN_NOTIONAL_VALUE", 0.0) or 0.0)
+        if final_usd < min_notional_final:
+            bot.log(
+                f"🚫 POST_REDUCTION_MIN_NOTIONAL {symbol}: ${final_usd:.2f} < ${min_notional_final:.2f}"
+            )
+            _safe_update_signal_alert_status(bot, entry_client_order_id, "VETOED")
+            _drop_pending_intent()
+            return "POST_REDUCTION_MIN_NOTIONAL"
+
+        final_sl_pct = abs(float(price) - float(sl_val)) / float(price) * 100 if price > 0 else 0.0
+        max_entry_sl_pct = float(getattr(Config, "MAX_ENTRY_SL_PCT", 0.0) or 0.0)
+        if max_entry_sl_pct > 0 and final_sl_pct > max_entry_sl_pct:
+            bot.log(f"🚫 FINAL_SL_TOO_WIDE {symbol}: {final_sl_pct:.2f}% > {max_entry_sl_pct:.2f}%")
+            _safe_update_signal_alert_status(bot, entry_client_order_id, "VETOED")
+            _drop_pending_intent()
+            return "FINAL_SL_TOO_WIDE"
+
+        final_risk_usd = float(amount) * abs(float(price) - float(sl_val))
+        max_risk_usd = float(getattr(Config, "MAX_RISK_USD", 0.0) or 0.0)
+        if not is_shadow and max_risk_usd > 0 and final_risk_usd > max_risk_usd:
+            bot.log(f"🚫 FINAL_RISK_TOO_HIGH {symbol}: ${final_risk_usd:.2f} > ${max_risk_usd:.2f}")
+            _safe_update_signal_alert_status(bot, entry_client_order_id, "VETOED")
+            _drop_pending_intent()
+            return "FINAL_RISK_TOO_HIGH"
+
         fees = 0.001
         spread_cost = (context or {}).get("spread", 0.0)
         tp_pct = abs(tp_val - price) / price * 100
@@ -604,7 +648,17 @@ def execute_order(
             bot.log(
                 f"\U0001f680 [PRECISION ENTRY] {symbol} {side} ${final_usd:.2f} @ {price:.5f} (Lev: {current_leverage}x)"
             )
-            bot.execution.set_leverage(current_leverage, symbol)
+            leverage_result = bot.execution.set_leverage(current_leverage, symbol)
+            if not leverage_result:
+                bot.log(f"🚫 LEVERAGE_SETUP_FAILED {symbol}: abortando entrada REAL")
+                append_execution_event(
+                    bot,
+                    "LEVERAGE_SETUP_FAILED",
+                    {"symbol": symbol, "leverage": current_leverage},
+                )
+                _safe_update_signal_alert_status(bot, entry_client_order_id, "REJECTED")
+                _drop_pending_intent()
+                return "LEVERAGE_SETUP_FAILED"
             order_slippage = Config.MAX_SLIPPAGE * 100
             order = bot.execution.create_precision_order(
                 symbol,
@@ -699,6 +753,13 @@ def execute_order(
                         bot.is_paused = True
                         bot.integrity_lock_active = True
                         setattr(bot, "halt_system_active", True)
+                        pending_state["status"] = "EMERGENCY_CLOSE_PENDING"
+                        pending_state["closing_in_progress"] = True
+                        pending_state["last_hard_sl_error"] = sl_error[:180]
+                        with bot.db_lock:
+                            bot.brain.save_active_trade_state(symbol, pending_state)
+                        with bot.lock:
+                            bot.active_trades[symbol] = pending_state
                         append_execution_event(
                             bot,
                             "FAIL_SAFE_CLOSE_FAILED_HALT",
@@ -709,7 +770,8 @@ def execute_order(
                             },
                         )
                     _safe_update_signal_alert_status(bot, entry_client_order_id, "REJECTED")
-                    _drop_pending_intent()
+                    if closed:
+                        _drop_pending_intent()
                     return "ENTRY_ABORTED_NO_HARD_SL"
 
                 append_execution_event(
@@ -725,25 +787,28 @@ def execute_order(
                     },
                 )
 
-                send_telegram_msg(
-                    f"\U0001f680 *\U0001f525 REAL TRADE ABIERTO*\n"
-                    f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-                    f"\U0001f539 *{symbol}*\n"
-                    f"\U0001f538 Lado: {side}\n"
-                    f"\U0001f4b0 Precio: ${price}\n"
-                    f"\U0001f4ca Notional: ${final_usd:.2f}\n"
-                    f"\U0001f194 ID: {order.get('id', 'N/A')}\n"
-                    f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-                    f"\U0001f4c8 *MERCADO*\n"
-                    f"   RSI: {context.get('rsi', 0) if context else 0:.1f}\n"
-                    f"   ADX: {context.get('adx', 0) if context else 0:.1f}\n"
-                    f"   Tendencia: {context.get('trend', 'N/A') if context else 'N/A'}\n"
-                    f"   SL: {sl_val:.4f} | TP: {tp_val:.4f}"
-                )
-                margin_used = final_usd / current_leverage
-                balance_lock = getattr(bot, "balance_lock", bot.lock)
-                with balance_lock:
-                    bot.available_balance -= margin_used
+                margin_used = float(final_usd) / max(float(current_leverage), 1)
+                try:
+                    send_telegram_msg(
+                        f"\U0001f680 *\U0001f525 REAL TRADE ABIERTO*\n"
+                        f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+                        f"\U0001f539 *{symbol}*\n"
+                        f"\U0001f538 Lado: {side}\n"
+                        f"\U0001f4b0 Precio: ${price}\n"
+                        f"\U0001f4ca Notional: ${final_usd:.2f}\n"
+                        f"\U0001f194 ID: {order.get('id', 'N/A')}\n"
+                        f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
+                        f"\U0001f4c8 *MERCADO*\n"
+                        f"   RSI: {context.get('rsi', 0) if context else 0:.1f}\n"
+                        f"   ADX: {context.get('adx', 0) if context else 0:.1f}\n"
+                        f"   Tendencia: {context.get('trend', 'N/A') if context else 'N/A'}\n"
+                        f"   SL: {sl_val:.4f} | TP: {tp_val:.4f}"
+                    )
+                    balance_lock = getattr(bot, "balance_lock", bot.lock)
+                    with balance_lock:
+                        bot.available_balance -= margin_used
+                except Exception as entry_side_effect_err:
+                    bot.log(f"⚠️ Entry side effect error (non-fatal): {entry_side_effect_err}")
             else:
                 bot.log(f"❌ FALLO DE EJECUCIÓN: {symbol}")
                 reject_reason = str(
@@ -780,7 +845,9 @@ def execute_order(
                     },
                 )
                 if not Config.PAPER_MODE:
+                    bot.is_paused = True
                     bot.integrity_lock_active = True
+                    setattr(bot, "halt_system_active", True)
                     with bot.db_lock:
                         bot.brain.save_active_trade_state(symbol, pending_state)
                     return "ENTRY_ACK_UNKNOWN"
@@ -859,6 +926,7 @@ def execute_order(
                 "requested_amount": float(requested_amount if not is_shadow else amount),
                 "remaining_amount": float(remaining_amount if not is_shadow else 0.0),
                 "notional_usd": float(final_usd),
+                "size_usd": float(final_usd),
                 "margin_used": float(margin_used),
                 "margin_reserved": bool(simulated_margin_state.get("margin_reserved", False)),
                 "margin_released": bool(simulated_margin_state.get("margin_released", False)),

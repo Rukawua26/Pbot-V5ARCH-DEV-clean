@@ -102,7 +102,7 @@ class NotificationQueue:
         return False
 
     def send(self, message, priority=Priority.INFO):
-        if not Config.TELEGRAM_TOKEN or not Config.TELEGRAM_CHAT_ID:
+        if not _telegram_configured():
             return
 
         payload = {
@@ -128,7 +128,7 @@ class NotificationQueue:
         filename="sniper.png",
         priority=Priority.INFO,
     ):
-        if not Config.TELEGRAM_TOKEN or not Config.TELEGRAM_CHAT_ID:
+        if not _telegram_configured():
             return
 
         data = {
@@ -156,6 +156,17 @@ class NotificationQueue:
 
 # Instancia global
 _notifier_queue = None
+_telegram_config_warning_sent = False
+
+
+def _telegram_configured():
+    global _telegram_config_warning_sent
+    if Config.TELEGRAM_TOKEN and Config.TELEGRAM_CHAT_ID:
+        return True
+    if not _telegram_config_warning_sent:
+        _telegram_config_warning_sent = True
+        print("⚠️ Telegram no configurado: faltan TELEGRAM_TOKEN o TELEGRAM_CHAT_ID")
+    return False
 
 
 def get_queue():
@@ -180,7 +191,7 @@ def send_telegram_msg(message, priority=Priority.INFO):
 def send_telegram_photo(caption, photo_buffer, priority=Priority.INFO):
     """Envía una foto a Telegram."""
     try:
-        if not Config.TELEGRAM_TOKEN or not Config.TELEGRAM_CHAT_ID:
+        if not _telegram_configured():
             return
         if hasattr(photo_buffer, "getvalue"):
             photo_bytes = photo_buffer.getvalue()

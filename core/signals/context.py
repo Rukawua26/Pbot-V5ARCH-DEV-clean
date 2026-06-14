@@ -71,8 +71,12 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
     )
     ctx["market_hour"] = datetime.now().hour
     market_breadth = getattr(bot, "market_breadth", {}) or {}
+    ctx["market_breadth_sentiment"] = str(market_breadth.get("sentiment", "") or "")
     ctx["market_breadth_dump_ratio"] = float(market_breadth.get("dump_ratio", 0.0) or 0.0)
     ctx["market_breadth_pump_ratio"] = float(market_breadth.get("pump_ratio", 0.0) or 0.0)
+    hmm_snapshot = getattr(bot, "hmm_markov_snapshot", None)
+    if isinstance(hmm_snapshot, dict):
+        ctx["hmm_data"] = hmm_snapshot
 
     raw_log_count = int(getattr(bot, "_raw_snapshot_log_count", 0) or 0)
     if raw_log_count < 5:

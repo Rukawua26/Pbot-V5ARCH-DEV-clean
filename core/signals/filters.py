@@ -427,9 +427,10 @@ def _apply_entry_filters_and_adjust_prob(
                 ctx["oi_current"] = oi_current
             if oi_delta_pct is not None and bool(getattr(Config, "OI_FILTER_ENABLED", False)):
                 delta_price_pct = 0.0
-                if df_main is not None and not df_main.empty and len(df_main) >= 5:
+                oi_price_lookback = max(2, int(getattr(Config, "OI_PRICE_LOOKBACK_BARS", 2) or 2))
+                if df_main is not None and not df_main.empty and len(df_main) >= oi_price_lookback:
                     price_now = float(df_main["close"].iloc[-1])
-                    price_prev = float(df_main["close"].iloc[-5])
+                    price_prev = float(df_main["close"].iloc[-oi_price_lookback])
                     if price_prev > 0:
                         delta_price_pct = (price_now - price_prev) / price_prev
                 oi_verdict = validate_signal_with_oi(audit_signal, delta_price_pct, oi_delta_pct)
@@ -641,6 +642,11 @@ def _plan_execution_mode(
 ):
     is_shadow_exec = True
     should_execute = False
+
+    if filter_passed and "VETO" in str(audit_verdict).upper():
+        filter_passed = False
+        filter_reason = filter_reason or audit_verdict
+        return should_execute, is_shadow_exec, audit_verdict, filter_passed, filter_reason
 
     REAL_THRESHOLD = Config.REAL_CONFIDENCE_MIN * 100
 

@@ -36,10 +36,6 @@ def _should_pre_veto_regime(bot, market_regime):
     if not _is_markov_snapshot_usable(snapshot):
         return True, f"Ranging market ({market_regime})"
 
-    bearish_prob = float(snapshot.get("bearish_reversal_prob", 0.0) or 0.0)
-    threshold = float(getattr(Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0))
-    if bearish_prob >= threshold:
-        return True, f"RANGE bearish reversal risk ({bearish_prob:.1f}% >= {threshold:.1f}%)"
     return False, None
 
 

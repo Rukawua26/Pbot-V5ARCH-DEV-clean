@@ -1,8 +1,10 @@
+import hashlib
 import json
 import random
 import time
 
 from config import Config
+from core.execution_telemetry import append_execution_event
 from core.telegram_api import sanitize_telegram_error, telegram_get_json
 from core.time_utils import monotonic_now, parse_datetime_utc, utc_now
 
@@ -13,10 +15,28 @@ def _extract_telegram_message(update):
     return update.get("message") or update.get("edited_message") or update.get("channel_post") or {}
 
 
-def _is_authorized_telegram_chat(chat_id) -> bool:
+def _is_authorized_telegram_chat(chat_id, from_id=None) -> bool:
     expected = str(getattr(Config, "TELEGRAM_CHAT_ID", "") or "").strip()
     current = str(chat_id or "").strip()
-    return bool(expected) and current == expected
+    if not bool(expected) or current != expected:
+        return False
+    admin_ids = str(getattr(Config, "TELEGRAM_ADMIN_IDS", "") or "").strip()
+    if admin_ids and from_id is not None:
+        allowed = [x.strip() for x in admin_ids.split(",") if x.strip()]
+        if allowed and str(from_id) not in allowed:
+            return False
+    return True
+
+
+def _telegram_command_name(text: str) -> str:
+    return str(text or "").split(maxsplit=1)[0][:64]
+
+
+def _telegram_chat_id_hash(chat_id) -> str:
+    raw = str(chat_id or "").strip()
+    if not raw:
+        return ""
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
 
 
 def _apply_ticker_stream_update(bot, data) -> int:
@@ -129,12 +149,30 @@ def telegram_listener(bot):
                 message = _extract_telegram_message(update)
                 text = str(message.get("text", "") or "").strip()
                 chat_id = message.get("chat", {}).get("id")
+                from_id = (message.get("from") or {}).get("id")
 
                 if not text:
                     continue
-                if not _is_authorized_telegram_chat(chat_id):
+                if not _is_authorized_telegram_chat(chat_id, from_id):
+                    append_execution_event(
+                        bot,
+                        "TELEGRAM_COMMAND_REJECTED",
+                        {
+                            "command": _telegram_command_name(text),
+                            "chat_id_hash": _telegram_chat_id_hash(chat_id),
+                            "reason": "unauthorized_chat",
+                        },
+                    )
                     continue
 
+                append_execution_event(
+                    bot,
+                    "TELEGRAM_COMMAND_ACCEPTED",
+                    {
+                        "command": _telegram_command_name(text),
+                        "chat_id_hash": _telegram_chat_id_hash(chat_id),
+                    },
+                )
                 # Lógica centralizada
                 bot.handle_command(text)
 

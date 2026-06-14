@@ -204,6 +204,22 @@ def _verify_orphan_multiple(bot, symbol: str) -> tuple:
     return True, ""
 
 
+def _halt_unadoptable_real_orphan(bot, symbol: str, reason: str, details: dict | None = None):
+    bot.is_paused = True
+    bot.integrity_lock_active = True
+    setattr(bot, "halt_system_active", True)
+    payload = dict(details or {})
+    payload["reason"] = reason
+    with bot.db_lock:
+        bot.brain.save_error_snapshot(symbol, "REAL_ORPHAN_UNADOPTABLE_HALT", payload)
+    append_execution_event(
+        bot,
+        "REAL_ORPHAN_UNADOPTABLE_HALT",
+        {"symbol": symbol, "reason": reason, **payload},
+    )
+    bot.log(f"🛑 REAL_ORPHAN_UNADOPTABLE {symbol}: {reason}")
+
+
 def reconcile_bootstrap_state(bot):
     """Sincroniza estado DB <-> Exchange al arrancar para evitar huérfanos/ghosts."""
     try:
@@ -239,6 +255,22 @@ def reconcile_bootstrap_state(bot):
                 open_orders = fetch_open_orders() or []
             except Exception as error:
                 bot.log(f"⚠️ No se pudieron consultar open orders en reconciliación: {error}")
+                if not Config.PAPER_MODE:
+                    bot.is_paused = True
+                    bot.integrity_lock_active = True
+                    setattr(bot, "halt_system_active", True)
+                    with bot.db_lock:
+                        bot.brain.save_error_snapshot(
+                            "SYSTEM",
+                            "BOOTSTRAP_RECONCILIATION_FAILED",
+                            {"error": str(error)[:220], "source": "fetch_open_orders"},
+                        )
+                    append_execution_event(
+                        bot,
+                        "BOOTSTRAP_RECONCILIATION_FAILED_HALT",
+                        {"error": str(error)[:180], "source": "fetch_open_orders"},
+                    )
+                    return
         exchange_positions = {}
         for pos in positions:
             amount = float(pos.get("contracts") or 0)
@@ -282,6 +314,13 @@ def reconcile_bootstrap_state(bot):
             size_valid, size_reason, size_usd = _validate_orphan_size(entry_price, amount)
             if not size_valid:
                 bot.log(f"⚠️ Huérfano {symbol} rechazado: {size_reason}")
+                if not Config.PAPER_MODE:
+                    _halt_unadoptable_real_orphan(
+                        bot,
+                        symbol,
+                        size_reason,
+                        {"entry": entry_price, "amount": amount},
+                    )
                 continue
 
             verify_valid, verify_reason = _verify_orphan_multiple(bot, symbol)
@@ -289,6 +328,13 @@ def reconcile_bootstrap_state(bot):
                 bot.log(
                     f"⚠️ Huérfano {symbol} rechazado: verificación múltiple falló: {verify_reason}"
                 )
+                if not Config.PAPER_MODE:
+                    _halt_unadoptable_real_orphan(
+                        bot,
+                        symbol,
+                        verify_reason,
+                        {"entry": entry_price, "amount": amount, "size_usd": size_usd},
+                    )
                 continue
 
             market_price = 0.0
@@ -325,13 +371,27 @@ def reconcile_bootstrap_state(bot):
                 },
                 "adopted_orphan": True,
             }
+            entry_coid, sl_coid, _tp_coid = generate_order_ids(
+                symbol,
+                info["side"],
+                utc_now().timestamp(),
+                str(getattr(bot, "instance_uuid", "bootstrap-reconcile")),
+            )
+            adopted_trade["entry_client_order_id"] = entry_coid
+            adopted_trade["sl_client_order_id"] = sl_coid
             with bot.lock:
                 bot.active_trades[symbol] = adopted_trade
             with bot.db_lock:
                 bot.brain.save_active_trade_state(symbol, adopted_trade)
 
             try:
-                sl_order = bot.execution.place_hard_sl(symbol, info["side"], amount, sl)
+                sl_order = bot.execution.place_hard_sl(
+                    symbol,
+                    info["side"],
+                    amount,
+                    sl,
+                    client_order_id=sl_coid,
+                )
                 if sl_order:
                     with bot.lock:
                         bot.active_trades[symbol]["sl_exchange_order_id"] = sl_order.get("id")
@@ -646,7 +706,11 @@ def recover_halt_if_exchange_consistent(bot, required_snapshots: int = 2) -> tup
             continue
         amount = pos.get("contracts")
         if amount is None:
-            amount = (pos.get("info") or {}).get("positionAmt", 0) if isinstance(pos.get("info"), dict) else 0
+            amount = (
+                (pos.get("info") or {}).get("positionAmt", 0)
+                if isinstance(pos.get("info"), dict)
+                else 0
+            )
         if abs(float(amount or 0.0)) > 0.0:
             exchange_symbols.append(normalize_position_symbol(pos.get("symbol", "")))
     exchange_symbols = sorted(symbol for symbol in exchange_symbols if symbol)

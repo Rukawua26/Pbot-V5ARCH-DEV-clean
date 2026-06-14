@@ -72,6 +72,37 @@ def handle_basic_command(bot, text: str) -> bool:
         from tools.notifier import send_telegram_msg
 
         try:
+            unsafe_reasons = []
+            with bot.lock:
+                if bool(getattr(bot, "halt_system_active", False)):
+                    unsafe_reasons.append("HALT_SYSTEM_ACTIVE")
+                if bool(getattr(bot, "integrity_lock_active", False)):
+                    unsafe_reasons.append("INTEGRITY_LOCK_ACTIVE")
+                for symbol, trade in getattr(bot, "active_trades", {}).items():
+                    if not (trade or {}).get("is_shadow", False):
+                        status = str((trade or {}).get("status") or "")
+                        unsafe_reasons.append(f"LOCAL_REAL_TRADE:{symbol}:{status or 'UNKNOWN'}")
+            fetch_positions = getattr(getattr(bot, "execution", None), "fetch_positions", None)
+            if callable(fetch_positions):
+                positions = fetch_positions() or []
+                open_positions = [
+                    p for p in positions if abs(float((p or {}).get("contracts") or 0.0)) > 0.0
+                ]
+                if open_positions:
+                    unsafe_reasons.append("EXCHANGE_POSITIONS_OPEN")
+            fetch_open_orders = getattr(getattr(bot, "execution", None), "fetch_open_orders", None)
+            if callable(fetch_open_orders):
+                open_orders = fetch_open_orders() or []
+                if open_orders:
+                    unsafe_reasons.append("EXCHANGE_OPEN_ORDERS")
+            if unsafe_reasons:
+                send_telegram_msg(
+                    "🛑 *REBASE CAPITAL BLOQUEADO*\n"
+                    "No se liberan locks con estado REAL inseguro. Usa /recover_halt tras reconciliar.\n"
+                    f"Motivos: {', '.join(unsafe_reasons[:6])}"
+                )
+                return True
+
             current = float(bot.get_current_balance() or 0.0)
             balance_lock = getattr(bot, "balance_lock", None)
             if balance_lock:

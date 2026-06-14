@@ -241,6 +241,51 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
     @patch("core.trade_entry.Config.PAPER_MODE", False)
     @patch("core.trade_entry.send_telegram_msg")
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_leverage_setup_failure_aborts_before_order(self, _, _tg):
+        bot = self._min_bot()
+        bot.execution.set_leverage = MagicMock(return_value=None)
+        bot.execution.create_precision_order = MagicMock()
+
+        result = execute_order(
+            bot, "BTC/USDT", "BUY", 100.0, 1.0, is_shadow=False, context=self._ctx()
+        )
+
+        self.assertEqual(result, "LEVERAGE_SETUP_FAILED")
+        bot.execution.create_precision_order.assert_not_called()
+
+    @patch("core.trade_entry.Config.MAX_ENTRY_SL_PCT", 1.0)
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_final_sl_too_wide_aborts(self, _, _tg):
+        bot = self._min_bot()
+        bot.risk_engine.get_exit_levels = lambda **kw: (95.0, 120.0, "STD")
+
+        result = execute_order(
+            bot, "BTC/USDT", "BUY", 100.0, 1.0, is_shadow=True, context=self._ctx()
+        )
+
+        self.assertEqual(result, "FINAL_SL_TOO_WIDE")
+
+    @patch("core.trade_entry.Config.MIN_NOTIONAL_VALUE", 50.0)
+    @patch("core.trade_entry.Config.CORRELATION_RISK_ENABLED", True)
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_post_reduction_min_notional_aborts(self, _, _tg):
+        bot = self._min_bot()
+        bot.risk_engine.calculate_position_size = lambda **kw: (1.0, 100.0)
+        with patch(
+            "core.trade_entry.compute_correlation_reduction",
+            return_value=(0.4, [{"correlation": 1.0}]),
+        ):
+            result = execute_order(
+                bot, "BTC/USDT", "BUY", 100.0, 1.0, is_shadow=True, context=self._ctx()
+            )
+
+        self.assertEqual(result, "POST_REDUCTION_MIN_NOTIONAL")
+
+    @patch("core.trade_entry.Config.PAPER_MODE", False)
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
     def test_hard_sl_fail_triggers_failsafe(self, _, _tg):
         bot = self._min_bot()
         bot.execution.create_precision_order = MagicMock(
@@ -309,6 +354,32 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
 
     # --- Success paths ---
 
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_refreshed_price_is_used_before_exit_levels_and_sizing(self, _, _tg):
+        bot = self._min_bot()
+        seen = {}
+
+        def _exit_levels(**kw):
+            seen["exit_entry_price"] = kw["entry_price"]
+            return 118.0, 130.0, "STD"
+
+        def _sizing(**kw):
+            seen["sizing_price"] = kw["price"]
+            return 1.0, kw["price"]
+
+        bot.execution.fetch_ticker = MagicMock(return_value={"last": 120.0})
+        bot.risk_engine.get_exit_levels = _exit_levels
+        bot.risk_engine.calculate_position_size = _sizing
+
+        result = execute_order(
+            bot, "SOL/USDT", "BUY", 100.0, 1.0, is_shadow=True, context=self._ctx()
+        )
+
+        self.assertEqual(result, "OK")
+        self.assertEqual(seen["exit_entry_price"], 120.0)
+        self.assertEqual(seen["sizing_price"], 120.0)
+
     @patch("core.trade_entry.Config.PAPER_MODE", False)
     @patch("core.trade_entry.send_telegram_msg")
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
@@ -334,6 +405,26 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
         self.assertEqual(result, "OK")
         self.assertIn("SOL/USDT", bot.active_trades)
         self.assertTrue(bot.active_trades["SOL/USDT"].get("is_shadow"))
+
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_override_usd_size_controls_notional_before_final_guards(self, _, _tg):
+        bot = self._min_bot()
+
+        result = execute_order(
+            bot,
+            "SOL/USDT",
+            "BUY",
+            100.0,
+            1.0,
+            is_shadow=True,
+            context=self._ctx(),
+            override_usd_size=250.0,
+        )
+
+        self.assertEqual(result, "OK")
+        self.assertAlmostEqual(bot.active_trades["SOL/USDT"].get("size_usd"), 250.0)
+        self.assertAlmostEqual(bot.active_trades["SOL/USDT"].get("amount"), 2.5)
 
     @patch("core.trade_entry.Config.PAPER_MODE", True)
     @patch("core.trade_entry.send_telegram_msg")

@@ -2,7 +2,7 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from threading import RLock
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 from core.reconciliation import (
     generate_client_order_id,
@@ -87,6 +87,80 @@ class ReconciliationTest(unittest.TestCase):
         trade = bot.active_trades["ETH/USDT"]
         self.assertTrue(trade.get("adopted_orphan", False))
         bot.execution.place_hard_sl.assert_called_once()
+        self.assertIn("sl_client_order_id", trade)
+        self.assertIn("client_order_id", bot.execution.place_hard_sl.call_args.kwargs)
+
+    @patch("core.reconciliation.Config.PAPER_MODE", False)
+    @patch("core.reconciliation.OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
+    def test_real_unadoptable_orphan_halts_instead_of_ignoring(self):
+        bot = SimpleNamespace()
+        bot.lock = RLock()
+        bot.db_lock = RLock()
+        bot.active_trades = {}
+        bot.balance = 100.0
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.halt_system_active = False
+        bot.log = MagicMock()
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "DOGE/USDT:USDT",
+                    "contracts": 1.0,
+                    "side": "long",
+                    "entryPrice": 1.0,
+                }
+            ],
+            fetch_open_orders=lambda: [],
+            place_hard_sl=MagicMock(),
+        )
+        bot.get_current_balance = lambda: 100.0
+        bot.brain = SimpleNamespace(
+            save_active_trade_state=MagicMock(),
+            save_error_snapshot=MagicMock(),
+            delete_active_trade_state=MagicMock(),
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        self.assertNotIn("DOGE/USDT", bot.active_trades)
+        bot.execution.place_hard_sl.assert_not_called()
+        bot.brain.save_error_snapshot.assert_any_call(
+            "DOGE/USDT",
+            "REAL_ORPHAN_UNADOPTABLE_HALT",
+            ANY,
+        )
+
+    @patch("core.reconciliation.Config.PAPER_MODE", False)
+    def test_real_bootstrap_halts_when_open_orders_lookup_fails(self):
+        bot = SimpleNamespace()
+        bot.lock = RLock()
+        bot.db_lock = RLock()
+        bot.active_trades = {}
+        bot.balance = 100.0
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.log = MagicMock()
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [],
+            fetch_open_orders=MagicMock(side_effect=RuntimeError("exchange down")),
+        )
+        bot.get_current_balance = lambda: 100.0
+        bot.brain = SimpleNamespace(
+            save_active_trade_state=MagicMock(),
+            save_error_snapshot=MagicMock(),
+            delete_active_trade_state=MagicMock(),
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(getattr(bot, "halt_system_active", False))
+        bot.brain.save_error_snapshot.assert_called()
 
     def test_keeps_pending_trade_if_open_order_exists_by_client_order_id(self):
         # Generar ID con nuevo formato

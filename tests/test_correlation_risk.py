@@ -147,6 +147,27 @@ class CorrelationReductionTests(unittest.TestCase):
         for d in details:
             self.assertAlmostEqual(d["correlation"], 1.0, places=2)
 
+    def test_single_high_positive_correlation_reduces_despite_negative_pair(self):
+        self.bot.active_trades = {"BTC/USDT": {}, "SOL/USDT": {}}
+        a = [100 + i for i in range(50)]
+        b = [200 - i for i in range(50)]
+        self._make_data_service(
+            {
+                "ETH/USDT": _df_from_closes(a),
+                "BTC/USDT": _df_from_closes(a),
+                "SOL/USDT": _df_from_closes(b),
+            }
+        )
+        with (
+            patch.object(Config, "CORRELATION_RISK_ENABLED", True),
+            patch.object(Config, "CORRELATION_RISK_THRESHOLD", 0.80),
+        ):
+            mult, details = compute_correlation_reduction(
+                self.bot, "ETH/USDT", ["BTC/USDT", "SOL/USDT"]
+            )
+        self.assertLess(mult, 1.0)
+        self.assertEqual(len(details), 2)
+
     def test_no_data_service_returns_no_reduction(self):
         self.bot.active_trades = {"BTC/USDT": {}}
         self.bot.data_service = None
