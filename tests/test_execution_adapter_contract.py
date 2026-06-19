@@ -60,6 +60,17 @@ class ExecutionAdapterContractTest(unittest.TestCase):
 
         execution.exchange.set_sandbox_mode.assert_called_once_with(True)
 
+    def test_factory_rejects_unknown_backend(self):
+        config = SimpleNamespace(
+            BINANCE_API_KEY="k",
+            BINANCE_API_SECRET="s",
+            USE_TESTNET=False,
+            EXECUTION_BACKEND="shadow-lve",
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "EXECUTION_BACKEND"):
+            build_execution_gateway(config, _FakeExecutionService)
+
     def test_shadow_adapter_simulates_partial_fills(self):
         live = _FakeExecutionService("k", "s")
         adapter = ShadowExecutionAdapter(

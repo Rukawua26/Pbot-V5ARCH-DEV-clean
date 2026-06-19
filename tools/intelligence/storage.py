@@ -10,7 +10,6 @@ from core.learning_paths import DEFAULT_DB_PATH
 
 from .contracts import AdvisoryArtifact
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 REPORTS_DIR = ROOT_DIR / "reports" / "intelligence"
 
@@ -94,10 +93,16 @@ def save_advisory_snapshot(
         cur = conn.execute(
             "INSERT INTO advisory_snapshots (advisory_type, created_at, summary, artifact_path, payload_json) "
             "VALUES (?, ?, ?, ?, ?)",
-            (advisory_type, created_at, summary, artifact_path, json.dumps(payload, ensure_ascii=False)),
+            (
+                advisory_type,
+                created_at,
+                summary,
+                artifact_path,
+                json.dumps(payload, ensure_ascii=False),
+            ),
         )
         conn.commit()
-        return int(cur.lastrowid)
+        return int(cur.lastrowid or 0)
     finally:
         conn.close()
 

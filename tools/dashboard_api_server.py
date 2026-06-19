@@ -1,11 +1,12 @@
-import json
 import hmac
+import json
 import os
-import time
 import sqlite3
+import threading
+import time
 from collections import deque
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -16,13 +17,16 @@ from tools.intelligence.report_builder import (
     generate_full_intelligence_cycle,
     read_report_artifact,
 )
-from tools.intelligence.storage import list_advisory_snapshots, fetch_trade_annotations, ensure_intelligence_tables
+from tools.intelligence.storage import (
+    ensure_intelligence_tables,
+    fetch_trade_annotations,
+    list_advisory_snapshots,
+)
 
 API_KEY = os.getenv("SNIPER_API_KEY")
 if not API_KEY:
     raise RuntimeError(
-        "SNIPER_API_KEY no configurada. "
-        "Establece una clave segura para el dashboard API."
+        "SNIPER_API_KEY no configurada. Establece una clave segura para el dashboard API."
     )
 if len(API_KEY) < 16:
     raise RuntimeError("SNIPER_API_KEY debe tener al menos 16 caracteres.")
@@ -31,9 +35,16 @@ CMD_DIR = "/dev/shm/sniper_cmd"
 LOG_FILE = "sniper.log"
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "dashboard", "static")
 DB_PATH = DEFAULT_DB_PATH
-EXEC_EVENTS_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs", "execution_events.jsonl")
+EXEC_EVENTS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "logs", "execution_events.jsonl"
+)
 ALLOWED_ORIGINS = os.getenv("SNIPER_DASHBOARD_ORIGINS", "http://127.0.0.1:8000").split(",")
 ALLOWED_COMMANDS = frozenset({"/pause", "/resume", "/panic", "/recover_halt"})
+RATE_LIMIT_REQUESTS = int(os.getenv("SNIPER_DASHBOARD_RATE_LIMIT_REQUESTS", "30"))
+RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("SNIPER_DASHBOARD_RATE_LIMIT_WINDOW_SECONDS", "60"))
+MAX_BODY_BYTES = 64 * 1024
+_rate_limit_state: dict[str, list[float]] = {}
+_rate_limit_lock = threading.Lock()
 
 app = FastAPI(title="Sniper AI API")
 ensure_intelligence_tables(DB_PATH)
@@ -44,6 +55,46 @@ app.add_middleware(
     allow_headers=["*"],
     allow_methods=["*"],
 )
+
+
+def _clamp_limit(value: int, default: int = 100, maximum: int = 500) -> int:
+    try:
+        raw = int(value)
+    except (TypeError, ValueError):
+        raw = default
+    return max(1, min(raw, maximum))
+
+
+def _check_rate_limit(client_ip: str) -> None:
+    now = time.time()
+    with _rate_limit_lock:
+        timestamps = [
+            ts
+            for ts in _rate_limit_state.get(client_ip, [])
+            if now - ts < RATE_LIMIT_WINDOW_SECONDS
+        ]
+        if len(timestamps) >= RATE_LIMIT_REQUESTS:
+            raise HTTPException(429, "Rate limit exceeded")
+        timestamps.append(now)
+        _rate_limit_state[client_ip] = timestamps
+
+
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+    content_length = request.headers.get("content-length")
+    try:
+        body_size = int(content_length) if content_length else 0
+    except ValueError:
+        body_size = MAX_BODY_BYTES + 1
+    if body_size > MAX_BODY_BYTES:
+        raise HTTPException(413, "Request body too large")
+    response: Response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
 
 
 class Command(BaseModel):
@@ -124,6 +175,7 @@ def _get_db():
 
 @app.get("/api/v1/trades")
 def get_trades(limit: int = 100, type: str = "all", _=Depends(verify_key)):
+    limit = _clamp_limit(limit)
     conn = _get_db()
     try:
         where_clause = ""
@@ -134,9 +186,7 @@ def get_trades(limit: int = 100, type: str = "all", _=Depends(verify_key)):
         elif type == "shadow":
             where_clause = " WHERE is_shadow = ?"
             params = (1,)
-        total = conn.execute(
-            f"SELECT COUNT(*) FROM trades{where_clause}", params
-        ).fetchone()[0]
+        total = conn.execute(f"SELECT COUNT(*) FROM trades{where_clause}", params).fetchone()[0]
         rows = conn.execute(
             f"SELECT * FROM trades{where_clause} ORDER BY timestamp DESC LIMIT ?",
             params + (limit,),
@@ -149,6 +199,7 @@ def get_trades(limit: int = 100, type: str = "all", _=Depends(verify_key)):
 
 @app.get("/api/v1/blocked")
 def get_blocked(limit: int = 100, _=Depends(verify_key)):
+    limit = _clamp_limit(limit)
     events = []
     if not os.path.exists(EXEC_EVENTS_PATH):
         return {"blocked": [], "total": 0}
@@ -161,45 +212,53 @@ def get_blocked(limit: int = 100, _=Depends(verify_key)):
             ev = e.get("event", "")
             payload = e.get("payload", {})
             if ev == "FILTER_APPLIED" and not payload.get("filter_passed", True):
-                events.append({
-                    "ts": e["ts"],
-                    "symbol": payload.get("symbol", ""),
-                    "side": payload.get("side", ""),
-                    "reason": payload.get("filter_reason", "UNKNOWN"),
-                    "prob_final": payload.get("prob_final"),
-                    "btc_regime": payload.get("btc_regime"),
-                    "event_type": "FILTER",
-                })
+                events.append(
+                    {
+                        "ts": e["ts"],
+                        "symbol": payload.get("symbol", ""),
+                        "side": payload.get("side", ""),
+                        "reason": payload.get("filter_reason", "UNKNOWN"),
+                        "prob_final": payload.get("prob_final"),
+                        "btc_regime": payload.get("btc_regime"),
+                        "event_type": "FILTER",
+                    }
+                )
             elif ev == "RANGE_VETO":
-                events.append({
-                    "ts": e["ts"],
-                    "symbol": payload.get("symbol", ""),
-                    "side": payload.get("side", ""),
-                    "reason": "RANGE_VETO",
-                    "prob_final": None,
-                    "btc_regime": payload.get("btc_regime"),
-                    "event_type": "RANGE_VETO",
-                })
+                events.append(
+                    {
+                        "ts": e["ts"],
+                        "symbol": payload.get("symbol", ""),
+                        "side": payload.get("side", ""),
+                        "reason": "RANGE_VETO",
+                        "prob_final": None,
+                        "btc_regime": payload.get("btc_regime"),
+                        "event_type": "RANGE_VETO",
+                    }
+                )
             elif ev == "MTF_FILTER" and payload.get("reason", "").startswith("MTF_VETO"):
-                events.append({
-                    "ts": e["ts"],
-                    "symbol": payload.get("symbol", ""),
-                    "side": payload.get("side", ""),
-                    "reason": payload.get("reason", "MTF_VETO"),
-                    "prob_final": payload.get("prob_before"),
-                    "btc_regime": None,
-                    "event_type": "MTF_VETO",
-                })
+                events.append(
+                    {
+                        "ts": e["ts"],
+                        "symbol": payload.get("symbol", ""),
+                        "side": payload.get("side", ""),
+                        "reason": payload.get("reason", "MTF_VETO"),
+                        "prob_final": payload.get("prob_before"),
+                        "btc_regime": None,
+                        "event_type": "MTF_VETO",
+                    }
+                )
             elif ev == "MARKOV_REGIME_DECISION" and not payload.get("filter_passed", True):
-                events.append({
-                    "ts": e["ts"],
-                    "symbol": payload.get("symbol", ""),
-                    "side": payload.get("side", ""),
-                    "reason": f"MARKOV_{payload.get('decision', 'VETO')}",
-                    "prob_final": None,
-                    "btc_regime": payload.get("btc_regime"),
-                    "event_type": "MARKOV_VETO",
-                })
+                events.append(
+                    {
+                        "ts": e["ts"],
+                        "symbol": payload.get("symbol", ""),
+                        "side": payload.get("side", ""),
+                        "reason": f"MARKOV_{payload.get('decision', 'VETO')}",
+                        "prob_final": None,
+                        "btc_regime": payload.get("btc_regime"),
+                        "event_type": "MARKOV_VETO",
+                    }
+                )
     events.reverse()
     events = events[:limit]
 
@@ -212,8 +271,7 @@ def get_blocked(limit: int = 100, _=Depends(verify_key)):
         "blocked": events,
         "total": len(events),
         "reason_counts": [
-            {"reason": k, "count": v}
-            for k, v in sorted(reason_counts.items(), key=lambda x: -x[1])
+            {"reason": k, "count": v} for k, v in sorted(reason_counts.items(), key=lambda x: -x[1])
         ],
     }
 
@@ -238,6 +296,7 @@ def get_trade_stats(_=Depends(verify_key)):
     finally:
         conn.close()
 
+
 @app.get("/api/v1/equity")
 def get_equity(_=Depends(verify_key)):
     conn = _get_db()
@@ -249,8 +308,10 @@ def get_equity(_=Depends(verify_key)):
     finally:
         conn.close()
 
+
 @app.get("/api/v1/exec-events")
 def get_exec_events(event_type: str = "", event_limit: int = 200, _=Depends(verify_key)):
+    event_limit = _clamp_limit(event_limit, default=200)
     if not os.path.exists(EXEC_EVENTS_PATH):
         return {"events": [], "total": 0}
     matches = []
@@ -284,12 +345,16 @@ def get_intelligence_weekly(_=Depends(verify_key)):
 
 @app.get("/api/v1/intelligence/advisories")
 def get_intelligence_advisories(advisory_type: str = "", limit: int = 20, _=Depends(verify_key)):
+    limit = _clamp_limit(limit, default=20)
     advisories = list_advisory_snapshots(DB_PATH, advisory_type=advisory_type, limit=limit)
     return {"advisories": advisories, "total": len(advisories)}
 
 
 @app.get("/api/v1/intelligence/annotations")
-def get_intelligence_annotations(trade_id: int | None = None, limit: int = 50, _=Depends(verify_key)):
+def get_intelligence_annotations(
+    trade_id: int | None = None, limit: int = 50, _=Depends(verify_key)
+):
+    limit = _clamp_limit(limit, default=50)
     annotations = fetch_trade_annotations(DB_PATH, trade_id=trade_id, limit=limit)
     return {"annotations": annotations, "total": len(annotations)}
 

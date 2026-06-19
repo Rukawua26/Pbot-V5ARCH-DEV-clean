@@ -39,6 +39,18 @@ class WalkForwardValidationTest(unittest.TestCase):
 
         self.assertEqual(windows, [])
 
+    def test_multi_month_validation_windows_do_not_overlap_by_default(self):
+        timestamps = np.array(
+            [f"2026-{month:02d}-05T00:00:00" for month in range(1, 9)],
+            dtype="datetime64[ns]",
+        )
+
+        windows = build_walk_forward_windows(timestamps, train_months=3, val_months=2)
+
+        self.assertEqual(windows[0]["val_months"], ["2026-04", "2026-05"])
+        self.assertEqual(windows[1]["val_months"], ["2026-06", "2026-07"])
+        self.assertTrue(set(windows[0]["val_months"]).isdisjoint(windows[1]["val_months"]))
+
     def test_training_pipeline_does_not_use_random_train_test_split(self):
         source = Path("tools/train_models.py").read_text(encoding="utf-8")
 

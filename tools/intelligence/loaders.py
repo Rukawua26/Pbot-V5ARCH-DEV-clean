@@ -10,7 +10,6 @@ from core.learning_paths import DEFAULT_DB_PATH
 
 from .contracts import ExecutionEventRecord, StateSnapshotRecord, TradeRecord
 
-
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DEFAULT_STATE_PATH = Path("/dev/shm/sniper_state.json")
 DEFAULT_EVENTS_PATH = ROOT_DIR / "logs" / "execution_events.jsonl"
@@ -206,7 +205,7 @@ def load_trade_context_snapshots(
         conn.close()
     snapshots: list[dict[str, Any]] = []
     for row in rows:
-        payload = {}
+        payload: dict[str, Any] = {}
         try:
             payload = json.loads(row["context_json"]) if row["context_json"] else {}
         except (TypeError, json.JSONDecodeError):

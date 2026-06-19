@@ -257,6 +257,35 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         self.assertEqual(service.exchange.create_attempts, 0)
 
     @patch("core.execution_service.time.sleep", return_value=None)
+    def test_place_hard_sl_recovers_by_client_order_id_after_timeout(self, _sleep_mock):
+        service = ExecutionService("k", "s")
+        service.exchange = _ClientOrderLookupExchange(
+            lookup_order={
+                "orderId": "sl-recovered",
+                "status": "NEW",
+                "clientOrderId": "sl-client-1",
+                "executedQty": "0",
+                "origQty": "1",
+                "avgPrice": "0",
+                "price": "0",
+            }
+        )
+        service.set_weight_tracker(None)
+
+        result = service.place_hard_sl(
+            "BTC/USDT",
+            side="BUY",
+            amount=1.0,
+            stop_price=99.5,
+            client_order_id="sl-client-1",
+        )
+
+        self.assertEqual(result.get("id"), "sl-recovered")
+        self.assertEqual(service.last_hard_sl_error, "")
+        self.assertGreaterEqual(service.exchange.create_attempts, 1)
+        self.assertEqual(service.exchange.lookup_attempts, 1)
+
+    @patch("core.execution_service.time.sleep", return_value=None)
     def test_reduce_only_market_retry_reuses_client_order_id(self, _sleep_mock):
         service = ExecutionService("k", "s")
         service.exchange = _RetryCreateOrderExchange()

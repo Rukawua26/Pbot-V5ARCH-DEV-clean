@@ -90,6 +90,44 @@ class ReconciliationTest(unittest.TestCase):
         self.assertIn("sl_client_order_id", trade)
         self.assertIn("client_order_id", bot.execution.place_hard_sl.call_args.kwargs)
 
+    @patch("core.reconciliation.send_telegram_msg")
+    def test_orphan_adoption_persists_open_state_only_after_hard_sl(self, mocked_tg):
+        bot = SimpleNamespace()
+        bot.lock = RLock()
+        bot.db_lock = RLock()
+        bot.active_trades = {}
+        bot.balance = 100.0
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.log = MagicMock()
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "ETH/USDT:USDT",
+                    "contracts": 0.5,
+                    "side": "long",
+                    "entryPrice": 3000,
+                }
+            ],
+            fetch_open_orders=lambda: [],
+            place_hard_sl=MagicMock(return_value={"id": "sl-confirmed"}),
+            fetch_ticker=lambda s: {"last": 2950},
+        )
+        bot.get_current_balance = lambda: 100.0
+        bot.brain = SimpleNamespace(
+            save_active_trade_state=MagicMock(),
+            save_error_snapshot=MagicMock(),
+            delete_active_trade_state=MagicMock(),
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertEqual(bot.brain.save_active_trade_state.call_count, 1)
+        saved_symbol, saved_trade = bot.brain.save_active_trade_state.call_args.args
+        self.assertEqual(saved_symbol, "ETH/USDT")
+        self.assertEqual(saved_trade.get("sl_exchange_order_id"), "sl-confirmed")
+        self.assertEqual(saved_trade.get("status"), "OPEN")
+
     @patch("core.reconciliation.Config.PAPER_MODE", False)
     @patch("core.reconciliation.OperationalConfig.ORPHAN_ADOPTION_MIN_SIZE_USD", 10.0)
     def test_real_unadoptable_orphan_halts_instead_of_ignoring(self):

@@ -8,6 +8,7 @@ from tools.fidelity_audit import (
     _apply_shock_vetoes,
     _apply_side_specific_vetoes,
     _filter_reason_veto_candles,
+    _load_jsonl_with_stats,
     _market_breadth_fear_candles,
     _mtf_veto_candles,
     align_runtime_to_proxy,
@@ -18,6 +19,21 @@ from tools.fidelity_audit import (
 
 
 class FidelityAuditTest(unittest.TestCase):
+    def test_load_jsonl_reports_malformed_lines(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+
+        with TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "events.jsonl"
+            path.write_text('{"ok": true}\nnot-json\n\n', encoding="utf-8")
+
+            rows, stats = _load_jsonl_with_stats(path)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(stats["lines"], 3)
+        self.assertEqual(stats["malformed"], 1)
+        self.assertEqual(stats["empty"], 1)
+
     def test_extract_runtime_decisions_filters_symbol_and_labels_veto(self):
         events = [
             {
@@ -84,6 +100,42 @@ class FidelityAuditTest(unittest.TestCase):
 
         self.assertEqual(len(aligned), 1)
         self.assertEqual(aligned.iloc[0]["proxy_label"], "BUY")
+
+    def test_align_preserves_filter_passed_action_for_non_real_shadow_mode(self):
+        runtime = pd.DataFrame(
+            [
+                {
+                    "ts": pd.Timestamp("2026-05-11T01:10:00Z"),
+                    "event": "FILTER_APPLIED",
+                    "side": "BUY",
+                    "mode": "NONE",
+                    "filter_passed": True,
+                    "runtime_label": "NONE",
+                    "runtime_action": "NONE",
+                    "runtime_side": "BUY",
+                }
+            ]
+        )
+        proxy = pd.DataFrame(
+            [
+                {
+                    "time": pd.Timestamp("2026-05-11T01:00:00Z"),
+                    "proxy_label": "BUY",
+                    "proxy_action": "BUY",
+                    "score": 70.0,
+                    "mt_vote": 70.0,
+                    "sr_vote": 50.0,
+                    "adx": 25.0,
+                    "close": 100.0,
+                }
+            ]
+        )
+
+        aligned = align_runtime_to_proxy(
+            runtime, proxy, timeframe="1h", max_time_delta_seconds=3900
+        )
+
+        self.assertEqual(aligned.iloc[0]["runtime_action"], "BUY")
 
     def test_summarize_fidelity_reports_confusion_and_score(self):
         aligned = pd.DataFrame(

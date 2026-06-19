@@ -412,10 +412,16 @@ def _apply_entry_filters_and_adjust_prob(
                 )
 
     if audit_signal == "BUY" and str(ctx.get("market_breadth_sentiment", "")).upper() == "FEAR":
-        filter_passed = False
+        fear_threshold = float(getattr(Config, "MARKET_BREADTH_FEAR_THRESHOLD", 0.70) or 0.70)
         dump_ratio = float(ctx.get("market_breadth_dump_ratio", 0.0) or 0.0)
-        filter_reason = f"MARKET_BREADTH_FEAR: FEAR ({dump_ratio * 100:.0f}% dump)"
-        bot.log(f"⛔ {symbol}: veto LONG por Market Breadth FEAR ({dump_ratio * 100:.0f}% dump)")
+        if dump_ratio < fear_threshold:
+            ctx["market_breadth_fear_ignored"] = True
+        else:
+            filter_passed = False
+            filter_reason = f"MARKET_BREADTH_FEAR: FEAR ({dump_ratio * 100:.0f}% dump)"
+            bot.log(
+                f"⛔ {symbol}: veto LONG por Market Breadth FEAR ({dump_ratio * 100:.0f}% dump)"
+            )
 
     # [OI DELTA v118.3] Veto por senal falsa (short squeeze / long liquidation)
     # OI siempre se fetchea para el Context Vault; el filtro solo se aplica si está habilitado

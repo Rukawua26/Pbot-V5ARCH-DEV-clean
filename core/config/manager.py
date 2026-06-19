@@ -236,14 +236,12 @@ class Config(OperationalConfig, StrategyConfig):
                 "REAL_MODE_TESTNET_BLOCKED: modo REAL requiere USE_TESTNET=false. "
                 "Use PAPER_MODE=true para pruebas o desactive testnet antes de operar con capital real."
             )
-        if cls.MAX_OPEN_TRADES < 1 or cls.MAX_OPEN_TRADES > 5:
+        if cls.MAX_OPEN_TRADES < 1 or cls.MAX_OPEN_TRADES > 3:
             errors.append(
-                "REAL_MODE_MAX_TRADES: en modo REAL, MAX_OPEN_TRADES debe estar entre 1 y 5."
+                "REAL_MODE_MAX_TRADES: en modo REAL, MAX_OPEN_TRADES debe estar entre 1 y 3."
             )
-        if cls.MAX_RISK_USD <= 0 or cls.MAX_RISK_USD > 100:
-            errors.append(
-                "REAL_MODE_MAX_RISK: en modo REAL, MAX_RISK_USD debe estar entre 0 y 100."
-            )
+        if cls.MAX_RISK_USD <= 0 or cls.MAX_RISK_USD > 50:
+            errors.append("REAL_MODE_MAX_RISK: en modo REAL, MAX_RISK_USD debe estar entre 0 y 50.")
         if float(cls.RISK_PER_TRADE_PERCENT) <= 0 or float(cls.RISK_PER_TRADE_PERCENT) > 2.0:
             errors.append(
                 "REAL_MODE_RISK_PCT: en modo REAL, RISK_PER_TRADE_PERCENT debe estar entre 0% y 2%."
@@ -276,6 +274,9 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append("BTC_RISK_MAX_PRICE_AGE_SECONDS debe ser positivo")
         if int(cls.HALT_RECOVERY_MAX_ATTEMPTS) < 1:
             errors.append("HALT_RECOVERY_MAX_ATTEMPTS debe ser >= 1")
+        backend = str(getattr(cls, "EXECUTION_BACKEND", "live") or "live").lower()
+        if backend not in {"live", "shadow_live"}:
+            errors.append("EXECUTION_BACKEND debe ser 'live' o 'shadow_live'")
 
         total_weight = (
             cls.XGB_WEIGHT + cls.LGB_WEIGHT + cls.RF_WEIGHT + cls.GB_WEIGHT + cls.LR_WEIGHT

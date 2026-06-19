@@ -2,15 +2,14 @@
 from __future__ import annotations
 
 import json
+import pickle
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score
-import pickle
 
 ROOT = Path(__file__).resolve().parent.parent
 CANDLES_PATH = ROOT / "data_storage" / "candles" / "BTC_USDT_1h.parquet"
@@ -93,7 +92,9 @@ def simulate_agent_scores(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     w20 = alma_weights(20, alma_offset, alma_sigma)
     alma_short = rolling_weighted(close, w9)
     alma_long = rolling_weighted(close, w20)
-    mom_now = np.divide(alma_short - alma_long, alma_long, out=np.zeros_like(close), where=np.abs(alma_long) > 1e-12)
+    mom_now = np.divide(
+        alma_short - alma_long, alma_long, out=np.zeros_like(close), where=np.abs(alma_long) > 1e-12
+    )
     mom_prev = np.roll(mom_now, 1)
     mom_prev[0] = 0.0
     mt = np.full(close.shape[0], 50.0)
@@ -109,7 +110,9 @@ def simulate_agent_scores(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     tr = np.maximum.reduce([tr1, tr2, tr3])
     atr = rolling_mean(tr, 14)
     sma20 = rolling_mean(close, 20)
-    z_dynamic = np.divide(close - sma20, atr * 1.5, out=np.zeros_like(close), where=np.abs(atr) > 1e-12)
+    z_dynamic = np.divide(
+        close - sma20, atr * 1.5, out=np.zeros_like(close), where=np.abs(atr) > 1e-12
+    )
     z_dynamic = np.nan_to_num(z_dynamic, nan=0.0, posinf=0.0, neginf=0.0)
 
     ret = np.zeros_like(close)
@@ -140,7 +143,13 @@ def simulate_agent_scores(df: pd.DataFrame, params: dict) -> pd.DataFrame:
     return out
 
 
-def build_labels(df: pd.DataFrame, sl_pct: float, tp_pct: float) -> tuple[np.ndarray, np.ndarray]:
+def build_labels(
+    df: pd.DataFrame,
+    sl_pct: float,
+    tp_pct: float,
+    *,
+    max_horizon_bars: int = 72,
+) -> tuple[np.ndarray, np.ndarray]:
     close = df["close"].astype(float).to_numpy()
     high = df["high"].astype(float).to_numpy()
     low = df["low"].astype(float).to_numpy()
@@ -161,7 +170,8 @@ def build_labels(df: pd.DataFrame, sl_pct: float, tp_pct: float) -> tuple[np.nda
         sl_price = entry * (1.0 - sl)
 
         label = None
-        for j in range(i + 1, n):
+        horizon_end = min(n, i + 1 + max(1, int(max_horizon_bars)))
+        for j in range(i + 1, horizon_end):
             hit_tp = high[j] >= tp_price
             hit_sl = low[j] <= sl_price
             if hit_tp or hit_sl:
@@ -186,13 +196,33 @@ def build_labels(df: pd.DataFrame, sl_pct: float, tp_pct: float) -> tuple[np.nda
     return np.array(X, dtype=float), np.array(y, dtype=int)
 
 
-def train_mlp(X: np.ndarray, y: np.ndarray) -> tuple[dict, float]:
+def chronological_split_indices(
+    n_samples: int,
+    *,
+    val_fraction: float = 0.2,
+    embargo_bars: int = 72,
+) -> tuple[np.ndarray, np.ndarray]:
+    if n_samples < 2:
+        raise RuntimeError("Dataset insuficiente para split temporal")
+    split = int(n_samples * (1.0 - val_fraction))
+    split = max(1, min(split, n_samples - 1))
+    train_end = max(1, split - max(0, int(embargo_bars)))
+    train_idx = np.arange(0, train_end)
+    val_idx = np.arange(split, n_samples)
+    if len(train_idx) == 0 or len(val_idx) == 0:
+        raise RuntimeError("Split temporal vacío; reduce embargo_bars o aumenta muestras")
+    return train_idx, val_idx
+
+
+def train_mlp(X: np.ndarray, y: np.ndarray, *, embargo_bars: int = 72) -> tuple[dict, float]:
     if len(X) < 100:
         raise RuntimeError(f"Dataset insuficiente para entrenar: {len(X)} filas")
 
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
-    )
+    train_idx, val_idx = chronological_split_indices(len(X), embargo_bars=embargo_bars)
+    X_train, X_val = X[train_idx], X[val_idx]
+    y_train, y_val = y[train_idx], y[val_idx]
+    if len(np.unique(y_train)) < 2 or len(np.unique(y_val)) < 2:
+        raise RuntimeError("Split temporal sin ambas clases en train/validation")
 
     scaler = StandardScaler()
     X_train_s = scaler.fit_transform(X_train)
@@ -224,6 +254,10 @@ def train_mlp(X: np.ndarray, y: np.ndarray) -> tuple[dict, float]:
         "timeframe": "1h",
         "sl_pct": float(params_global["stop_loss_pct"]),
         "tp_pct": float(params_global["take_profit_pct"]),
+        "split": "chronological",
+        "train_samples": int(len(train_idx)),
+        "validation_samples": int(len(val_idx)),
+        "embargo_bars": int(embargo_bars),
     }
     return artifact, float(acc)
 

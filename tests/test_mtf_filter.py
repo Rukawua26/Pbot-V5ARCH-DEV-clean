@@ -257,6 +257,25 @@ class MTFFilterTests(unittest.TestCase):
         self.assertIn("5M", reason)
         self.assertEqual(ctx["mtf_weight"], 0.75)
 
+    def test_uses_effective_context_regime_before_bot_regime(self):
+        bot = _FakeBot({"15m": _make_df(_UPTREND), "5m": _make_df(_UPTREND)})
+        bot.market_regime = "RANGE"
+        ctx = {"btc_regime": "BULL_TREND"}
+        captured = {}
+
+        def fake_alignment(_df_main, _df_15m, _df_5m, _signal, regime=""):
+            captured["regime"] = regime
+            return 1.0, "MTF_OK"
+
+        with (
+            patch.object(Config, "MTF_FILTER_ENABLED", True),
+            patch("core.signals.mtf.filter.analyze_mtf_alignment", side_effect=fake_alignment),
+            patch("core.signals.mtf.filter.append_execution_event"),
+        ):
+            apply_mtf_filter(bot, "BTC/USDT", "BUY", 80.0, ctx, _make_df(_UPTREND))
+
+        self.assertEqual(captured["regime"], "BULL_TREND")
+
     def test_entry_pipeline_mtf_disabled_does_not_fetch_intraday_data(self):
         class RaisingDataService:
             def fetch_and_update_data(self, *_args, **_kwargs):

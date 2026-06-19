@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Sniper AI external watchdog periodically
+
+[Timer]
+OnBootSec=60
+OnUnitActiveSec=30
+AccuracySec=5
+Unit=sniper-ai-watchdog.service
+
+[Install]
+WantedBy=timers.target

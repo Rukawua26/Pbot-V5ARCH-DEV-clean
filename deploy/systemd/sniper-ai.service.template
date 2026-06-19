@@ -7,6 +7,8 @@ Type=simple
 User={{USER}}
 WorkingDirectory={{WORKDIR}}
 Environment=PYTHONUNBUFFERED=1
+Environment=SNIPER_DB_PATH={{WORKDIR}}/data/sniper_brain.db
+Environment=WATCHDOG_HEARTBEAT_PATH=/dev/shm/sniper_ai_heartbeat.json
 EnvironmentFile=-{{WORKDIR}}/.env
 ExecStart={{PYTHON_BIN}} main.py
 KillSignal=SIGTERM
@@ -16,6 +18,10 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=sniper-ai
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths={{WORKDIR}} /dev/shm /tmp
 
 [Install]
 WantedBy=multi-user.target

@@ -8,8 +8,10 @@ aiodns==4.0.0
     # via ccxt
 aiohappyeyeballs==2.6.1
     # via aiohttp
-aiohttp==3.14.0
-    # via ccxt
+aiohttp==3.14.1
+    # via
+    #   -r requirements.in
+    #   ccxt
 aiosignal==1.4.0
     # via aiohttp
 alembic==1.18.4
@@ -40,8 +42,10 @@ coincurve==21.0.0
     # via ccxt
 colorlog==6.10.1
     # via optuna
-cryptography==47.0.0
-    # via ccxt
+cryptography==49.0.0
+    # via
+    #   -r requirements.in
+    #   ccxt
 fastapi==0.136.3
     # via -r requirements.in
 frozenlist==1.8.0
@@ -158,8 +162,10 @@ sqlalchemy==2.0.49
     # via
     #   alembic
     #   optuna
-starlette==1.2.1
-    # via fastapi
+starlette==1.3.1
+    # via
+    #   -r requirements.in
+    #   fastapi
 ta==0.11.0
     # via -r requirements.in
 threadpoolctl==3.6.0

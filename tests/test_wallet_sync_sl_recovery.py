@@ -138,6 +138,47 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
         bot.execution.place_hard_sl.assert_called_once()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
+    def test_open_orders_lookup_failure_halts_without_duplicating_sl(self):
+        bot = self._base_bot()
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.halt_system_active = False
+        bot.active_trades = {
+            "ETH/USDT": {
+                "symbol": "ETH/USDT",
+                "side": "BUY",
+                "entry": 2000.0,
+                "amount": 0.5,
+                "sl": 1980.0,
+                "is_shadow": False,
+                "open_time": datetime.now(),
+                "sl_exchange_order_id": None,
+            }
+        }
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "ETH/USDT:USDT",
+                    "contracts": 0.5,
+                    "side": "long",
+                    "entryPrice": 2000.0,
+                    "unrealizedPnl": 0.0,
+                    "info": {},
+                }
+            ],
+            fetch_open_orders=MagicMock(side_effect=RuntimeError("orders unavailable")),
+            place_hard_sl=MagicMock(return_value={"id": "duplicate-sl"}),
+        )
+
+        sync_wallet(bot)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        bot.execution.place_hard_sl.assert_not_called()
+        bot.brain.save_error_snapshot.assert_called()
+
+    @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
     def test_ignores_partial_unrelated_stop_as_hard_sl_coverage(self):
         bot = self._base_bot()
         bot.active_trades = {

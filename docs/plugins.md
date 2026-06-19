@@ -95,7 +95,7 @@ Ver `.opencode/skills/security-and-hardening/SKILL.md` — el plugin npm es cód
 No. El bot no tiene sistema de plugins. Para extender funcionalidad, modificar `core/` directamente o usar el sistema de estrategias/agentes en `core/strategy/agents/`.
 
 **¿El plugin afecta al dashboard?**
-No. El dashboard (`dashboard/api_server.py`, `tools/dashboard.py`) es independiente.
+No. El dashboard (`tools/dashboard_api_server.py`, `tools/dashboard.py`) es independiente.
 
 **¿Cómo actualizar el plugin?**
 ```bash

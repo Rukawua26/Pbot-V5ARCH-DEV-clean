@@ -171,10 +171,14 @@ def close_trade(
                 bot.log(f"❌ ERROR CRÍTICO CERRANDO {symbol}: {e}")
                 close_failed = False
 
-                if "notional" in str(e).lower() or "-4164" in str(e) or "insufficient" in str(e).lower():
+                if (
+                    "notional" in str(e).lower()
+                    or "-4164" in str(e)
+                    or "insufficient" in str(e).lower()
+                ):
                     bot.log(f"⚠️ Error de min notional/dust detectado para {symbol}")
                     close_failed = True
-                elif not _order_looks_filled(order):
+                elif not isinstance(order, dict) or not _order_looks_filled(order):
                     bot.log(f"⚠️ Close order para {symbol} no confirmado como filled")
                     close_failed = True
                 else:
@@ -183,7 +187,9 @@ def close_trade(
                             bot.log(f"⚠️ Posición remota no está plana tras close para {symbol}")
                             close_failed = True
                     except Exception as flat_error:
-                        bot.log(f"⚠️ No se pudo verificar posición plana tras close para {symbol}: {flat_error}")
+                        bot.log(
+                            f"⚠️ No se pudo verificar posición plana tras close para {symbol}: {flat_error}"
+                        )
                         close_failed = True
 
                 if close_failed:

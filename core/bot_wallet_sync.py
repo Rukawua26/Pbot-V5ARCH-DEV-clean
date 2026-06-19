@@ -9,6 +9,7 @@ from core.trade_helpers import _emergency_market_close
 from tools.notifier import send_telegram_msg
 
 _OPEN_ENTRY_ORDER_LOOKUP_FAILED = object()
+_HARD_SL_ORDER_LOOKUP_FAILED = object()
 
 
 def _bool_reduce_only(order: dict) -> bool:
@@ -88,6 +89,7 @@ def _find_existing_hard_sl_order(bot, symbol: str, trade: dict):
                 return order
     except Exception as error:
         bot.log(f"⚠️ No se pudo inspeccionar open orders de {symbol} para SL: {error}")
+        return _HARD_SL_ORDER_LOOKUP_FAILED
     return None
 
 
@@ -186,7 +188,9 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
         if verified_sl and verified_sl != "HALT":
             return False
         if verified_sl == "HALT":
-            bot.log(f"🛑 HARD_SL_VERIFICATION_HALTED {symbol}: wallet sync aborted due to verification failure")
+            bot.log(
+                f"🛑 HARD_SL_VERIFICATION_HALTED {symbol}: wallet sync aborted due to verification failure"
+            )
             return False
         bot.log(
             f"⚠️ HARD_SL_MISSING_ON_EXCHANGE {symbol}: id local {trade.get('sl_exchange_order_id')} no está abierto/cubriendo. Re-adjuntando."
@@ -194,6 +198,13 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
         trade["sl_exchange_order_id"] = None
 
     existing_sl = _find_existing_hard_sl_order(bot, symbol, trade)
+    if existing_sl is _HARD_SL_ORDER_LOOKUP_FAILED:
+        _halt_wallet_sync(
+            bot,
+            "HARD_SL_OPEN_ORDERS_LOOKUP_FAILED",
+            {"symbol": symbol},
+        )
+        return False
     if existing_sl:
         trade["sl_exchange_order_id"] = existing_sl.get("id")
         trade["status"] = "OPEN"
@@ -399,12 +410,12 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
             trade["status"] = "PARTIAL_FILL_CANCEL_FAILED"
             trade["partial_fill_pending"] = True
             trade["remaining_amount"] = remaining_estimated
-            with bot.db_lock:
-                bot.brain.save_active_trade_state(symbol, trade)
             with bot.lock:
                 bot.is_paused = True
                 bot.integrity_lock_active = True
                 setattr(bot, "halt_system_active", True)
+                with bot.db_lock:
+                    bot.brain.save_active_trade_state(symbol, trade)
             append_execution_event(
                 bot,
                 "PARTIAL_FILL_CANCEL_FAILED",
@@ -522,12 +533,17 @@ def sync_wallet(bot):
 
                     # No purgar si el estado es ambiguo (orden no confirmada, cierre en curso, etc.)
                     ambiguous_statuses = {
-                        "PENDING_SEND", "ENTRY_ACK_UNKNOWN", "EXIT_STUCK",
-                        "CLOSING_INITIATED", "PARTIAL_FILL_PENDING",
+                        "PENDING_SEND",
+                        "ENTRY_ACK_UNKNOWN",
+                        "EXIT_STUCK",
+                        "CLOSING_INITIATED",
+                        "PARTIAL_FILL_PENDING",
                     }
                     status = trade.get("status", "")
                     if status in ambiguous_statuses:
-                        bot.log(f"⏳ Wallet sync: {symbol} tiene estado ambiguo ({status}), no purgando")
+                        bot.log(
+                            f"⏳ Wallet sync: {symbol} tiene estado ambiguo ({status}), no purgando"
+                        )
                         continue
 
                     bot.log(f"🧹 Purgando manual: {symbol}")

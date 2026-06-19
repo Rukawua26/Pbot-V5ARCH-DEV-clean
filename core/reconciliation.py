@@ -379,11 +379,6 @@ def reconcile_bootstrap_state(bot):
             )
             adopted_trade["entry_client_order_id"] = entry_coid
             adopted_trade["sl_client_order_id"] = sl_coid
-            with bot.lock:
-                bot.active_trades[symbol] = adopted_trade
-            with bot.db_lock:
-                bot.brain.save_active_trade_state(symbol, adopted_trade)
-
             try:
                 sl_order = bot.execution.place_hard_sl(
                     symbol,
@@ -393,18 +388,21 @@ def reconcile_bootstrap_state(bot):
                     client_order_id=sl_coid,
                 )
                 if sl_order:
+                    adopted_trade["sl_exchange_order_id"] = sl_order.get("id")
+                    adopted_trade["status"] = "OPEN"
                     with bot.lock:
-                        bot.active_trades[symbol]["sl_exchange_order_id"] = sl_order.get("id")
+                        bot.active_trades[symbol] = adopted_trade
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
+                        bot.brain.save_active_trade_state(symbol, adopted_trade)
                 else:
                     bot.is_paused = True
                     bot.integrity_lock_active = True
                     setattr(bot, "halt_system_active", True)
+                    adopted_trade["status"] = "ADOPTED_UNPROTECTED"
                     with bot.lock:
-                        bot.active_trades[symbol]["status"] = "ADOPTED_UNPROTECTED"
+                        bot.active_trades[symbol] = adopted_trade
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
+                        bot.brain.save_active_trade_state(symbol, adopted_trade)
                         bot.brain.save_error_snapshot(
                             symbol,
                             "ORPHAN_HARD_SL_ATTACH_FAILED",
@@ -420,10 +418,11 @@ def reconcile_bootstrap_state(bot):
                 bot.is_paused = True
                 bot.integrity_lock_active = True
                 setattr(bot, "halt_system_active", True)
+                adopted_trade["status"] = "ADOPTED_UNPROTECTED"
                 with bot.lock:
-                    bot.active_trades[symbol]["status"] = "ADOPTED_UNPROTECTED"
+                    bot.active_trades[symbol] = adopted_trade
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
+                    bot.brain.save_active_trade_state(symbol, adopted_trade)
                     bot.brain.save_error_snapshot(
                         symbol,
                         "ORPHAN_HARD_SL_ATTACH_EXCEPTION",

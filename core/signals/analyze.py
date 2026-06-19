@@ -46,7 +46,7 @@ def _is_shadow_learning_runtime(bot) -> bool:
     return paper_mode and (execution_mode in {"shadow", "shadow_live"} or backend == "shadow_live")
 
 
-def _get_fast_coherence_veto_reason(bot, df_main):
+def _get_fast_coherence_veto_reason(bot, df_main, signal: str | None = None):
     if not bool(getattr(Config, "DIRECTIONAL_COHERENCE_FILTER", True)):
         return None
     if df_main is None or df_main.empty or "close" not in df_main.columns:
@@ -66,7 +66,9 @@ def _get_fast_coherence_veto_reason(bot, df_main):
     except Exception:
         return None
 
-    tentative_signal = "BUY" if close_val > ema_val else "SELL"
+    tentative_signal = str(signal or "").upper()
+    if tentative_signal not in {"BUY", "SELL"}:
+        tentative_signal = "BUY" if close_val > ema_val else "SELL"
     if tentative_signal == "SELL" and is_bull:
         return "COHERENCIA (FAST PATH): SELL bloqueado en regimen ALCISTA"
     if tentative_signal == "BUY" and is_bear:
@@ -104,20 +106,6 @@ def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
                 "⚪",
                 f"⏭️ VOL EXTREMA ({atr_pct:.1f}%)",
                 {"atr_pct": atr_pct / 100, "tier": "IRON"},
-            )
-            return None
-
-        fast_veto_reason = _get_fast_coherence_veto_reason(bot, df_main)
-        if fast_veto_reason:
-            bot.log(f"⛔ FAST_VETO {symbol}: {fast_veto_reason}")
-            bot.update_radar(
-                symbol,
-                {"signal": "WAIT", "mode": "NONE"},
-                0.0,
-                "⚪",
-                f"⛔ VETO: {fast_veto_reason}",
-                {"tier": "IRON"},
-                response_ms=elapsed,
             )
             return None
 
@@ -190,6 +178,21 @@ def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
                     df_4h=df_4h,
                     market_regime=market_regime,
                 )
+
+        audit_signal = str(res[0] if isinstance(res, (list, tuple)) and len(res) > 0 else "")
+        fast_veto_reason = _get_fast_coherence_veto_reason(bot, df_main, audit_signal)
+        if fast_veto_reason:
+            bot.log(f"⛔ FAST_VETO {symbol}: {fast_veto_reason}")
+            bot.update_radar(
+                symbol,
+                {"signal": "WAIT", "mode": "NONE"},
+                0.0,
+                "⚪",
+                f"⛔ VETO: {fast_veto_reason}",
+                {"tier": "IRON", "signal": audit_signal},
+                response_ms=elapsed,
+            )
+            return None
 
         return res
 

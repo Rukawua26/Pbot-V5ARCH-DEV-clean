@@ -16,7 +16,7 @@
 [![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Runtime_Clean-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean)
 [![Modos](https://img.shields.io/badge/Modos-PAPER_%7C_REAL_%7C_SHADOW-0ea5e9?style=flat-square)]()
 [![HMM](https://img.shields.io/badge/HMM-Markov_Intelligence-f97316?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/Tests-873_ok_%7C_2_skipped-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-891_ok_%7C_2_skipped-22c55e?style=flat-square)]()
 [![Shadow](https://img.shields.io/badge/Shadow_Capacity-20_trades-9333ea?style=flat-square)]()
 [![Deploy](https://img.shields.io/badge/Deploy-systemd_%7C_Docker-111827?style=flat-square)]()
 [![Risk](https://img.shields.io/badge/Risk_Engine-v118.7-ef4444?style=flat-square)]()
@@ -36,12 +36,15 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 
 | Check | Estado |
 |---|---|
-| `unittest discover` | ✅ `873 tests OK` · `2 skipped` |
-| `ruff --select F,E9` | ✅ Sin errores fatales |
+| `unittest discover` | ✅ `891 tests OK` · `2 skipped` |
+| `ruff` | ✅ Sin errores en archivos tocados |
 | `compileall main.py core tools` | ✅ OK |
 | `check_no_silent_pass.py` | ✅ OK |
 | `mypy --explicit-package-bases core` | ✅ OK |
-| Runtime safety | ✅ Locks, shutdown, subprocess y pickle hardening revisados |
+| `pip-audit --strict` | ✅ Sin vulnerabilidades conocidas |
+| `coverage report --fail-under=65` | ✅ 67% |
+| `docker build -t sniper-ai .` | ✅ OK |
+| Runtime safety | ✅ HARD SL, locks, reconciliación y deploy hardening revisados |
 
 > Esta rama limpia elimina módulos huérfanos, corrige riesgos de concurrencia y deja el runtime preparado para validación CI/producción.
 
@@ -54,6 +57,20 @@ Binance Futures → Triage Dinámico → HMM BTC → Agentes MT/SR/G
 ---
 
 ## ✨ Últimas Fases
+
+### 🛡️ Phase 21 — Runtime Safety + CI Closure (Junio 2026)
+Sweep de seguridad y validación completa antes de publicar en GitHub:
+
+| Área | Resultado |
+|---|---|
+| HARD SL | Estados ambiguos en open orders ahora fuerzan `HALT` en vez de duplicar órdenes |
+| Reconciliación | Posiciones huérfanas solo persisten `OPEN` tras confirmar HARD SL |
+| Locks | Account/exchange calls serializadas y lock inversion corregida |
+| Config REAL | `EXECUTION_BACKEND` validado y guardrails REAL unificados |
+| ML/Data | Split temporal cronológico con embargo y optimizer legacy bloqueado por defecto |
+| Dashboard | API canónica `tools.dashboard_api_server`; legacy duplicado retirado |
+| Dependencias | `aiohttp`, `cryptography` y `starlette` actualizados; `pip-audit` limpio |
+| Validación | 891 tests OK · 67% coverage · Docker build OK |
 
 ### 🧠 Phase 20 — Intelligence Layer + Dashboard Consultivo (Junio 2026)
 Nueva capa consultiva, separada del runtime crítico, integrada en el dashboard:
@@ -87,7 +104,7 @@ Limpieza profunda orientada a estabilidad operativa:
 | Concurrencia | Protegidos accesos a `active_trades`, `scanner_history`, cooldowns y balance |
 | Shutdown | Señalización defensiva con `_shutdown_event` y cierre de executors |
 | Seguridad | Pickle seguro, subprocess con path validado y timeout |
-| Validación | 873 tests OK · `ruff F/E9` OK · mypy core OK |
+| Validación | 891 tests OK · `ruff` OK · mypy core OK |
 
 ### 🟣 Phase 18 — Hardening Técnico (Junio 2026)
 Consolidación del runtime sin deuda legacy:
@@ -99,7 +116,7 @@ Consolidación del runtime sin deuda legacy:
 | 🧠 RAG Memory | `find_similar_contexts` vectorizado con NumPy |
 | 💾 Maturity cache | Hash-debounce + persistencia async |
 | 🗄️ DB path | `core.learning_paths.DEFAULT_DB_PATH` como fuente única |
-| ✅ Validación | 873 tests · compileall · fatal ruff · mypy core · silent-pass guard |
+| ✅ Validación | 891 tests · compileall · ruff · mypy core · silent-pass guard |
 
 ### 🟡 Phase 17 — Recalibración SHADOW (Mayo 2026)
 Ajuste de umbrales para operar en régimen RANGE:
@@ -319,8 +336,10 @@ PENDING_SEND → PENDING_EXCHANGE_OPEN → ENTRY_FILLED_AWAITING_POSITION_SYNC �
 | 15 | MTF regime-aware + spread dinámico por régimen | ✅ |
 | 16 | Kinetic SR: boost ×1.3 absorción · penalty ×0.7 falling knife | ✅ |
 | 17 | Recalibración SHADOW: umbrales 55% · SHOCK 0.20% · RANGE 0.80x | ✅ |
-| 18 | Hardening técnico: legacy retirado · RAG NumPy · 873 tests | ✅ |
+| 18 | Hardening técnico: legacy retirado · RAG NumPy · tests ampliados | ✅ |
 | 19 | GitHub Projects v2 Kanban async — ciclo vida de operaciones | ✅ |
+| 20 | Intelligence Layer + Dashboard consultivo | ✅ |
+| 21 | Runtime Safety + CI Closure: audit, coverage y Docker OK | ✅ |
 
 ---
 
@@ -379,6 +398,12 @@ systemctl --user status sniper-ai.service --no-pager
 docker compose up --build -d
 ```
 
+Build manual verificado:
+
+```bash
+docker build -t sniper-ai .
+```
+
 ---
 
 ## 📊 Operación Diaria
@@ -424,9 +449,18 @@ SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest discover -s tests
 
 # Invarianza temporal
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest tests/test_temporal_invariance.py
+
+# Dependencias y seguridad
+./.venv/bin/python -m pip check
+./.venv/bin/python -m pip_audit --strict
+
+# Cobertura mínima y contenedor
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m coverage run -m unittest discover -s tests -p "test_*.py"
+./.venv/bin/python -m coverage report --fail-under=65
+docker build -t sniper-ai .
 ```
 
-**Estado verificado:** `873` tests OK · `2` skipped (hmmlearn env + testnet E2E opt-in)
+**Estado verificado:** `891` tests OK · `2` skipped · `67%` coverage · `pip-audit` limpio · Docker build OK.
 
 ---
 
@@ -445,7 +479,7 @@ El bot opera en modo REAL en Binance Futures con capital controlado:
 
 ```bash
 bash tools/start_real_pilot.sh   # Arrancar
-bash tools/stop_real_pilot.sh    # Detener + post-mortem
+bash tools/stop_real_pilot.sh --confirm-real-stop    # Detener tras verificar posiciones/SL
 ```
 
 ---
@@ -471,7 +505,7 @@ Pbot-V5ARCH-DEV/
 │   │   └── thresholds.py       # 30+ umbrales tipados
 │   ├── signals/                # Filtros y ejecución de señales
 │   └── strategy/               # Agentes MT · SR · G
-├── tests/                      # 873 tests unittest
+├── tests/                      # 891 tests unittest
 ├── tools/                      # Herramientas de análisis y validación
 ├── sniper-ai.service           # Servicio systemd principal
 ├── sniper-ai-watchdog.service  # Watchdog systemd
@@ -508,7 +542,7 @@ Pbot-V5ARCH-DEV/
 
 <div align="center">
 
-**Sniper AI** · `v118.7-PRO` · Phase 19 · Binance Futures · Python 3.12+
+**Sniper AI** · `v118.7-PRO` · Phase 21 · Binance Futures · Python 3.12+
 
 *Construido con enfoque en seguridad runtime, trazabilidad total y exploración sin riesgo.*
 

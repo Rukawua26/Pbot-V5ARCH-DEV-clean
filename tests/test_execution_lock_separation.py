@@ -81,7 +81,7 @@ class ExecutionLockSeparationTest(unittest.TestCase):
             "account lock should be owned inside _call_exchange_account callback",
         )
 
-    def test_call_exchange_account_does_not_hold_exchange_lock(self):
+    def test_call_exchange_account_holds_exchange_lock(self):
         self.service.exchange.fetch_balance = MagicMock(return_value={"total": {"USDT": 100}})
         exchange_held = {"during": False}
 
@@ -89,9 +89,9 @@ class ExecutionLockSeparationTest(unittest.TestCase):
             exchange_held["during"] = self.service._exchange_call_lock._is_owned()
 
         self.service._call_exchange_account("test_acc_op", check_locks)
-        self.assertFalse(
+        self.assertTrue(
             exchange_held["during"],
-            "exchange lock should NOT be held inside _call_exchange_account (uses _no_lock=True)",
+            "exchange lock should be held inside _call_exchange_account to protect shared CCXT state",
         )
 
     def test_call_exchange_account_delegates_with_no_lock(self):

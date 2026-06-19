@@ -115,9 +115,7 @@ def build_dataset(rows: list[sqlite3.Row], filtered_noise_rows: int) -> DatasetB
             y_class.append(1 if pnl > 0 else 0)
             y_reg.append(pnl)
             ts = pd.to_datetime(row["timestamp"], utc=True, errors="coerce")
-            timestamps.append(
-                ts.to_datetime64() if not pd.isna(ts) else np.datetime64("NaT")
-            )
+            timestamps.append(ts.to_datetime64() if not pd.isna(ts) else np.datetime64("NaT"))
         except Exception:
             continue
 
@@ -186,7 +184,9 @@ def _oversample_positive_class(
 
     target_pos = int(np.ceil(len(neg_idx) * max(1.0, positive_class_weight)))
     extra = max(0, target_pos - len(pos_idx))
-    sampled_extra = rng.choice(pos_idx, size=extra, replace=True) if extra else np.array([], dtype=int)
+    sampled_extra = (
+        rng.choice(pos_idx, size=extra, replace=True) if extra else np.array([], dtype=int)
+    )
     final_idx = np.concatenate([np.arange(len(y)), sampled_extra])
     rng.shuffle(final_idx)
     return X[final_idx], y[final_idx]
@@ -196,6 +196,7 @@ def build_walk_forward_windows(
     timestamps: np.ndarray,
     train_months: int = 3,
     val_months: int = 1,
+    val_stride_months: int | None = None,
 ) -> list[dict]:
     """Construye ventanas rolling por mes: train N meses, valida M meses."""
     if train_months <= 0 or val_months <= 0:
@@ -209,7 +210,8 @@ def build_walk_forward_windows(
     months = sorted(periods.unique())
     windows = []
     last_start = len(months) - train_months - val_months + 1
-    for start in range(max(0, last_start)):
+    stride = max(1, int(val_stride_months or val_months))
+    for start in range(0, max(0, last_start), stride):
         train_periods = months[start : start + train_months]
         val_periods = months[start + train_months : start + train_months + val_months]
         train_idx = np.flatnonzero(periods.isin(train_periods).to_numpy())
@@ -229,9 +231,7 @@ def build_walk_forward_windows(
     return windows
 
 
-def _chronological_holdout_window(
-    timestamps: np.ndarray, train_ratio: float = 0.8
-) -> list[dict]:
+def _chronological_holdout_window(timestamps: np.ndarray, train_ratio: float = 0.8) -> list[dict]:
     ts = pd.Series(pd.to_datetime(timestamps, utc=True, errors="coerce"))
     if ts.isna().any() or len(ts) < 2:
         return []
@@ -343,7 +343,9 @@ def train_consensus(
         if len(np.unique(y_train)) < 2:
             raise SystemExit(f"Walk-forward ventana {window['name']} sin ambas clases en train.")
         if len(np.unique(y_val)) < 2:
-            raise SystemExit(f"Walk-forward ventana {window['name']} sin ambas clases en validación.")
+            raise SystemExit(
+                f"Walk-forward ventana {window['name']} sin ambas clases en validación."
+            )
 
         clf, scaler, balanced_n = _fit_consensus_classifier(
             X_train,
@@ -427,9 +429,7 @@ def train_consensus(
         "val_f1_min": float(min(row["f1"] for row in window_metrics)),
         "val_f1_mean": float(np.mean([row["f1"] for row in window_metrics])),
         "val_recall_min": float(min(row["recall"] for row in window_metrics)),
-        "val_precision_mean": float(
-            np.mean([row["precision"] for row in window_metrics])
-        ),
+        "val_precision_mean": float(np.mean([row["precision"] for row in window_metrics])),
     }
 
 

@@ -1,30 +1,39 @@
 from __future__ import annotations
 
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from core.learning_paths import DEFAULT_DB_PATH
 
 from .collector import collect_runtime_dataset
-from .loaders import DEFAULT_EVENTS_PATH, DEFAULT_STATE_PATH, load_trade_by_id, parse_iso_ts
+from .loaders import DEFAULT_EVENTS_PATH, DEFAULT_STATE_PATH, load_trade_by_id
 from .storage import (
     fetch_trade_annotations,
-    list_advisory_snapshots,
     save_advisory_snapshot,
     write_report_artifact,
 )
 
 
 def _blocked_reason_summary(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    counts = Counter()
+    counts: Counter[str] = Counter()
     for event in events:
-        if event.get("event") in {"FILTER_APPLIED", "RANGE_VETO", "MTF_FILTER", "MARKOV_REGIME_DECISION"}:
+        if event.get("event") in {
+            "FILTER_APPLIED",
+            "RANGE_VETO",
+            "MTF_FILTER",
+            "MARKOV_REGIME_DECISION",
+        }:
             payload = event.get("payload") or {}
             if event.get("event") == "FILTER_APPLIED" and payload.get("filter_passed", True):
                 continue
-            reason = str(payload.get("filter_reason") or payload.get("reason") or event.get("event") or "UNKNOWN")
+            reason = str(
+                payload.get("filter_reason")
+                or payload.get("reason")
+                or event.get("event")
+                or "UNKNOWN"
+            )
             counts[reason] += 1
     return [{"reason": key, "count": value} for key, value in counts.most_common(10)]
 
@@ -32,9 +41,15 @@ def _blocked_reason_summary(events: list[dict[str, Any]]) -> list[dict[str, Any]
 def build_daily_report(dataset: dict[str, Any]) -> dict[str, Any]:
     trades = dataset.get("trades") or []
     state = dataset.get("state") or {}
-    shadow_closed = [trade for trade in trades if trade.get("is_shadow") and trade.get("pnl_percent") is not None]
-    real_closed = [trade for trade in trades if not trade.get("is_shadow") and trade.get("pnl_percent") is not None]
-    report = {
+    shadow_closed = [
+        trade for trade in trades if trade.get("is_shadow") and trade.get("pnl_percent") is not None
+    ]
+    real_closed = [
+        trade
+        for trade in trades
+        if not trade.get("is_shadow") and trade.get("pnl_percent") is not None
+    ]
+    report: dict[str, Any] = {
         "report_type": "daily",
         "generated_at": dataset.get("generated_at"),
         "window_hours": dataset.get("window_hours"),
@@ -83,7 +98,7 @@ def build_postmortem_report(
     annotations = fetch_trade_annotations(db_path, trade_id=trade_id, limit=10)
     pnl_pct = float(trade.pnl_percent or 0.0)
     severity = "high" if pnl_pct < -2.0 else "medium" if pnl_pct < 0 else "low"
-    report = {
+    report: dict[str, Any] = {
         "report_type": "postmortem",
         "generated_at": datetime.now(UTC).isoformat(),
         "trade": trade.to_dict(),
@@ -97,9 +112,13 @@ def build_postmortem_report(
         "advice": [],
     }
     if trade.is_shadow:
-        report["advice"].append("El dato SHADOW sirve para calibración previa antes de mover reglas a REAL.")
+        report["advice"].append(
+            "El dato SHADOW sirve para calibración previa antes de mover reglas a REAL."
+        )
     if pnl_pct < 0:
-        report["advice"].append("Revisar veto reasons y contexto cercano para ver si hubo degradación evitable.")
+        report["advice"].append(
+            "Revisar veto reasons y contexto cercano para ver si hubo degradación evitable."
+        )
     if trade.reason:
         report["advice"].append(f"Exit/close reason observada: {trade.reason}")
     return report
@@ -156,12 +175,14 @@ def build_and_store_advisories(
             artifact_path=artifact_path,
             db_path=db_path,
         )
-        stored.append({
-            "advisory_type": advisory["advisory_type"],
-            "summary": advisory["summary"],
-            "artifact_path": artifact_path,
-            "payload": advisory["payload"],
-        })
+        stored.append(
+            {
+                "advisory_type": advisory["advisory_type"],
+                "summary": advisory["summary"],
+                "artifact_path": artifact_path,
+                "payload": advisory["payload"],
+            }
+        )
     return stored
 
 
@@ -171,8 +192,12 @@ def generate_full_intelligence_cycle(
     events_path: str | Path = DEFAULT_EVENTS_PATH,
     state_path: str | Path = DEFAULT_STATE_PATH,
 ) -> dict[str, Any]:
-    daily_dataset = collect_runtime_dataset(db_path=db_path, events_path=events_path, state_path=state_path, hours=24)
-    weekly_dataset = collect_runtime_dataset(db_path=db_path, events_path=events_path, state_path=state_path, hours=24 * 7)
+    daily_dataset = collect_runtime_dataset(
+        db_path=db_path, events_path=events_path, state_path=state_path, hours=24
+    )
+    weekly_dataset = collect_runtime_dataset(
+        db_path=db_path, events_path=events_path, state_path=state_path, hours=24 * 7
+    )
     daily_report = build_daily_report(daily_dataset)
     weekly_report = build_weekly_report(weekly_dataset)
     daily_path = write_report_artifact("daily_report.json", daily_report)

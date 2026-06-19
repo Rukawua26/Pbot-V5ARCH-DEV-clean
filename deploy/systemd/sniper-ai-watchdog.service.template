@@ -8,3 +8,7 @@ User={{USER}}
 WorkingDirectory={{WORKDIR}}
 Environment=WATCHDOG_HEARTBEAT_PATH={{HEARTBEAT_PATH}}
 ExecStart={{PYTHON_BIN}} tools/watchdog_supervisor.py --service sniper-ai.service --stale-seconds 45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths={{WORKDIR}} /dev/shm /tmp

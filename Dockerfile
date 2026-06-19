@@ -22,9 +22,9 @@ RUN groupadd -g ${GROUP_ID} botgroup && \
 # Install Python dependencies
 # Using --no-cache-dir to keep image size small
 COPY requirements.lock .
-# All deps have pre-built manylinux wheels — no system build tools needed
+# Prefer wheels, but allow source install for lightweight packages without wheels (e.g. ta).
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir --only-binary :all: -r requirements.lock
+    pip install --no-cache-dir -r requirements.lock
 
 # Copy the application code
 COPY . .

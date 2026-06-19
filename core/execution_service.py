@@ -111,14 +111,15 @@ class ExecutionService:
         raise RuntimeError(f"{op_name} failed without captured error")
 
     def _call_exchange_account(self, op_name: str, fn, *, retries: int = 2, timeout_s: float = 0.0):
-        with self._account_lock:
-            return self._call_exchange(
-                op_name,
-                fn,
-                retries=retries,
-                timeout_s=timeout_s,
-                _no_lock=True,
-            )
+        with self._exchange_call_lock:
+            with self._account_lock:
+                return self._call_exchange(
+                    op_name,
+                    fn,
+                    retries=retries,
+                    timeout_s=timeout_s,
+                    _no_lock=True,
+                )
 
     def _track_emergency_stuck(self, symbol: str, side: str, amount: float, order: dict):
         """Emite telemetría de emergencia cuando posición queda atrapada en libro."""
@@ -896,6 +897,19 @@ class ExecutionService:
             self.last_hard_sl_error = ""
             return order
         except Exception as e:
+            if client_order_id:
+                try:
+                    recovered = self.fetch_order_by_client_id(symbol, client_order_id)
+                    if recovered:
+                        self.last_hard_sl_error = ""
+                        self.logger.warning(
+                            f"⚠️ HARD SL {symbol} recuperado por clientOrderId tras error: {client_order_id}"
+                        )
+                        return recovered
+                except Exception as lookup_error:
+                    self.logger.warning(
+                        f"⚠️ No se pudo recuperar HARD SL ambiguo {symbol}/{client_order_id}: {lookup_error}"
+                    )
             self.last_hard_sl_error = str(e)
             self.logger.error(f"⚠️ Error colocando Hard SL {symbol}: {e}")
             return None
@@ -961,7 +975,7 @@ class ExecutionService:
                 )
                 try:
                     emergency_price = self.exchange.price_to_precision(symbol, current_price)
-                    emergency_params = dict(params)
+                    emergency_params: dict[str, object] = dict(params)
                     emergency_params.setdefault(
                         "newClientOrderId",
                         _exit_client_order_id(symbol, exit_side, f"{exit_label}:emergency", 0),

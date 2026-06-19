@@ -14,8 +14,8 @@ import pandas as pd
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from core.backtester import VectorBacktester
 from config import Config
+from core.backtester import VectorBacktester
 from core.strategy.shocks import next_shock_distance_pct
 from tools.walk_forward_backtest import BacktestParams, load_candles_csv
 
@@ -38,19 +38,28 @@ class FidelityParams:
 
 
 def _load_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows, _stats = _load_jsonl_with_stats(path)
+    return rows
+
+
+def _load_jsonl_with_stats(path: Path) -> tuple[list[dict[str, Any]], dict[str, int]]:
     rows: list[dict[str, Any]] = []
+    stats = {"lines": 0, "malformed": 0, "empty": 0}
     if not path.exists():
-        return rows
+        return rows, stats
     with path.open("r", encoding="utf-8") as file_obj:
         for line in file_obj:
+            stats["lines"] += 1
             line = line.strip()
             if not line:
+                stats["empty"] += 1
                 continue
             try:
                 rows.append(json.loads(line))
             except json.JSONDecodeError:
+                stats["malformed"] += 1
                 continue
-    return rows
+    return rows, stats
 
 
 def _runtime_label(payload: dict[str, Any]) -> str:
@@ -100,8 +109,10 @@ def extract_runtime_decisions(
         )
     if not rows:
         return pd.DataFrame()
-    frame = pd.DataFrame(rows).sort_values("ts").drop_duplicates(
-        subset=["ts", "event", "runtime_label"], keep="last"
+    frame = (
+        pd.DataFrame(rows)
+        .sort_values("ts")
+        .drop_duplicates(subset=["ts", "event", "runtime_label"], keep="last")
     )
     if limit > 0:
         frame = frame.tail(limit)
@@ -394,11 +405,24 @@ def align_runtime_to_proxy(
     runtime_work["candle_time"] = runtime_work["ts"].dt.floor(timeframe)
     collapsed_rows: list[dict[str, Any]] = []
     for candle_time, group in runtime_work.sort_values("ts").groupby("candle_time"):
-        signal_rows = group[group.get("event", "") == "SIGNAL_ANALYZED"] if "event" in group.columns else group.iloc[0:0]
-        filter_rows = group[group.get("event", "") == "FILTER_APPLIED"] if "event" in group.columns else group.iloc[0:0]
+        signal_rows = (
+            group[group.get("event", "") == "SIGNAL_ANALYZED"]
+            if "event" in group.columns
+            else group.iloc[0:0]
+        )
+        filter_rows = (
+            group[group.get("event", "") == "FILTER_APPLIED"]
+            if "event" in group.columns
+            else group.iloc[0:0]
+        )
         final_row = signal_rows.tail(1).iloc[0] if not signal_rows.empty else group.tail(1).iloc[0]
         filter_row = filter_rows.tail(1).iloc[0] if not filter_rows.empty else None
-        side = str(final_row.get("side") or final_row.get("runtime_side") or final_row.get("runtime_label") or "").upper()
+        side = str(
+            final_row.get("side")
+            or final_row.get("runtime_side")
+            or final_row.get("runtime_label")
+            or ""
+        ).upper()
         mode = str(final_row.get("mode") or "").upper()
         runtime_label = side if mode in {"REAL", "SHADOW"} and side in {"BUY", "SELL"} else "NONE"
         collapsed = final_row.to_dict()
@@ -410,6 +434,15 @@ def align_runtime_to_proxy(
             collapsed["filter_passed"] = filter_row.get("filter_passed")
             collapsed["filter_reason"] = filter_row.get("filter_reason")
             collapsed["filter_prob_final"] = filter_row.get("prob_final")
+            filter_passed = filter_row.get("filter_passed")
+            filter_side = str(filter_row.get("side") or side).upper()
+            if filter_passed == True and filter_side in {"BUY", "SELL"}:  # noqa: E712
+                collapsed["runtime_label"] = filter_side
+                collapsed["runtime_action"] = filter_side
+                collapsed["runtime_side"] = filter_side
+            elif filter_passed == False:  # noqa: E712
+                collapsed["runtime_label"] = "NONE"
+                collapsed["runtime_action"] = "NONE"
         collapsed_rows.append(collapsed)
     runtime_work = pd.DataFrame(collapsed_rows).reset_index(drop=True)
     proxy_work["candle_time"] = pd.to_datetime(proxy_work["time"], utc=True).dt.floor(timeframe)
@@ -446,8 +479,8 @@ def align_runtime_to_proxy(
     if merged.empty:
         return merged
     merged["time_delta_seconds"] = (
-        merged["ts"] - pd.to_datetime(merged["time"], utc=True)
-    ).dt.total_seconds().abs()
+        (merged["ts"] - pd.to_datetime(merged["time"], utc=True)).dt.total_seconds().abs()
+    )
     return merged[merged["time_delta_seconds"] <= max_time_delta_seconds].reset_index(drop=True)
 
 
@@ -539,20 +572,20 @@ def summarize_fidelity(aligned: pd.DataFrame) -> dict[str, Any]:
         }
     samples = len(aligned)
     action_agree = aligned["runtime_action"].eq(aligned["proxy_action"])
-    false_positive_mask = aligned["runtime_action"].eq("NONE") & aligned[
-        "proxy_action"
-    ].isin(["BUY", "SELL"])
+    false_positive_mask = aligned["runtime_action"].eq("NONE") & aligned["proxy_action"].isin(
+        ["BUY", "SELL"]
+    )
     false_negative_mask = aligned["runtime_action"].isin(["BUY", "SELL"]) & aligned[
         "proxy_action"
     ].eq("NONE")
-    both_execute = aligned["runtime_action"].isin(["BUY", "SELL"]) & aligned[
-        "proxy_action"
-    ].isin(["BUY", "SELL"])
+    both_execute = aligned["runtime_action"].isin(["BUY", "SELL"]) & aligned["proxy_action"].isin(
+        ["BUY", "SELL"]
+    )
     if bool(both_execute.any()):
         side_agreement_rate = float(
-            aligned.loc[both_execute, "runtime_side"].eq(
-                aligned.loc[both_execute, "proxy_label"]
-            ).mean()
+            aligned.loc[both_execute, "runtime_side"]
+            .eq(aligned.loc[both_execute, "proxy_label"])
+            .mean()
         )
         side_agreement_value: float | None = side_agreement_rate
         action_agreement_rate = float(action_agree.mean())
@@ -584,10 +617,18 @@ def summarize_fidelity(aligned: pd.DataFrame) -> dict[str, Any]:
     for idx, row in aligned.loc[false_positive_mask].iterrows():
         runtime_side = str(row.get("runtime_side") or "").upper()
         proxy_side = str(row.get("proxy_action") or "").upper()
-        if runtime_side in {"BUY", "SELL"} and proxy_side in {"BUY", "SELL"} and runtime_side != proxy_side:
+        if (
+            runtime_side in {"BUY", "SELL"}
+            and proxy_side in {"BUY", "SELL"}
+            and runtime_side != proxy_side
+        ):
             proxy_false_positive_diagnostics["DIRECTION_MISMATCH"] += 1
         prob = runtime_prob.loc[idx] if idx in runtime_prob.index else None
-        if prob is not None and not pd.isna(prob) and float(prob) < float(getattr(Config, "SHADOW_MODE_MIN", 55.0)):
+        if (
+            prob is not None
+            and not pd.isna(prob)
+            and float(prob) < float(getattr(Config, "SHADOW_MODE_MIN", 55.0))
+        ):
             proxy_false_positive_diagnostics["BELOW_SHADOW_THRESHOLD"] += 1
         reason = _reason_bucket(row.get("filter_reason"))
         if reason not in {"NO_REASON", "FILTER PASS (V118-PRO)", "HMM_RANGE_PENALTY"}:
@@ -616,8 +657,7 @@ def summarize_fidelity(aligned: pd.DataFrame) -> dict[str, Any]:
     proxy_had_trade_intent = proxy_raw_action.isin(["BUY", "SELL"])
     exogenous_unmodeled = runtime_veto_buckets[
         aligned["proxy_action"].isin(["BUY", "SELL"])
-        &
-        proxy_had_trade_intent
+        & proxy_had_trade_intent
         & (
             (runtime_veto_buckets.isin({"MARKET_BREADTH_FEAR"}) & ~breadth_active)
             | (runtime_veto_buckets.isin({"MTF_VETO"}) & ~mtf_active)
@@ -641,9 +681,7 @@ def summarize_fidelity(aligned: pd.DataFrame) -> dict[str, Any]:
         "runtime_execute_rate": round(
             float(aligned["runtime_action"].isin(["BUY", "SELL"]).mean()), 6
         ),
-        "proxy_execute_rate": round(
-            float(aligned["proxy_action"].isin(["BUY", "SELL"]).mean()), 6
-        ),
+        "proxy_execute_rate": round(float(aligned["proxy_action"].isin(["BUY", "SELL"]).mean()), 6),
         "label_confusion": _confusion(aligned, "runtime_label", "proxy_label"),
         "action_confusion": _confusion(aligned, "runtime_action", "proxy_action"),
         "false_positive_count": int(false_positive_mask.sum()),
@@ -651,16 +689,12 @@ def summarize_fidelity(aligned: pd.DataFrame) -> dict[str, Any]:
         "proxy_false_positive_reasons": _counter_from_series(
             filter_reason.loc[false_positive_mask].map(_reason_bucket)
         ),
-        "proxy_false_positive_diagnostics": dict(
-            proxy_false_positive_diagnostics.most_common()
-        ),
+        "proxy_false_positive_diagnostics": dict(proxy_false_positive_diagnostics.most_common()),
         "runtime_veto_reasons": _counter_from_series(runtime_veto_buckets),
         "proxy_modeled_veto_reasons": _counter_from_series(
             modeled_proxy_veto_buckets[modeled_proxy_veto_buckets.ne("NO_REASON")]
         ),
-        "proxy_modeled_veto_reason_components": _counter_from_multireason_series(
-            proxy_veto_reason
-        ),
+        "proxy_modeled_veto_reason_components": _counter_from_multireason_series(proxy_veto_reason),
         "proxy_modeled_environment_reasons": environment_reasons,
         "exogenous_veto_reasons_not_modeled": _counter_from_series(exogenous_unmodeled),
     }
@@ -674,7 +708,7 @@ def run_fidelity_audit(
     params: BacktestParams,
     fidelity_params: FidelityParams,
 ) -> dict[str, Any]:
-    events = _load_jsonl(events_path)
+    events, event_load_stats = _load_jsonl_with_stats(events_path)
     candles = load_candles_csv(candles_path)
     runtime = extract_runtime_decisions(
         events,
@@ -730,10 +764,13 @@ def run_fidelity_audit(
             "candles_path": str(candles_path),
         },
         "summary": summary,
+        "event_load_stats": event_load_stats,
         "aligned_samples": aligned.tail(50).to_dict(orient="records") if not aligned.empty else [],
     }
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(json.dumps(report, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    output_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True, default=str), encoding="utf-8"
+    )
     return report
 
 

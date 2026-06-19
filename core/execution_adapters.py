@@ -371,6 +371,8 @@ def build_execution_gateway(config, execution_service_cls):
                 execution.logger.warning(f"⚠️ No se pudo activar sandbox mode: {error}")
 
     backend = str(getattr(config, "EXECUTION_BACKEND", "live") or "live").lower()
+    if backend not in {"live", "shadow_live"}:
+        raise RuntimeError(f"EXECUTION_BACKEND inválido: {backend}")
     if backend == "shadow_live":
         if not bool(getattr(config, "PAPER_MODE", True)):
             raise RuntimeError("EXECUTION_BACKEND=shadow_live no está permitido en modo REAL")

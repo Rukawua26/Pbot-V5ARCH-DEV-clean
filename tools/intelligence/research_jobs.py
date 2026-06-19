@@ -7,29 +7,28 @@ from .contracts import ExecutionEventRecord, TradeRecord
 
 
 def summarize_veto_impact(events: list[ExecutionEventRecord]) -> dict[str, Any]:
-    reasons = Counter()
-    by_symbol: dict[str, Counter] = defaultdict(Counter)
+    reasons: Counter[str] = Counter()
+    by_symbol: dict[str, Counter[str]] = defaultdict(Counter)
     for event in events:
         payload = event.payload or {}
         reason = str(
-            payload.get("filter_reason")
-            or payload.get("reason")
-            or event.event
-            or "UNKNOWN"
+            payload.get("filter_reason") or payload.get("reason") or event.event or "UNKNOWN"
         )
         symbol = str(payload.get("symbol") or "UNKNOWN")
         reasons[reason] += 1
         by_symbol[symbol][reason] += 1
-    top_symbols = []
+    top_symbols: list[dict[str, Any]] = []
     for symbol, symbol_reasons in by_symbol.items():
         top_reason, top_count = symbol_reasons.most_common(1)[0]
-        top_symbols.append({
-            "symbol": symbol,
-            "top_reason": top_reason,
-            "count": top_count,
-            "total": sum(symbol_reasons.values()),
-        })
-    top_symbols.sort(key=lambda item: item["total"], reverse=True)
+        top_symbols.append(
+            {
+                "symbol": symbol,
+                "top_reason": top_reason,
+                "count": top_count,
+                "total": sum(symbol_reasons.values()),
+            }
+        )
+    top_symbols.sort(key=lambda item: int(item["total"]), reverse=True)
     return {
         "total_events": sum(reasons.values()),
         "reason_counts": [{"reason": key, "count": value} for key, value in reasons.most_common()],
@@ -38,7 +37,7 @@ def summarize_veto_impact(events: list[ExecutionEventRecord]) -> dict[str, Any]:
 
 
 def compare_shadow_vs_real(trades: list[TradeRecord]) -> dict[str, Any]:
-    groups = {"shadow": [], "real": []}
+    groups: dict[str, list[TradeRecord]] = {"shadow": [], "real": []}
     for trade in trades:
         groups["shadow" if trade.is_shadow else "real"].append(trade)
 
@@ -67,8 +66,8 @@ def compare_shadow_vs_real(trades: list[TradeRecord]) -> dict[str, Any]:
 
 
 def summarize_context_clusters(trades: list[TradeRecord]) -> dict[str, Any]:
-    clusters = Counter()
-    symbol_clusters = Counter()
+    clusters: Counter[str] = Counter()
+    symbol_clusters: Counter[str] = Counter()
     for trade in trades:
         regime = str(trade.market_regime or "UNKNOWN")
         side = str(trade.side or "?")

@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from config import Config
+from core.signals.analyze import _get_fast_coherence_veto_reason
 from core.signals.filters import (
     _evaluate_bootstrap_heuristic,
     _get_markov_snapshot_mode,
@@ -212,6 +213,20 @@ class TestResolveBtcRegimeAdjustment(unittest.TestCase):
         w, r, v = _resolve_btc_regime_adjustment("BUY", "UNKNOWN")
         self.assertEqual(r, "RANGE_NEUTRAL")
         self.assertFalse(v)
+
+
+class TestFastCoherenceVeto(unittest.TestCase):
+    def test_uses_real_strategy_signal_when_provided(self):
+        import pandas as pd
+
+        bot = SimpleNamespace(current_sentiment=("ALCISTA",))
+        df = pd.DataFrame({"close": [90.0], "ema": [100.0]})
+
+        with patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True):
+            self.assertIsNone(_get_fast_coherence_veto_reason(bot, df, signal="BUY"))
+            reason = _get_fast_coherence_veto_reason(bot, df, signal="SELL")
+
+        self.assertIn("SELL bloqueado", reason)
 
 
 if __name__ == "__main__":

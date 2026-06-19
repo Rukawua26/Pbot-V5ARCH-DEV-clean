@@ -50,7 +50,12 @@ def apply_mtf_filter(
         return prob_final, True, "MTF_DISABLED"
 
     mtf_data = fetch_mtf_data(bot, symbol)
-    market_regime = str(getattr(bot, "market_regime", "") or "")
+    market_regime = str(
+        (ctx.get("btc_regime") if isinstance(ctx, dict) else None)
+        or (ctx.get("regime") if isinstance(ctx, dict) else None)
+        or getattr(bot, "market_regime", "")
+        or ""
+    )
     weight, reason = analyze_mtf_alignment(
         df_main,
         mtf_data.get("15m"),
