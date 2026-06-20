@@ -826,6 +826,66 @@ class ChildOrderIdTest(unittest.TestCase):
         self.assertTrue(any(part.startswith("TP") for part in cid_tp.split("_")))
 
 
+class RealBootstrapReconciliationFailureTest(unittest.TestCase):
+    def _bot(self, execution):
+        bot = SimpleNamespace()
+        bot.lock = RLock()
+        bot.db_lock = RLock()
+        bot.active_trades = {}
+        bot.balance = 100.0
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.halt_system_active = False
+        bot.log = MagicMock()
+        bot.execution = execution
+        bot.get_current_balance = lambda: 100.0
+        bot.brain = SimpleNamespace(
+            save_active_trade_state=MagicMock(),
+            save_error_snapshot=MagicMock(),
+            delete_active_trade_state=MagicMock(),
+        )
+        return bot
+
+    @patch("core.reconciliation.Config.PAPER_MODE", False)
+    def test_real_fetch_positions_failure_halts_bootstrap_reconciliation(self):
+        execution = SimpleNamespace(
+            fetch_positions=MagicMock(side_effect=RuntimeError("positions down")),
+            fetch_open_orders=MagicMock(return_value=[]),
+        )
+        bot = self._bot(execution)
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        bot.brain.save_error_snapshot.assert_called_with(
+            "SYSTEM",
+            "BOOTSTRAP_RECONCILIATION_FAILED",
+            {"error": "positions down", "source": "fetch_positions"},
+        )
+        execution.fetch_open_orders.assert_not_called()
+
+    @patch("core.reconciliation.Config.PAPER_MODE", False)
+    def test_real_fetch_open_orders_failure_halts_bootstrap_reconciliation(self):
+        execution = SimpleNamespace(
+            fetch_positions=MagicMock(return_value=[]),
+            fetch_open_orders=MagicMock(side_effect=RuntimeError("orders down")),
+        )
+        bot = self._bot(execution)
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        bot.brain.save_error_snapshot.assert_called_with(
+            "SYSTEM",
+            "BOOTSTRAP_RECONCILIATION_FAILED",
+            {"error": "orders down", "source": "fetch_open_orders"},
+        )
+
+
 class HaltRecoveryTest(unittest.TestCase):
     def _bot(self, active_trades=None, positions=None, balance=100.0):
         bot = SimpleNamespace()

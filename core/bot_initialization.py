@@ -106,6 +106,7 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
     bot.pending_send_stale_seconds = int(getattr(Config, "PENDING_SEND_STALE_SECONDS", 30))
     bot.last_entry_open_ts = 0.0
     bot.last_shadow_signal_ts = 0.0
+    bot._last_real_auth_healthcheck_mono = 0.0
     bot.confidence_stagnation_lock_active = False
 
 

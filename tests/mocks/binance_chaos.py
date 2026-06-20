@@ -152,3 +152,51 @@ class ConcurrentTimeoutExchange:
             "status": "canceled",
             "timeout_seen": self.timeout,
         }
+
+
+class ExchangeUnavailableOnce:
+    def __init__(self):
+        self.timeout = 9000
+        self.fetch_attempts = 0
+
+    def fetch_ticker(self, symbol):
+        self.fetch_attempts += 1
+        if self.fetch_attempts == 1:
+            raise ccxt.ExchangeNotAvailable("502 Bad Gateway")
+        return {"symbol": symbol, "last": 100.0}
+
+
+class RateLimitedCloseExchange:
+    def __init__(self):
+        self.timeout = 9000
+        self.cancel_attempts = 0
+        self.created = []
+
+    def cancel_all_orders(self, _symbol):
+        self.cancel_attempts += 1
+        if self.cancel_attempts == 1:
+            raise ccxt.RateLimitExceeded("rate limited")
+        return []
+
+    def fetch_ticker(self, _symbol):
+        return {"last": 100.0}
+
+    def price_to_precision(self, _symbol, price):
+        return str(round(float(price), 2))
+
+    def create_order(self, symbol, order_type, side, amount, price, params):
+        order = {
+            "id": f"close-{len(self.created) + 1}",
+            "symbol": symbol,
+            "type": order_type,
+            "side": side,
+            "amount": amount,
+            "price": price,
+            "status": "closed",
+            "params": params,
+        }
+        self.created.append(order)
+        return order
+
+    def fetch_order(self, order_id, symbol):
+        return {"id": order_id, "symbol": symbol, "status": "closed"}

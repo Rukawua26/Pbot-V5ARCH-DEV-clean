@@ -6,6 +6,7 @@ import pandas as pd
 
 from config import Config
 from core.cmd_consumer import consume_command_file
+from core.real_auth_health import maybe_check_real_auth
 from core.reconciliation import reconcile_bootstrap_state
 from core.watchdog import write_watchdog_heartbeat
 
@@ -91,6 +92,7 @@ def run_bot_runtime_loop(bot, dashboard_module, logger, shadow_logger):
         while bot.is_running:
             try:
                 consume_command_file(bot)
+                maybe_check_real_auth(bot)
                 telemetry = bot._collect_telemetry()
 
                 ml_metrics = {}

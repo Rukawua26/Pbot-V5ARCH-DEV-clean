@@ -4,6 +4,7 @@ from contextlib import nullcontext
 from config import Config
 from core.execution_telemetry import append_execution_event
 from core.kanban_sync import async_actualizar_pnl, async_mover_tarjeta
+from core.runtime_metrics import append_runtime_metric
 from core.time_utils import monotonic_now, parse_datetime_utc, utc_now
 from core.trade_helpers import _calculate_trade_pnl
 from core.trade_state import TradeStatus
@@ -75,6 +76,15 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
             "HARD_SL_AMEND_FAILED_HALT",
             {"symbol": symbol, "old_sl": previous_sl, "new_sl": new_sl},
         )
+        append_runtime_metric(
+            "halt",
+            {
+                "reason": "HARD_SL_AMEND_FAILED",
+                "symbol": symbol,
+                "old_sl": previous_sl,
+                "new_sl": new_sl,
+            },
+        )
         bot.log(f"🛑 HARD_SL_AMEND_FAILED {symbol}: SL local {previous_sl} -> {new_sl}")
         return
 
@@ -95,6 +105,10 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
         bot,
         "HARD_SL_AMENDED",
         {"symbol": symbol, "old_sl": previous_sl, "new_sl": new_sl, "old_order_id": old_order_id},
+    )
+    append_runtime_metric(
+        "hard_sl",
+        {"event": "amended", "symbol": symbol, "old_sl": previous_sl, "new_sl": new_sl},
     )
 
 
@@ -613,6 +627,10 @@ def run_guardian_loop(bot):
                             continue
 
                 except Exception as e:
+                    append_runtime_metric(
+                        "guardian_error",
+                        {"scope": "symbol", "symbol": s, "error": str(e)[:180]},
+                    )
                     bot.log(f"Guardian error en {s}: {e}")
 
             # Sync wallet más reactivo para parciales (shadow/paper): 1s con parciales, 15s normal
@@ -686,6 +704,10 @@ def run_guardian_loop(bot):
                 last_heavy = now_mono
 
         except Exception as e:
+            append_runtime_metric(
+                "guardian_error",
+                {"scope": "loop", "error": str(e)[:180]},
+            )
             bot.log(f"Err Guardián: {e}")
 
         # MODULACIÓN DE FRECUENCIA v118: 0.1s para dominio < 500ms (trades activos), 2s tranquilo

@@ -36,13 +36,13 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 
 | Check | Estado |
 |---|---|
-| `unittest discover` | ✅ `891 tests OK` · `2 skipped` |
+| `unittest discover` | ✅ `949 tests OK` · `2 skipped` |
 | `ruff` | ✅ Sin errores en archivos tocados |
 | `compileall main.py core tools` | ✅ OK |
 | `check_no_silent_pass.py` | ✅ OK |
 | `mypy --explicit-package-bases core` | ✅ OK |
 | `pip-audit --strict` | ✅ Sin vulnerabilidades conocidas |
-| `coverage report --fail-under=65` | ✅ 67% |
+| `coverage report --fail-under=75` | ✅ 75% |
 | `docker build -t sniper-ai .` | ✅ OK |
 | Runtime safety | ✅ HARD SL, locks, reconciliación y deploy hardening revisados |
 
@@ -70,7 +70,7 @@ Sweep de seguridad y validación completa antes de publicar en GitHub:
 | ML/Data | Split temporal cronológico con embargo y optimizer legacy bloqueado por defecto |
 | Dashboard | API canónica `tools.dashboard_api_server`; legacy duplicado retirado |
 | Dependencias | `aiohttp`, `cryptography` y `starlette` actualizados; `pip-audit` limpio |
-| Validación | 891 tests OK · 67% coverage · Docker build OK |
+| Validación | 949 tests OK · 75% coverage · Docker build OK |
 
 ### 🧠 Phase 20 — Intelligence Layer + Dashboard Consultivo (Junio 2026)
 Nueva capa consultiva, separada del runtime crítico, integrada en el dashboard:
@@ -444,6 +444,10 @@ PATH="./.venv/bin:$PATH" bash scripts/smoke_modular_imports.sh
 # Contratos de arquitectura
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/regression_contracts.py
 
+# Runtime safety drills
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/chaos_matrix.py
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/recovery_drill.py
+
 # Suite completa de tests
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest discover -s tests -p "test_*.py"
 
@@ -456,11 +460,13 @@ SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest tests/test_tempor
 
 # Cobertura mínima y contenedor
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m coverage run -m unittest discover -s tests -p "test_*.py"
-./.venv/bin/python -m coverage report --fail-under=65
+./.venv/bin/python -m coverage report --fail-under=75
 docker build -t sniper-ai .
 ```
 
-**Estado verificado:** `891` tests OK · `2` skipped · `67%` coverage · `pip-audit` limpio · Docker build OK.
+**Estado verificado:** `949` tests OK · `2` skipped · `75%` coverage · `pip-audit` limpio · Docker build OK.
+
+**Coverage ratchet:** gate actual `fail-under=75`; siguiente objetivo `80%` priorizando `bot_guardian`, `bot_cycles`, `bot_io_loops`, `bot_runtime_monitor`, `data_service` y `trade_exit`.
 
 ---
 
@@ -505,10 +511,9 @@ Pbot-V5ARCH-DEV/
 │   │   └── thresholds.py       # 30+ umbrales tipados
 │   ├── signals/                # Filtros y ejecución de señales
 │   └── strategy/               # Agentes MT · SR · G
-├── tests/                      # 891 tests unittest
+├── tests/                      # 949 tests unittest
 ├── tools/                      # Herramientas de análisis y validación
-├── sniper-ai.service           # Servicio systemd principal
-├── sniper-ai-watchdog.service  # Watchdog systemd
+├── deploy/systemd/legacy/      # Unidades systemd históricas
 ├── docs/runbooks/              # Guías operativas
 └── docker-compose.yml
 ```
@@ -526,6 +531,12 @@ Pbot-V5ARCH-DEV/
 | [`BOT_TECHNICAL_ROADMAP.md`](BOT_TECHNICAL_ROADMAP.md) | Hoja de ruta técnica |
 | [`docs/runbooks/real-trading.md`](docs/runbooks/real-trading.md) | Checklist de activación REAL |
 | [`docs/runbooks/recovery.md`](docs/runbooks/recovery.md) | Procedimientos de recuperación |
+| [`docs/runbooks/chaos-validation.md`](docs/runbooks/chaos-validation.md) | Matriz de fallos de exchange |
+| [`docs/runbooks/risk-governance.md`](docs/runbooks/risk-governance.md) | Prioridad de decisiones de riesgo |
+| [`docs/runbooks/hmm-stuck-range.md`](docs/runbooks/hmm-stuck-range.md) | Fallos de lógica HMM/RANGE |
+| [`docs/runbooks/drawdown-while-trading.md`](docs/runbooks/drawdown-while-trading.md) | Drawdown mientras sigue operando |
+| [`docs/runbooks/high-confidence-no-entry.md`](docs/runbooks/high-confidence-no-entry.md) | Señales fuertes sin entrada |
+| [`docs/runbooks/shadow-real-divergence.md`](docs/runbooks/shadow-real-divergence.md) | Divergencia SHADOW vs REAL |
 | [`docs/runbooks/github-projects-kanban.md`](docs/runbooks/github-projects-kanban.md) | Guía Kanban |
 
 ---

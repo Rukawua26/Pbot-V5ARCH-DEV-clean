@@ -16,6 +16,7 @@ from core.execution_order_helpers import (
     _parse_order_float,
     _with_exit_state,
 )
+from core.runtime_metrics import record_exchange_call_metric
 from core.types import CCXTBalanceResponse, CCXTOrder
 from tools.notifier import send_telegram_msg
 
@@ -74,6 +75,7 @@ class ExecutionService:
         last_error = None
         lock_ctx = nullcontext() if _no_lock else self._exchange_call_lock
         for attempt in range(1, retries + 1):
+            attempt_started = time.perf_counter()
             with lock_ctx:
                 previous_timeout = getattr(self.exchange, "timeout", None)
                 timeout_overridden = False
@@ -81,9 +83,23 @@ class ExecutionService:
                     if timeout_s > 0:
                         self.exchange.timeout = int(timeout_s * 1000)
                         timeout_overridden = True
-                    return fn()
+                    result = fn()
+                    record_exchange_call_metric(
+                        op_name,
+                        attempt=attempt,
+                        started_perf=attempt_started,
+                        ok=True,
+                    )
+                    return result
                 except ccxt.RateLimitExceeded as error:
                     last_error = error
+                    record_exchange_call_metric(
+                        op_name,
+                        attempt=attempt,
+                        started_perf=attempt_started,
+                        ok=False,
+                        error=error,
+                    )
                     if attempt >= retries:
                         break
                     sleep_s = (0.6 * attempt) + random.uniform(0.0, 0.3)
@@ -92,6 +108,13 @@ class ExecutionService:
                     )
                 except (ccxt.NetworkError, ccxt.RequestTimeout) as error:
                     last_error = error
+                    record_exchange_call_metric(
+                        op_name,
+                        attempt=attempt,
+                        started_perf=attempt_started,
+                        ok=False,
+                        error=error,
+                    )
                     if attempt >= retries:
                         break
                     sleep_s = (0.35 * attempt) + random.uniform(0.0, 0.2)
@@ -100,6 +123,13 @@ class ExecutionService:
                     )
                 except Exception as error:
                     last_error = error
+                    record_exchange_call_metric(
+                        op_name,
+                        attempt=attempt,
+                        started_perf=attempt_started,
+                        ok=False,
+                        error=error,
+                    )
                     break
                 finally:
                     if timeout_overridden:

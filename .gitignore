@@ -37,6 +37,7 @@ models/
 data/
 data_storage/
 backups/
+Propuestas/
 docs/reports/*.csv
 reports/
 audit_report.json

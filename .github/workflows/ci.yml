@@ -102,6 +102,14 @@ jobs:
         run: |
           python tools/regression_contracts.py
 
+      - name: Chaos matrix (runtime safety)
+        run: |
+          python tools/chaos_matrix.py
+
+      - name: Recovery drill (restart safety)
+        run: |
+          python tools/recovery_drill.py
+
       - name: Regression unit tests (runtime flows)
         run: |
           python -m unittest discover -s tests -p "test_*.py"
@@ -109,7 +117,7 @@ jobs:
       - name: Coverage gate (core)
         run: |
           coverage run -m unittest discover -s tests -p "test_*.py"
-          coverage report --fail-under=65
+          coverage report --fail-under=75
 
       - name: Temporal invariance stress tests
         run: |

@@ -18,7 +18,9 @@ from tests.mocks.binance_chaos import (
     ChaseLimitNoFillExchange,
     ClientOrderLookupExchange,
     ConcurrentTimeoutExchange,
+    ExchangeUnavailableOnce,
     NoPriceExchange,
+    RateLimitedCloseExchange,
 )
 
 
@@ -66,6 +68,18 @@ CHAOS_MATRIX: tuple[ChaosScenario, ...] = (
         description="clientOrderId lookup returns OrderNotFound after ambiguous create",
         expected_outcome="Lookup resolves to None rather than transport failure",
         critical_invariant="OrderNotFound is not escalated as duplicate exposure by itself",
+    ),
+    ChaosScenario(
+        scenario_id="exchange_502_retry_recovers",
+        description="Exchange 502/ExchangeNotAvailable during read recovers on bounded retry",
+        expected_outcome="Read succeeds after one retry",
+        critical_invariant="Transient exchange outage does not corrupt order state",
+    ),
+    ChaosScenario(
+        scenario_id="rate_limit_close_retries_reduce_only",
+        description="Rate limit during close path is retried before reduce-only close",
+        expected_outcome="Close order is created after bounded retry",
+        critical_invariant="Close retry remains bounded and does not duplicate exposure",
     ),
 )
 
@@ -164,6 +178,27 @@ def run_chaos_matrix() -> dict:
             "scenario_id": "order_lookup_not_found",
             "passed": lookup is None,
             "details": {"lookup": lookup},
+        }
+    )
+
+    service = _service(ExchangeUnavailableOnce())
+    ticker = service.fetch_ticker("BTC/USDT")
+    results.append(
+        {
+            "scenario_id": "exchange_502_retry_recovers",
+            "passed": bool(ticker and ticker.get("last") == 100.0 and service.exchange.fetch_attempts == 2),
+            "details": {"fetch_attempts": service.exchange.fetch_attempts, "last": (ticker or {}).get("last")},
+        }
+    )
+
+    service = _service(RateLimitedCloseExchange())
+    with patch("core.execution_service.time.sleep", return_value=None):
+        close = service.close_position("BTC/USDT", side="BUY", amount=0.1)
+    results.append(
+        {
+            "scenario_id": "rate_limit_close_retries_reduce_only",
+            "passed": bool(close and close.get("status") == "closed" and service.exchange.cancel_attempts == 2),
+            "details": {"cancel_attempts": service.exchange.cancel_attempts, "status": (close or {}).get("status")},
         }
     )
 

@@ -22,11 +22,24 @@ Este runbook valida si el runtime se degrada de forma segura ante ambigüedad y 
 6. `order_lookup_not_found`
    - Esperado: `OrderNotFound` resuelve a `None`, no se eleva como fallo de transporte.
 
+7. `exchange_502_retry_recovers`
+   - Esperado: un `ExchangeNotAvailable`/502 transitorio se recupera con retry acotado.
+
+8. `rate_limit_close_retries_reduce_only`
+   - Esperado: rate-limit en cierre reintenta de forma acotada y termina en orden reduce-only/cierre.
+
 ## Ejecución
 
 ```bash
 ./.venv/bin/python tools/chaos_matrix.py
+./.venv/bin/python tools/recovery_drill.py
 ```
+
+`tools/recovery_drill.py` cubre actualmente:
+
+- adopcion de posicion huerfana solo despues de adjuntar `HARD SL`.
+- fallo al adjuntar `HARD SL` termina en `HALT` y estado `ADOPTED_UNPROTECTED`.
+- `fetch_positions` ambiguo durante reinicio termina en `HALT`.
 
 ## Criterio de aprobación
 

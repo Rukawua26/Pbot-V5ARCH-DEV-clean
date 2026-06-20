@@ -9,6 +9,7 @@ from core.execution_telemetry import append_execution_event
 from core.kanban_sync import async_mover_tarjeta
 from core.postmortem import label_exit_reason
 from core.regime_tuning import record_trade as record_regime_trade
+from core.runtime_metrics import append_runtime_metric
 from core.time_utils import parse_datetime_utc, utc_now
 from core.trade_helpers import (
     _calculate_pnl_and_metrics,
@@ -205,6 +206,14 @@ def close_trade(
                         bot,
                         "REAL_CLOSE_FAILED_HALT",
                         {"symbol": symbol, "error": str(e), "closing_in_progress": False},
+                    )
+                    append_runtime_metric(
+                        "halt",
+                        {
+                            "reason": "REAL_CLOSE_FAILED",
+                            "symbol": symbol,
+                            "error": str(e)[:180],
+                        },
                     )
                     return
 
@@ -605,6 +614,14 @@ def close_trade(
                     send_telegram_msg(
                         f"\U0001f6d1 *CIERRE_STUCK* {symbol} falló y activó HALT. "
                         f"Error: {str(e)[:100]}. Requiere intervención manual."
+                    )
+                    append_runtime_metric(
+                        "halt",
+                        {
+                            "reason": "CIERRE_STUCK",
+                            "symbol": symbol,
+                            "error": str(e)[:180],
+                        },
                     )
                 else:
                     current["status"] = TradeStatus.OPEN.value

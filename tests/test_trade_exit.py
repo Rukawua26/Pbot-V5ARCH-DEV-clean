@@ -1,5 +1,6 @@
 import unittest
 from datetime import UTC, datetime
+from threading import RLock
 from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
@@ -350,3 +351,66 @@ class TestCloseTradePaperPath(unittest.TestCase):
 
         # -- Telegram notification sent --
         te.send_telegram_msg.assert_called_once()
+
+
+class TestCloseTradeRealFailurePath(unittest.TestCase):
+    def _bot(self):
+        trade = {
+            "symbol": "BTC/USDT",
+            "side": "BUY",
+            "entry": 50000.0,
+            "amount": 0.001,
+            "open_time": datetime(2024, 1, 1, tzinfo=UTC),
+            "closing_in_progress": False,
+            "status": "OPEN",
+            "is_shadow": False,
+            "market_snapshot": {},
+            "entry_confidence": 75.0,
+        }
+        return SimpleNamespace(
+            lock=RLock(),
+            db_lock=RLock(),
+            active_trades={"BTC/USDT": trade},
+            recent_closed_trades=[],
+            log=MagicMock(),
+            brain=SimpleNamespace(
+                save_active_trade_state=MagicMock(),
+                delete_active_trade_state=MagicMock(),
+            ),
+            execution=SimpleNamespace(
+                close_position=MagicMock(return_value={"id": "close-1", "status": "closed", "filled": 0.001}),
+                close_due_to_degradation=MagicMock(),
+                fetch_my_trades=MagicMock(return_value=[]),
+            ),
+            is_paused=False,
+            integrity_lock_active=False,
+            halt_system_active=False,
+        )
+
+    @patch("core.trade_exit.time.sleep", return_value=None)
+    @patch("core.trade_exit.append_execution_event")
+    @patch("core.trade_exit.send_telegram_msg")
+    @patch("core.trade_exit._exchange_position_is_flat", return_value=False)
+    def test_real_unconfirmed_close_sets_exit_stuck_and_halts(
+        self, _flat, _tg, append_event, _sleep
+    ):
+        from core.trade_exit import close_trade
+        from core.trade_state import TradeStatus
+
+        bot = self._bot()
+        with patch.object(Config, "PAPER_MODE", False):
+            close_trade(bot, "BTC/USDT", "MANUAL_CLOSE", 50100.0)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        self.assertEqual(bot.active_trades["BTC/USDT"]["status"], TradeStatus.EXIT_STUCK.value)
+        self.assertFalse(bot.active_trades["BTC/USDT"]["closing_in_progress"])
+        bot.brain.save_active_trade_state.assert_called_with(
+            "BTC/USDT", bot.active_trades["BTC/USDT"]
+        )
+        append_event.assert_called_with(
+            bot,
+            "REAL_CLOSE_FAILED_HALT",
+            ANY,
+        )

@@ -9,6 +9,8 @@ class ChaosMatrixTests(unittest.TestCase):
         self.assertIn("create_ack_timeout_recovered_by_client_id", scenario_ids)
         self.assertIn("chase_limit_hard_floor_stuck", scenario_ids)
         self.assertIn("concurrent_timeout_restore", scenario_ids)
+        self.assertIn("exchange_502_retry_recovers", scenario_ids)
+        self.assertIn("rate_limit_close_retries_reduce_only", scenario_ids)
 
     def test_run_chaos_matrix_passes_all_scenarios(self):
         report = run_chaos_matrix()
