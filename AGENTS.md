@@ -7,6 +7,9 @@
 
 ## Fuentes de verdad
 
+- Antes de tocar código, revisa `docs/engineering/memoria-tecnica.md`; es la memoria versionada de cambios críticos, decisiones, invariantes y regresiones prevenidas.
+- Si implementas una mejora pendiente, revisa `docs/roadmap/mejoras-pendientes.md` antes de editar.
+- Si el cambio toca bugs ya conocidos, revisa `.opencode/context/known-bugs.md` y conserva sus reglas preventivas.
 - El entrypoint real es `main.py`; solo importa `run_entrypoint` desde `core.bot_app`.
 - `config.py` es solo un proxy legacy; la configuración real vive en `core/config/manager.py` y `core/config/operational.py`.
 - `.env` se carga explícitamente en `main.py` y como fallback al importar `core/config/operational.py`.

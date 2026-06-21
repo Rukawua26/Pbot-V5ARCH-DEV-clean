@@ -529,6 +529,7 @@ Pbot-V5ARCH-DEV/
 | [`SECURITY.md`](SECURITY.md) | Política de seguridad |
 | [`SPEC.md`](SPEC.md) | Especificación técnica del sistema |
 | [`BOT_TECHNICAL_ROADMAP.md`](BOT_TECHNICAL_ROADMAP.md) | Hoja de ruta técnica |
+| [`docs/engineering/memoria-tecnica.md`](docs/engineering/memoria-tecnica.md) | Memoria tecnica de cambios, decisiones y guardrails |
 | [`docs/roadmap/mejoras-pendientes.md`](docs/roadmap/mejoras-pendientes.md) | Backlog tecnico y mejoras pendientes |
 | [`docs/runbooks/real-trading.md`](docs/runbooks/real-trading.md) | Checklist de activación REAL |
 | [`docs/runbooks/recovery.md`](docs/runbooks/recovery.md) | Procedimientos de recuperación |
