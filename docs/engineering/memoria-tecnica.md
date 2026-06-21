@@ -4,11 +4,21 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Uso Obligatorio
 
-- Antes de modificar codigo, revisar esta memoria tecnica.
+- Antes de modificar codigo, revisar esta memoria tecnica con lectura proporcional al riesgo del cambio.
 - Si el cambio toca bugs ya conocidos, revisar tambien `.opencode/context/known-bugs.md`.
 - Si el cambio implementa una mejora futura, revisar `docs/roadmap/mejoras-pendientes.md`.
 - Si el cambio toca ejecucion, reconciliacion, wallet sync, watchdog, recovery, ordenes, posiciones, `HALT`, stop loss, `core/bot_app.py`, `core/bot_facade.py`, `core/bot_connection.py` o `core/execution_adapters.py`, tratarlo como runtime critico.
 - Registrar aqui cualquier cambio que cree una regla preventiva, corrija una regresion, modifique contratos publicos o cambie el comportamiento operativo.
+
+## Como Leer Este Documento Ahorrando Contexto
+
+- Para preguntas generales o analisis sin edicion, no leas todo el documento salvo que se pidan decisiones historicas.
+- Para cambios menores no criticos, revisa `Uso Obligatorio`, `Invariantes` y solo las entradas relacionadas con el archivo o area afectada.
+- Para mejoras pendientes, revisa tambien `docs/roadmap/mejoras-pendientes.md`.
+- Para runtime critico, revisa invariantes completos, entradas criticas recientes, `.opencode/context/known-bugs.md` y la skill runtime.
+- Para refactors amplios o cambios de contratos publicos, revisa todo este documento antes de editar.
+- No conviertas esta memoria en un diario: registra decisiones, reglas preventivas, archivos sensibles y validacion; no pegues logs largos, diffs ni outputs completos.
+- Si este archivo supera un tamano operativo razonable, archiva historico por trimestre en `docs/engineering/archive/` y deja aqui solo el indice activo.
 
 ## Invariantes Que No Deben Romperse
 

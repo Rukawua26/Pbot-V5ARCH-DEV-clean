@@ -7,7 +7,8 @@
 
 ## Fuentes de verdad
 
-- Antes de tocar código, revisa `docs/engineering/memoria-tecnica.md`; es la memoria versionada de cambios críticos, decisiones, invariantes y regresiones prevenidas.
+- Antes de tocar código, revisa `docs/engineering/memoria-tecnica.md`; para ahorrar contexto, lee primero las secciones relevantes al archivo o área que vas a modificar.
+- Si el cambio toca runtime crítico, revisa invariantes completos en `docs/engineering/memoria-tecnica.md`, `.opencode/context/known-bugs.md` y la skill runtime aplicable.
 - Si implementas una mejora pendiente, revisa `docs/roadmap/mejoras-pendientes.md` antes de editar.
 - Si el cambio toca bugs ya conocidos, revisa `.opencode/context/known-bugs.md` y conserva sus reglas preventivas.
 - El entrypoint real es `main.py`; solo importa `run_entrypoint` desde `core.bot_app`.
