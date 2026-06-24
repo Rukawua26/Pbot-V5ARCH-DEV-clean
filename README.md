@@ -16,7 +16,7 @@
 [![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Runtime_Clean-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean)
 [![Modos](https://img.shields.io/badge/Modos-PAPER_%7C_REAL_%7C_SHADOW-0ea5e9?style=flat-square)]()
 [![HMM](https://img.shields.io/badge/HMM-Markov_Intelligence-f97316?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/Tests-891_ok_%7C_2_skipped-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-1003_ok_%7C_2_skipped-22c55e?style=flat-square)]()
 [![Shadow](https://img.shields.io/badge/Shadow_Capacity-20_trades-9333ea?style=flat-square)]()
 [![Deploy](https://img.shields.io/badge/Deploy-systemd_%7C_Docker-111827?style=flat-square)]()
 [![Risk](https://img.shields.io/badge/Risk_Engine-v118.7-ef4444?style=flat-square)]()
@@ -36,13 +36,13 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 
 | Check | Estado |
 |---|---|
-| `unittest discover` | ✅ `949 tests OK` · `2 skipped` |
+| `unittest discover` | ✅ `1003 tests OK` · `2 skipped` |
 | `ruff` | ✅ Sin errores en archivos tocados |
 | `compileall main.py core tools` | ✅ OK |
 | `check_no_silent_pass.py` | ✅ OK |
 | `mypy --explicit-package-bases core` | ✅ OK |
 | `pip-audit --strict` | ✅ Sin vulnerabilidades conocidas |
-| `coverage report --fail-under=75` | ✅ 75% |
+| `coverage report --fail-under=75` | ✅ 76% |
 | `docker build -t sniper-ai .` | ✅ OK |
 | Runtime safety | ✅ HARD SL, locks, reconciliación y deploy hardening revisados |
 
@@ -57,6 +57,17 @@ Binance Futures → Triage Dinámico → HMM BTC → Agentes MT/SR/G
 ---
 
 ## ✨ Últimas Fases
+
+### 🧱 Phase 22 — FVG Tracker + Idempotencia de Salidas (Junio 2026)
+Endurecimiento incremental sin activar nuevas decisiones de trading por defecto:
+
+| Área | Resultado |
+|---|---|
+| FVG Tracker | Detector read-only apagado por defecto con persistencia local y alertas opcionales |
+| Idempotencia | Writes críticos de salida recuperan por `clientOrderId` tras timeout ambiguo |
+| Coverage crítico | `trade_exit` 78%, `ghost_agent` 83%, `orchestrator` 95%, `shocks` 89%, `consensus_nn` 79% |
+| Dependencias | `msgpack` actualizado por `pip-audit` |
+| Validación | 1003 tests OK · 76% coverage · chaos/recovery/Docker OK |
 
 ### 🛡️ Phase 21 — Runtime Safety + CI Closure (Junio 2026)
 Sweep de seguridad y validación completa antes de publicar en GitHub:
@@ -340,6 +351,7 @@ PENDING_SEND → PENDING_EXCHANGE_OPEN → ENTRY_FILLED_AWAITING_POSITION_SYNC �
 | 19 | GitHub Projects v2 Kanban async — ciclo vida de operaciones | ✅ |
 | 20 | Intelligence Layer + Dashboard consultivo | ✅ |
 | 21 | Runtime Safety + CI Closure: audit, coverage y Docker OK | ✅ |
+| 22 | FVG tracker read-only + idempotencia de salidas + coverage crítico | ✅ |
 
 ---
 
@@ -373,6 +385,8 @@ Funciones disponibles en `tools/github_projects_kanban.py`:
 | `CVD_FILTER_ENABLED` | CVD rolling por aggTrade | `false` |
 | `CORRELATION_RISK_ENABLED` | Reducer por correlación | `false` |
 | `REGIME_TUNING_ENABLED` | Auto-tuning SL/TP | `true` |
+| `FVG_TRACKER_ENABLED` | Tracker FVG read-only; no participa en ejecución | `false` |
+| `FVG_MAX_SYMBOLS_PER_CYCLE` | Límite de símbolos FVG por ciclo | `20` |
 | `TOP_TRIAGE_COUNT` | Universo de pares a escanear | `30` |
 | `TELEGRAM_TOKEN` | Token del bot de Telegram | — |
 
@@ -464,9 +478,9 @@ SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m coverage run -m unittest d
 docker build -t sniper-ai .
 ```
 
-**Estado verificado:** `949` tests OK · `2` skipped · `75%` coverage · `pip-audit` limpio · Docker build OK.
+**Estado verificado:** `1003` tests OK · `2` skipped · `76%` coverage · `pip-audit` limpio · Docker build OK.
 
-**Coverage ratchet:** gate actual `fail-under=75`; siguiente objetivo `80%` priorizando `bot_guardian`, `bot_cycles`, `bot_io_loops`, `bot_runtime_monitor`, `data_service` y `trade_exit`.
+**Coverage ratchet:** gate actual `fail-under=75`; siguiente objetivo `80%` priorizando `bot_guardian`, `bot_cycles`, `bot_io_loops`, `bot_runtime_monitor` y `data_service`.
 
 ---
 
@@ -511,7 +525,7 @@ Pbot-V5ARCH-DEV/
 │   │   └── thresholds.py       # 30+ umbrales tipados
 │   ├── signals/                # Filtros y ejecución de señales
 │   └── strategy/               # Agentes MT · SR · G
-├── tests/                      # 949 tests unittest
+├── tests/                      # 1003 tests unittest
 ├── tools/                      # Herramientas de análisis y validación
 ├── deploy/systemd/legacy/      # Unidades systemd históricas
 ├── docs/runbooks/              # Guías operativas

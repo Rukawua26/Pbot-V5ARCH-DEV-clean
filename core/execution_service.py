@@ -417,13 +417,24 @@ class ExecutionService:
             self._no_price_exit_state[symbol] = state
             return None
 
+        client_order_id = state.get("client_order_id")
+        if not client_order_id:
+            client_order_id = _exit_client_order_id(
+                symbol,
+                exit_side,
+                f"no_price:{int(float(state.get('first_seen') or now_mono) * 1000)}",
+                0,
+            )
+            state["client_order_id"] = client_order_id
+
         try:
+            params = {"reduceOnly": True, "newClientOrderId": client_order_id}
             order = self._call_exchange(
                 "no_price_market_emergency_exit",
                 lambda: self.exchange.create_order(
-                    symbol, "market", exit_side, amount, None, {"reduceOnly": True}
+                    symbol, "market", exit_side, amount, None, params
                 ),
-                retries=2,
+                retries=1,
                 timeout_s=20.0,
             )
             self._track_api_weight("create_order", 1, "trading")
@@ -435,6 +446,19 @@ class ExecutionService:
             self._no_price_exit_state.pop(symbol, None)
             return order
         except Exception as error:
+            try:
+                recovered = self.fetch_order_by_client_id(symbol, str(client_order_id))
+                if recovered:
+                    self.logger.warning(
+                        f"⚠️ NO_PRICE market exit recuperado por clientOrderId tras error: {client_order_id}"
+                    )
+                    self._no_price_exit_state.pop(symbol, None)
+                    return recovered
+            except Exception as lookup_error:
+                self.logger.warning(
+                    f"⚠️ No se pudo recuperar NO_PRICE market exit ambiguo "
+                    f"{symbol}/{client_order_id}: {lookup_error}"
+                )
             self.logger.critical(f"❌ NO_PRICE_ESCALATED_MARKET_EXIT_FAILED {symbol}: {error}")
             self._no_price_exit_state[symbol] = state
             return None
@@ -693,21 +717,37 @@ class ExecutionService:
         order_params["newClientOrderId"] = client_order_id or _exit_client_order_id(
             symbol, side.lower(), f"market:{int(time.time() * 1000)}", 0
         )
-        order = self._call_exchange(
-            "create_reduce_only_market_order",
-            lambda: self.exchange.create_order(
-                symbol,
-                "MARKET",
-                side.lower(),
-                amount,
-                None,
-                params=order_params,
-            ),
-            retries=3,
-            timeout_s=25.0,
-        )
-        self._track_api_weight("create_order", 1, "trading")
-        return order
+        try:
+            order = self._call_exchange(
+                "create_reduce_only_market_order",
+                lambda: self.exchange.create_order(
+                    symbol,
+                    "MARKET",
+                    side.lower(),
+                    amount,
+                    None,
+                    params=order_params,
+                ),
+                retries=1,
+                timeout_s=25.0,
+            )
+            self._track_api_weight("create_order", 1, "trading")
+            return order
+        except Exception as error:
+            client_id = str(order_params["newClientOrderId"])
+            try:
+                recovered = self.fetch_order_by_client_id(symbol, client_id)
+                if recovered:
+                    self.logger.warning(
+                        f"⚠️ Reduce-only market {symbol} recuperado por clientOrderId tras error: {client_id}"
+                    )
+                    return recovered
+            except Exception as lookup_error:
+                self.logger.warning(
+                    f"⚠️ No se pudo recuperar reduce-only market ambiguo "
+                    f"{symbol}/{client_id}: {lookup_error}"
+                )
+            raise error
 
     def set_leverage(self, leverage, symbol):
         try:
@@ -1010,20 +1050,31 @@ class ExecutionService:
                         "newClientOrderId",
                         _exit_client_order_id(symbol, exit_side, f"{exit_label}:emergency", 0),
                     )
-                    order = self._call_exchange(
-                        emergency_op_name,
-                        lambda: self.exchange.create_order(
-                            symbol,
-                            "limit",
-                            exit_side,
-                            amount,
-                            emergency_price,
-                            emergency_params,
-                        ),
-                        retries=3,
-                        timeout_s=20.0,
-                    )
-                    self._track_api_weight("create_order", 1, "trading")
+                    emergency_client_id = str(emergency_params["newClientOrderId"])
+                    try:
+                        order = self._call_exchange(
+                            emergency_op_name,
+                            lambda: self.exchange.create_order(
+                                symbol,
+                                "limit",
+                                exit_side,
+                                amount,
+                                emergency_price,
+                                emergency_params,
+                            ),
+                            retries=1,
+                            timeout_s=20.0,
+                        )
+                        self._track_api_weight("create_order", 1, "trading")
+                    except Exception as create_error:
+                        recovered = self.fetch_order_by_client_id(symbol, emergency_client_id)
+                        if not recovered:
+                            raise create_error
+                        self.logger.warning(
+                            f"⚠️ Emergency exit {symbol} recuperado por clientOrderId tras error: "
+                            f"{emergency_client_id}"
+                        )
+                        order = recovered
                     self._no_price_exit_state.pop(symbol, None)
                     return _with_exit_state(cast(dict, order), "OPEN_UNCONFIRMED")
                 except Exception as emergency_err:

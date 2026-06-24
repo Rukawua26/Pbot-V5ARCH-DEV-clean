@@ -1,4 +1,5 @@
 import unittest
+from contextlib import ExitStack
 from datetime import UTC, datetime
 from threading import RLock
 from types import SimpleNamespace
@@ -378,7 +379,9 @@ class TestCloseTradeRealFailurePath(unittest.TestCase):
                 delete_active_trade_state=MagicMock(),
             ),
             execution=SimpleNamespace(
-                close_position=MagicMock(return_value={"id": "close-1", "status": "closed", "filled": 0.001}),
+                close_position=MagicMock(
+                    return_value={"id": "close-1", "status": "closed", "filled": 0.001}
+                ),
                 close_due_to_degradation=MagicMock(),
                 fetch_my_trades=MagicMock(return_value=[]),
             ),
@@ -414,3 +417,147 @@ class TestCloseTradeRealFailurePath(unittest.TestCase):
             "REAL_CLOSE_FAILED_HALT",
             ANY,
         )
+
+
+class TestCloseTradeRealSuccessPath(unittest.TestCase):
+    def _bot(self, trade_overrides=None, stagnation=None):
+        trade = {
+            "symbol": "BTC/USDT",
+            "side": "BUY",
+            "entry": 50000.0,
+            "amount": 0.001,
+            "open_time": datetime(2024, 1, 1, tzinfo=UTC),
+            "closing_in_progress": False,
+            "status": "OPEN",
+            "is_shadow": False,
+            "market_snapshot": {"votos": {"MT": 60.0}, "context": "RANGE"},
+            "entry_confidence": 75.0,
+            "mae_price": 49800.0,
+            "mfe_price": 50500.0,
+            "entry_atr": 100.0,
+            "market_regime": "RANGE",
+            "entry_shock_level": 49900.0,
+        }
+        if trade_overrides:
+            trade.update(trade_overrides)
+        return SimpleNamespace(
+            lock=RLock(),
+            db_lock=RLock(),
+            active_trades={"BTC/USDT": trade},
+            recent_closed_trades=[],
+            log=MagicMock(),
+            brain=SimpleNamespace(
+                log_trade=MagicMock(return_value=321),
+                save_active_trade_state=MagicMock(),
+                delete_active_trade_state=MagicMock(),
+                finalize_confidence_exit_audit=MagicMock(),
+                update_trade_context_result=MagicMock(),
+                update_agent_reputation=MagicMock(),
+                evolve_genetics=MagicMock(return_value=False),
+                check_eureka_status=MagicMock(return_value=("UNKNOWN", {})),
+                get_recent_exit_confidence_stagnation=MagicMock(return_value=stagnation),
+                update_dynamic_settings=MagicMock(),
+            ),
+            risk_engine=SimpleNamespace(record_trade_result=MagicMock()),
+            execution=SimpleNamespace(
+                close_position=MagicMock(
+                    return_value={"id": "close-1", "status": "closed", "filled": 0.001}
+                ),
+                close_due_to_degradation=MagicMock(
+                    return_value={"id": "deg-1", "status": "closed", "filled": 0.001}
+                ),
+                fetch_my_trades=MagicMock(
+                    return_value=[{"fee": {"currency": "USDT", "cost": 0.25}}]
+                ),
+            ),
+            _get_market_regime=MagicMock(return_value="RANGE"),
+            _update_dynamic_risk=MagicMock(),
+            _check_recent_mfe_health=MagicMock(),
+            confidence_stagnation_lock_active=False,
+            cooldown_pairs={},
+            is_paused=False,
+            pause_time=None,
+            integrity_lock_active=False,
+            halt_system_active=False,
+        )
+
+    def _patch_success_deps(self, pnl_percent=2.0, pnl_usd=1.0):
+        return (
+            patch("core.trade_exit.time.sleep", return_value=None),
+            patch("core.trade_exit._exchange_position_is_flat", return_value=True),
+            patch("core.trade_exit.send_telegram_msg"),
+            patch("core.trade_exit.set_symbol_cooldown"),
+            patch("core.trade_exit.record_regime_trade"),
+            patch("core.trade_exit.shadow_logger.log"),
+            patch("core.trade_exit.append_execution_event"),
+            patch("core.trade_exit.append_runtime_metric"),
+            patch("core.trade_exit.label_exit_reason", return_value={"exit_reason": "MANUAL"}),
+            patch(
+                "core.trade_exit._calculate_pnl_and_metrics",
+                return_value={
+                    "amt": 0.001,
+                    "pnl_bruto_usd": pnl_usd,
+                    "pnl_neto_usd": pnl_usd,
+                    "pnl_neto_percent": pnl_percent,
+                    "mae_percent": -0.4,
+                    "mfe_percent": 1.0,
+                },
+            ),
+        )
+
+    def test_real_success_closes_exchange_fetches_fees_and_removes_trade(self):
+        from core.trade_exit import close_trade
+
+        bot = self._bot()
+        with (
+            patch.object(Config, "PAPER_MODE", False),
+            patch.object(Config, "REGIME_TUNING_ENABLED", True),
+        ):
+            with ExitStack() as stack:
+                for cm in self._patch_success_deps():
+                    stack.enter_context(cm)
+                close_trade(bot, "BTC/USDT", "MANUAL_CLOSE", 51000.0, exit_confidence=70.0)
+
+        bot.execution.close_position.assert_called_once_with("BTC/USDT", "BUY", 0.001)
+        bot.execution.close_due_to_degradation.assert_not_called()
+        bot.execution.fetch_my_trades.assert_called_once_with("BTC/USDT", limit=2)
+        self.assertNotIn("BTC/USDT", bot.active_trades)
+        logged = bot.brain.log_trade.call_args[0][0]
+        self.assertEqual(logged["fees"], 0.25)
+        bot.brain.update_trade_context_result.assert_called_once()
+        bot.brain.finalize_confidence_exit_audit.assert_called_once()
+        bot.risk_engine.record_trade_result.assert_called_once_with("BTC/USDT", 2.0)
+
+    def test_degraded_reason_uses_degradation_close_path(self):
+        from core.trade_exit import close_trade
+
+        bot = self._bot()
+        with (
+            patch.object(Config, "PAPER_MODE", False),
+            patch.object(Config, "REGIME_TUNING_ENABLED", False),
+        ):
+            with ExitStack() as stack:
+                for cm in self._patch_success_deps():
+                    stack.enter_context(cm)
+                close_trade(bot, "BTC/USDT", "CONF_DEGRADED_EXIT", 51000.0)
+
+        bot.execution.close_due_to_degradation.assert_called_once_with("BTC/USDT", "BUY", 0.001)
+        bot.execution.close_position.assert_not_called()
+
+    def test_large_real_loss_sets_stagnation_and_circuit_breaker(self):
+        from core.trade_exit import close_trade
+
+        bot = self._bot(stagnation={"stddev": 0.2, "mean": 55, "min": 54, "max": 56, "count": 10})
+        with (
+            patch.object(Config, "PAPER_MODE", False),
+            patch.object(Config, "REGIME_TUNING_ENABLED", False),
+        ):
+            with ExitStack() as stack:
+                for cm in self._patch_success_deps(pnl_percent=-16.5, pnl_usd=-8.0):
+                    stack.enter_context(cm)
+                close_trade(bot, "BTC/USDT", "CIRCUIT BREAKER", 41000.0)
+
+        self.assertTrue(bot.confidence_stagnation_lock_active)
+        self.assertTrue(bot.is_paused)
+        self.assertIsNotNone(bot.pause_time)
+        bot.risk_engine.record_trade_result.assert_called_once_with("BTC/USDT", -16.5)

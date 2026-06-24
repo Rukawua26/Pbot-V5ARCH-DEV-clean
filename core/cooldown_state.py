@@ -130,7 +130,10 @@ def cleanup_expired_cooldowns(bot) -> None:
                 changed = True
                 if symbol in bot.cooldown_pairs:
                     del bot.cooldown_pairs[symbol]
-                if hasattr(bot, "cooldown_deadlines_mono") and symbol in bot.cooldown_deadlines_mono:
+                if (
+                    hasattr(bot, "cooldown_deadlines_mono")
+                    and symbol in bot.cooldown_deadlines_mono
+                ):
                     del bot.cooldown_deadlines_mono[symbol]
                 continue
 
@@ -139,7 +142,10 @@ def cleanup_expired_cooldowns(bot) -> None:
                 changed = True
                 if symbol in bot.cooldown_pairs:
                     del bot.cooldown_pairs[symbol]
-                if hasattr(bot, "cooldown_deadlines_mono") and symbol in bot.cooldown_deadlines_mono:
+                if (
+                    hasattr(bot, "cooldown_deadlines_mono")
+                    and symbol in bot.cooldown_deadlines_mono
+                ):
                     del bot.cooldown_deadlines_mono[symbol]
         if changed:
             persist_cooldowns(bot)

@@ -54,6 +54,8 @@ def run_initial_load(bot, dashboard_module):
         threading.Thread(target=bot.start_silent_sync, daemon=True).start()
         threading.Thread(target=bot._runtime_monitor_loop, daemon=True).start()
         threading.Thread(target=bot._start_state_snapshot_loop, daemon=True).start()
+        if hasattr(bot, "fvg_tracker") and bot.fvg_tracker.enabled:
+            threading.Thread(target=bot._fvg_tracker_loop, daemon=True).start()
 
     except Exception as error:
         bot.startup_error = error
@@ -109,14 +111,22 @@ def run_bot_runtime_loop(bot, dashboard_module, logger, shadow_logger):
                         logger.warning(f"⚠️ Error en métricas ML: {error_ml}")
 
                 with bot.lock:
-                    trades_snapshot = list(bot.active_trades.values()) if hasattr(bot, "active_trades") else []
-                closed_snapshot = list(bot.recent_closed_trades) if hasattr(bot, "recent_closed_trades") else []
+                    trades_snapshot = (
+                        list(bot.active_trades.values()) if hasattr(bot, "active_trades") else []
+                    )
+                closed_snapshot = (
+                    list(bot.recent_closed_trades) if hasattr(bot, "recent_closed_trades") else []
+                )
                 slock = getattr(bot, "scanner_lock", None)
                 if slock:
                     with slock:
-                        scanner_snapshot = bot.scanner_history[:50] if hasattr(bot, "scanner_history") else []
+                        scanner_snapshot = (
+                            bot.scanner_history[:50] if hasattr(bot, "scanner_history") else []
+                        )
                 else:
-                    scanner_snapshot = bot.scanner_history[:50] if hasattr(bot, "scanner_history") else []
+                    scanner_snapshot = (
+                        bot.scanner_history[:50] if hasattr(bot, "scanner_history") else []
+                    )
                 bot.ui.update(
                     balance=bot.balance,
                     trades=trades_snapshot,

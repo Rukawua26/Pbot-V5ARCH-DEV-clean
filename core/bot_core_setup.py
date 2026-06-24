@@ -1,4 +1,5 @@
 from config import Config
+from core.analytics.fvg_tracker import FvgTracker
 from core.candle_close_cache import CandleCloseCache
 from core.data_service import DataService
 from core.execution_adapters import build_execution_gateway
@@ -42,3 +43,14 @@ def init_core_services_and_engines(bot):
         flat_time_decay_bars=int(getattr(Config, "EXIT_FLAT_TIME_DECAY_BARS", 3)),
         flat_time_decay_atr_mult=float(getattr(Config, "EXIT_FLAT_TIME_DECAY_ATR_MULT", 0.5)),
     )
+
+    if Config.FVG_TRACKER_ENABLED:
+        bot.fvg_tracker = FvgTracker(
+            enabled=Config.FVG_TRACKER_ENABLED,
+            min_gap_pct=Config.FVG_MIN_GAP_PCT,
+            max_candles_scan=Config.FVG_MAX_CANDLES_SCAN,
+            alert_throttle_seconds=Config.FVG_ALERT_THROTTLE_SEC,
+            expiration_bars=Config.FVG_EXPIRATION_BARS,
+            telegram_alerts=Config.FVG_ALERT_TELEGRAM,
+            max_symbols_per_cycle=Config.FVG_MAX_SYMBOLS_PER_CYCLE,
+        )

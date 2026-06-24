@@ -150,7 +150,9 @@ class BotRuntimeOpsTest(unittest.TestCase):
 
         bot = SimpleNamespace(log=MagicMock())
 
-        self.assertEqual(check_instinctive_safety(bot, "BTC/USDT", {"atr_pct": 0.06}), "FORCE_SHADOW")
+        self.assertEqual(
+            check_instinctive_safety(bot, "BTC/USDT", {"atr_pct": 0.06}), "FORCE_SHADOW"
+        )
         self.assertEqual(check_instinctive_safety(bot, "BTC/USDT", {"atr_pct": 0.01}), "OK")
 
     def test_close_all_positions_emergency_closes_snapshot(self):
@@ -179,8 +181,9 @@ class SymbolControlsTest(unittest.TestCase):
         )
         bot = SimpleNamespace(_symbol_controls_cache=None, log=MagicMock())
 
-        with patch("core.bot_symbol_controls.os.path.exists", return_value=True), patch(
-            "builtins.open", mock_open(read_data=payload)
+        with (
+            patch("core.bot_symbol_controls.os.path.exists", return_value=True),
+            patch("builtins.open", mock_open(read_data=payload)),
         ):
             controls = load_runtime_symbol_controls(bot)
             cached = load_runtime_symbol_controls(bot)
@@ -200,15 +203,23 @@ class SymbolControlsTest(unittest.TestCase):
             log=MagicMock(),
         )
 
-        with patch("core.bot_symbol_controls.time.time", return_value=1000.0), patch(
-            "core.bot_symbol_controls.subprocess.run", return_value=SimpleNamespace(returncode=0, stderr="", stdout="")
+        with (
+            patch("core.bot_symbol_controls.time.time", return_value=1000.0),
+            patch(
+                "core.bot_symbol_controls.subprocess.run",
+                return_value=SimpleNamespace(returncode=0, stderr="", stdout=""),
+            ),
         ):
             refresh_symbol_controls_if_due(bot)
         self.assertEqual(bot._symbol_controls_cache["loaded_at"], 0.0)
 
         bot._symbol_controls_last_refresh = 0.0
-        with patch("core.bot_symbol_controls.time.time", return_value=2000.0), patch(
-            "core.bot_symbol_controls.subprocess.run", return_value=SimpleNamespace(returncode=1, stderr="bad", stdout="")
+        with (
+            patch("core.bot_symbol_controls.time.time", return_value=2000.0),
+            patch(
+                "core.bot_symbol_controls.subprocess.run",
+                return_value=SimpleNamespace(returncode=1, stderr="bad", stdout=""),
+            ),
         ):
             refresh_symbol_controls_if_due(bot)
         self.assertIn("Error refreshing", bot.log.call_args.args[0])
@@ -221,7 +232,9 @@ class SymbolControlsTest(unittest.TestCase):
             _funding_cache_ttl=300,
             _btc_data_cache=None,
             _btc_data_cache_ts=0.0,
-            execution=SimpleNamespace(fetch_funding_rate=MagicMock(return_value={"fundingRate": "0.001"})),
+            execution=SimpleNamespace(
+                fetch_funding_rate=MagicMock(return_value={"fundingRate": "0.001"})
+            ),
             data_service=SimpleNamespace(fetch_and_update_data=MagicMock(return_value={"bars": 1})),
         )
 
@@ -249,8 +262,9 @@ class ProcessLockTest(unittest.TestCase):
                 pl._single_instance_lock.close()
                 pl._single_instance_lock = None
                 Path(lock_path).write_text("123", encoding="utf-8")
-                with patch("core.process_lock._try_acquire_lock", return_value=False), patch(
-                    "sys.stderr"
+                with (
+                    patch("core.process_lock._try_acquire_lock", return_value=False),
+                    patch("sys.stderr"),
                 ):
                     self.assertFalse(pl.acquire_single_instance_lock(logger, lock_path))
             finally:
@@ -283,8 +297,11 @@ class MetricsExportTest(unittest.TestCase):
             cwd = os.getcwd()
             try:
                 os.chdir(tmp)
-                with patch("core.metrics_export.time.time", return_value=160.0), patch(
-                    "core.metrics_export.collect_telemetry", return_value={"ts": "T", "db": 1}
+                with (
+                    patch("core.metrics_export.time.time", return_value=160.0),
+                    patch(
+                        "core.metrics_export.collect_telemetry", return_value={"ts": "T", "db": 1}
+                    ),
                 ):
                     summary = export_metrics_summary(bot)
                 written = json.loads(Path("logs/metrics_summary.json").read_text(encoding="utf-8"))

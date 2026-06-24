@@ -1,5 +1,5 @@
-import unittest
 import threading
+import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -302,6 +302,7 @@ class TestRealCloseFailureHalt(unittest.TestCase):
     @patch("core.trade_exit.send_telegram_msg")
     def test_real_close_failure_sets_halt_and_exit_stuck(self, mock_tg):
         from core.trade_exit import close_trade
+
         bot = self._make_bot()
         bot.active_trades["BTC/USDT"] = {
             "symbol": "BTC/USDT",
@@ -349,7 +350,9 @@ class TestTp1FailureNoStateReduction(unittest.TestCase):
             sync_wallet=MagicMock(),
             _guardian_stats={"bailout_count": 0, "loops": 0, "work_s": 0.0, "sleep_s": 0.0},
             _exit_eval_last_log={},
-            exit_engine=SimpleNamespace(evaluate_exit=MagicMock(return_value={"should_exit": False})),
+            exit_engine=SimpleNamespace(
+                evaluate_exit=MagicMock(return_value={"should_exit": False})
+            ),
             risk_engine=SimpleNamespace(
                 should_abort_trade=MagicMock(return_value=(False, "OK")),
                 should_defer_confidence_exit_for_fee_noise=MagicMock(return_value=(False, "OK")),
@@ -367,6 +370,7 @@ class TestTp1FailureNoStateReduction(unittest.TestCase):
     @patch("core.bot_guardian.time.sleep", return_value=None)
     def test_tp1_failure_does_not_reduce_size_usd(self, _mock_sleep):
         from core.bot_guardian import run_guardian_loop
+
         bot = self._make_bot(tp_order_result=None, raise_on_tp=True)
         bot.active_trades["TEST/USDT"] = {
             "symbol": "TEST/USDT",
@@ -406,15 +410,26 @@ class TestHardSlVerificationFailure(unittest.TestCase):
                 save_error_snapshot=MagicMock(),
             ),
             execution=SimpleNamespace(
-                fetch_open_orders=lambda: (_ for _ in ()).throw(RuntimeError("network down"))
-                if fetch_fails
-                else [{"id": "sl-1", "type": "STOP_MARKET", "side": "sell", "amount": 1.0, "info": {}}],
+                fetch_open_orders=lambda: (
+                    (_ for _ in ()).throw(RuntimeError("network down"))
+                    if fetch_fails
+                    else [
+                        {
+                            "id": "sl-1",
+                            "type": "STOP_MARKET",
+                            "side": "sell",
+                            "amount": 1.0,
+                            "info": {},
+                        }
+                    ]
+                ),
             ),
         )
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
     def test_verification_failure_halts_real_trade(self):
         from core.bot_wallet_sync import _find_verified_hard_sl_order
+
         bot = self._make_bot(fetch_fails=True)
         trade = {"symbol": "TEST/USDT", "side": "BUY", "amount": 1.0, "is_shadow": False}
 

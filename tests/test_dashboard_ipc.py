@@ -195,8 +195,8 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn('data-tab="intelligence"', html)
         self.assertIn('id="intel-advisories"', html)
         self.assertIn('id="intel-postmortem"', html)
-        self.assertIn('generateIntelligence()', html)
-        self.assertIn('openTradePostmortem', html)
+        self.assertIn("generateIntelligence()", html)
+        self.assertIn("openTradePostmortem", html)
 
 
 if __name__ == "__main__":

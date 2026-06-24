@@ -4,8 +4,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from core.bot_connection import connect_to_binance
-from core.command_router import handle_basic_command
 from core.bot_io_loops import telegram_listener
+from core.command_router import handle_basic_command
 
 
 class BotSecurityRuntimeTest(unittest.TestCase):
@@ -100,7 +100,11 @@ class BotSecurityRuntimeTest(unittest.TestCase):
             is_paused=True,
             daily_drawdown_alert_sent=True,
             active_trades={
-                "BTC/USDT": {"symbol": "BTC/USDT", "is_shadow": False, "status": "ENTRY_ACK_UNKNOWN"}
+                "BTC/USDT": {
+                    "symbol": "BTC/USDT",
+                    "is_shadow": False,
+                    "status": "ENTRY_ACK_UNKNOWN",
+                }
             },
             execution=SimpleNamespace(
                 fetch_positions=MagicMock(return_value=[]),

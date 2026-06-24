@@ -61,15 +61,30 @@ def _execute_chase_limit_steps(
                 "newClientOrderId",
                 _exit_client_order_id(symbol, exit_side, client_order_label, step_idx),
             )
-            order = execution_service._call_exchange(
-                "close_position_create_order",
-                lambda: execution_service.exchange.create_order(
-                    symbol, "limit", exit_side, amount, limit_price, step_params
-                ),
-                retries=3,
-                timeout_s=20.0,
-            )
-            execution_service._track_api_weight("create_order", 1, "trading")
+            client_order_id = step_params["newClientOrderId"]
+            try:
+                order = execution_service._call_exchange(
+                    "close_position_create_order",
+                    lambda: execution_service.exchange.create_order(
+                        symbol, "limit", exit_side, amount, limit_price, step_params
+                    ),
+                    retries=1,
+                    timeout_s=20.0,
+                )
+                execution_service._track_api_weight("create_order", 1, "trading")
+            except Exception as create_err:
+                try:
+                    recovered = execution_service.fetch_order_by_client_id(symbol, client_order_id)
+                    if recovered:
+                        execution_service.logger.warning(
+                            f"⚠️ Chase step {step_idx + 1} recuperado por clientOrderId tras error: "
+                            f"{client_order_id}"
+                        )
+                        order = recovered
+                    else:
+                        raise create_err
+                except Exception:
+                    raise create_err
             last_order = order
 
             if execution_service._wait_order_filled(

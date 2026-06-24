@@ -34,6 +34,7 @@ except ImportError:
     tf = None
 
 from config import Config
+from core.analytics.fvg_tracker import run_fvg_tracker_loop
 from core.bot_audit_verdict import get_audit_verdict as resolve_audit_verdict
 from core.bot_balance_ops import (
     get_current_balance as fetch_current_balance,
@@ -394,6 +395,10 @@ class Bot:
 
     def _start_state_snapshot_loop(self):
         return self._delegate(run_start_state_snapshot_loop)
+
+    def _fvg_tracker_loop(self):
+        if hasattr(self, "fvg_tracker") and self.fvg_tracker.enabled:
+            return self._delegate(run_fvg_tracker_loop)
 
     def get_current_balance(self):
         return self._delegate(fetch_current_balance)

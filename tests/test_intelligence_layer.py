@@ -91,7 +91,11 @@ class IntelligenceLayerTests(unittest.TestCase):
                         {
                             "ts": "2026-06-14T10:15:00+00:00",
                             "event": "RANGE_VETO",
-                            "payload": {"symbol": "ETH/USDT", "side": "SELL", "btc_regime": "RANGE"},
+                            "payload": {
+                                "symbol": "ETH/USDT",
+                                "side": "SELL",
+                                "btc_regime": "RANGE",
+                            },
                         }
                     ),
                 ]

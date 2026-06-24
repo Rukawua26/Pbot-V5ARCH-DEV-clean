@@ -177,6 +177,16 @@ class Config(OperationalConfig, StrategyConfig):
     EXIT_FLAT_TIME_DECAY_BARS = _env_int("EXIT_FLAT_TIME_DECAY_BARS", 3)
     EXIT_FLAT_TIME_DECAY_ATR_MULT = _env_float("EXIT_FLAT_TIME_DECAY_ATR_MULT", 0.5)
 
+    # --- FVG / Gap Tracker (satélite read-only) ---
+    FVG_TRACKER_ENABLED = _env_bool("FVG_TRACKER_ENABLED", False)
+    FVG_MIN_GAP_PCT = _env_float("FVG_MIN_GAP_PCT", 0.1)
+    FVG_SCAN_INTERVAL = _env_int("FVG_SCAN_INTERVAL", 300)
+    FVG_ALERT_TELEGRAM = _env_bool("FVG_ALERT_TELEGRAM", True)
+    FVG_ALERT_THROTTLE_SEC = _env_int("FVG_ALERT_THROTTLE_SEC", 3600)
+    FVG_MAX_CANDLES_SCAN = _env_int("FVG_MAX_CANDLES_SCAN", 200)
+    FVG_MAX_SYMBOLS_PER_CYCLE = _env_int("FVG_MAX_SYMBOLS_PER_CYCLE", 20)
+    FVG_EXPIRATION_BARS = _env_int("FVG_EXPIRATION_BARS", 48)
+
     # Compatibilidad con rutas actuales de decisión (0-1)
     REAL_CONFIDENCE_MIN = REAL_MODE_THRESHOLD / 100.0
     REAL_CONFIDENCE_THRESHOLD = REAL_CONFIDENCE_MIN
@@ -277,6 +287,18 @@ class Config(OperationalConfig, StrategyConfig):
         backend = str(getattr(cls, "EXECUTION_BACKEND", "live") or "live").lower()
         if backend not in {"live", "shadow_live"}:
             errors.append("EXECUTION_BACKEND debe ser 'live' o 'shadow_live'")
+        if float(cls.FVG_MIN_GAP_PCT) <= 0:
+            errors.append("FVG_MIN_GAP_PCT debe ser positivo")
+        if int(cls.FVG_SCAN_INTERVAL) <= 0:
+            errors.append("FVG_SCAN_INTERVAL debe ser positivo")
+        if int(cls.FVG_ALERT_THROTTLE_SEC) < 0:
+            errors.append("FVG_ALERT_THROTTLE_SEC debe ser >= 0")
+        if int(cls.FVG_MAX_CANDLES_SCAN) < 3:
+            errors.append("FVG_MAX_CANDLES_SCAN debe ser >= 3")
+        if int(cls.FVG_MAX_SYMBOLS_PER_CYCLE) < 1:
+            errors.append("FVG_MAX_SYMBOLS_PER_CYCLE debe ser >= 1")
+        if int(cls.FVG_EXPIRATION_BARS) <= 0:
+            errors.append("FVG_EXPIRATION_BARS debe ser positivo")
 
         total_weight = (
             cls.XGB_WEIGHT + cls.LGB_WEIGHT + cls.RF_WEIGHT + cls.GB_WEIGHT + cls.LR_WEIGHT

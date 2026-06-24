@@ -131,11 +131,16 @@ def init_models_and_startup_tasks(bot, export_dataset_fn, backup_database_fn, tf
     # Startup validation: if REQUIRE_GHOST_MODEL_FOR_TRADING=True, verify ghost_model is loaded
     try:
         from core.config.operational import OperationalConfig
+
         if OperationalConfig.REQUIRE_GHOST_MODEL_FOR_TRADING:
             if not getattr(bot, "ghost_model", None):
-                bot.log("🚨 CRITICAL: REQUIRE_GHOST_MODEL_FOR_TRADING=True pero NO hay ghost_model cargado. Desactivando flag para evitar bloqueo silencioso de señales.")
+                bot.log(
+                    "🚨 CRITICAL: REQUIRE_GHOST_MODEL_FOR_TRADING=True pero NO hay ghost_model cargado. Desactivando flag para evitar bloqueo silencioso de señales."
+                )
                 OperationalConfig.REQUIRE_GHOST_MODEL_FOR_TRADING = False
             else:
-                bot.log(f"✅ Ghost model verificado: {bot.ghost_model_type} — REQUIRE_GHOST_MODEL_FOR_TRADING activo")
+                bot.log(
+                    f"✅ Ghost model verificado: {bot.ghost_model_type} — REQUIRE_GHOST_MODEL_FOR_TRADING activo"
+                )
     except Exception as e:
         bot.log(f"⚠️ Validación REQUIRE_GHOST_MODEL_FOR_TRADING omitida: {e}")

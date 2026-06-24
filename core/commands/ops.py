@@ -275,9 +275,7 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                 )
 
                 # 2. Espera no bloqueante del Event Loop (máx 10 min)
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=600
-                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=600)
 
                 if process.returncode == 0:
                     # 3. Notificación de Disponibilidad (No recarga inmediata)

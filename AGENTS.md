@@ -1,69 +1,75 @@
 # AGENTS
 
-## Alcance
+## Fuentes De Verdad
 
-- Este repo es un bot de trading para Binance Futures con modos `PAPER`, `SHADOW` y `REAL`.
-- Si un cambio toca ejecución, reconciliación, wallet sync, watchdog o recovery, trátalo como cambio de runtime crítico.
+- Bot de trading Binance Futures con modos `PAPER`, `SHADOW` y `REAL`; cambios en ejecución, órdenes, posiciones, wallet sync, reconciliación, watchdog, recovery, `HALT` o stop loss son runtime crítico.
+- Antes de editar código, lee `docs/engineering/memoria-tecnica.md` con profundidad proporcional al riesgo; para runtime crítico revisa también `.opencode/context/known-bugs.md`.
+- Si implementas o evalúas una mejora pendiente, lee primero `docs/roadmap/mejoras-pendientes.md`.
+- CI real vive en `.github/workflows/ci.yml`; si contradice README/docs, prioriza CI y scripts ejecutables.
 
-## Fuentes de verdad
+## Arquitectura Sensible
 
-- Antes de tocar código, revisa `docs/engineering/memoria-tecnica.md`; para ahorrar contexto, lee primero las secciones relevantes al archivo o área que vas a modificar.
-- Si el cambio toca runtime crítico, revisa invariantes completos en `docs/engineering/memoria-tecnica.md`, `.opencode/context/known-bugs.md` y la skill runtime aplicable.
-- Si implementas una mejora pendiente, revisa `docs/roadmap/mejoras-pendientes.md` antes de editar.
-- Si el cambio toca bugs ya conocidos, revisa `.opencode/context/known-bugs.md` y conserva sus reglas preventivas.
-- El entrypoint real es `main.py`; solo importa `run_entrypoint` desde `core.bot_app`.
-- `config.py` es solo un proxy legacy; la configuración real vive en `core/config/manager.py` y `core/config/operational.py`.
-- `.env` se carga explícitamente en `main.py` y como fallback al importar `core/config/operational.py`.
-- CI en `.github/workflows/ci.yml` es la referencia para el orden mínimo de validación.
+- `main.py` es deliberadamente mínimo: carga `.env` y llama `run_entrypoint` desde `core.bot_app`; no metas bootstrap pesado ahí.
+- `core/bot_app.py` construye `Bot` y cablea runtime, loops, dashboard, Telegram, wallet sync y servicios.
+- `config.py` es proxy legacy; la configuración real está en `core/config/manager.py` y `core/config/operational.py`; `.env` se carga en `main.py` y como fallback en `operational.py`.
+- `core/bot_facade.py` reexporta `Bot` como contrato público; cambios en `Bot`, `BotFacade` o `main.py` requieren `tools/regression_contracts.py`.
+- `core/bot_connection.py` separa modos: `PAPER` puede continuar con endpoints públicos; `REAL` requiere `ALLOW_REAL_TRADING=true`, keys válidas y permisos Futures, y debe abortar ante auth/permisos inválidos.
+- `core/execution_adapters.py` contiene `shadow_live`; no mezcles simulación shadow con ejecución real fuera de esa frontera.
+- `tools/learning.py` es el `Brain` usado en runtime; `learning.py` raíz no es la fuente runtime.
 
-## Arquitectura que importa
+## Invariantes Operativos
 
-- `core/bot_app.py` hace el bootstrap pesado y construye `Bot`; no metas lógica nueva en `main.py`.
-- `core/bot_facade.py` concentra el contrato público del runtime; conserva sus métodos cuando muevas lógica entre módulos.
-- `core/bot_connection.py` separa el comportamiento de conexión por modo: en `PAPER` puede degradar a endpoints públicos; en `REAL` fallos de auth/permisos deben abortar.
-- `core/execution_adapters.py` define los backends `live` y `shadow_live`; no mezcles simulación con flujo real fuera de esa frontera.
+- El exchange manda sobre DB para exposición real y estado de órdenes/posiciones.
+- Nunca dejes una posición real sin `HARD SL`; ante estado live ambiguo, prioriza `HALT` y reconciliación.
+- No agregues retries no idempotentes que puedan duplicar exposición.
+- Mantén separación estricta entre `PAPER`, `SHADOW` y `REAL`.
+- No introduzcas `pass` silenciosos en `core/`; `tools/check_no_silent_pass.py` y pre-commit lo bloquean.
+- En `core/trade_entry.py`, no muevas similarity search después del sizing: `similarity_boost` debe afectar el tamaño.
+- Conserva reglas conocidas: no bajar `MAX_ENTRY_SL_PCT` bajo `3.0`, no subir `SHOCK_MIN_DIST_PCT` sobre `0.2`, no activar `REQUIRE_GHOST_MODEL_FOR_TRADING=True` sin modelo y logging visible, y no subir `MIN_NOTIONAL_VALUE` sin validar balance por leverage.
 
-## Invariantes operativos
+## Locks
 
-- El exchange manda sobre la DB para exposición real y estado de órdenes/posiciones.
-- No dejes posiciones reales sin `HARD SL` ni agregues retries no idempotentes que puedan duplicar exposición.
-- Si el estado live queda ambiguo, prioriza `HALT` y reconciliación antes de continuar.
-- No introduzcas `pass` silenciosos en `core/`; CI lo bloquea salvo una allowlist mínima.
+- Si un flujo necesita varios locks, usa este orden ascendente: `bot.lock`, `execution._exchange_call_lock`, `execution._account_lock`, `shadow._lock`, `bot.db_lock`, `bot.price_lock`.
+- No adquieras un lock anterior mientras mantienes uno posterior; `bot_wallet_sync.py` puede ejecutarse desde guardian/runtime loops y debe respetar ese orden.
 
-## Orden global de locks
+## Skills OpenCode
 
-- Sigue este orden ascendente cuando un flujo necesite adquirir más de un lock: `bot.lock`, `execution._exchange_call_lock`, `execution._account_lock`, `shadow._lock`, `bot.db_lock`, `bot.price_lock`.
-- No adquieras un lock anterior de la lista mientras mantienes uno posterior.
-- `bot_wallet_sync.py` puede ejecutarse desde guardian/runtime loops que ya coordinan estado del bot; conserva este orden antes de agregar nuevas secciones críticas.
+- No cargues skills por defecto; sigue `.opencode/context/skill-policy.md`.
+- Usa las skills curadas de `.opencode/skills`: `runtime-ops-and-trading-safety`, `security-and-hardening`, `repo-validation`, `python-testing`, `opencode-customization` según el disparador.
+- No uses el directorio raíz `skills/` como fuente de skills OpenCode; contiene material más amplio y aumenta contexto.
 
-## Skills a cargar
-
-- Siempre que el trabajo toque runtime o seguridad, revisa `skills/runtime-ops-and-trading-safety/SKILL.md`.
-- Para cambios de endurecimiento o datos externos, revisa `skills/security-and-hardening/SKILL.md`.
-- Para cambios funcionales, revisa `skills/test-driven-development/SKILL.md` y deja cobertura en `tests/`.
-- Usa `skills/README.md` como índice de skills curadas; las listadas ahí sí aplican a este repo.
-
-## Verificación mínima
+## Comandos
 
 - Usa la venv local cuando exista: `./.venv/bin/python`.
-- Orden base alineado con CI:
+- Instalar como CI: `./.venv/bin/python -m pip install -r requirements.lock -r requirements-dev.lock`.
+- Test puntual: `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest tests/test_bot_security_runtime.py`.
+- Suite unitaria: `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest discover -s tests -p "test_*.py"`.
+- Si cambias bootstrap/imports modulares: `PYTHON_BIN=./.venv/bin/python bash scripts/smoke_modular_imports.sh`.
+- Si cambias contratos de `main.py`, `Bot` o `BotFacade`: `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/regression_contracts.py`.
+
+## Validación CI
 
 ```bash
+./.venv/bin/python -m pip check
+./.venv/bin/python -m pip_audit --strict
 ./.venv/bin/python -m compileall -q main.py core
-PATH="./.venv/bin:$PATH" bash scripts/smoke_modular_imports.sh
+./.venv/bin/ruff check core/ tests/
+./.venv/bin/ruff format --check core/ tests/
+MYPYPATH=. ./.venv/bin/mypy --explicit-package-bases core/config/ core/types.py core/bot_facade.py core/execution_adapters.py
+PYTHON_BIN=./.venv/bin/python bash scripts/smoke_modular_imports.sh
 ./.venv/bin/python tools/check_no_silent_pass.py
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/regression_contracts.py
-./.venv/bin/python tools/audit_correl.py --limit 50 --fail-on-critical
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/chaos_matrix.py
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/recovery_drill.py
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest discover -s tests -p "test_*.py"
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m coverage run -m unittest discover -s tests -p "test_*.py"
+./.venv/bin/python -m coverage report --fail-under=75
 SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest tests/test_temporal_invariance.py
+docker build -t sniper-ai .
 ```
 
-- Para un test puntual usa `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest tests/test_bot_security_runtime.py`.
-- Si cambias bootstrap o imports modulares, corre siempre `scripts/smoke_modular_imports.sh`.
-- Si cambias contratos de `main.py`, `Bot` o `BotFacade`, corre siempre `tools/regression_contracts.py`.
-
-## Límites de cambio
+## Límites
 
 - Haz cambios pequeños; no mezcles refactors amplios con fixes funcionales.
-- No borres código legacy sin entender si mantiene compatibilidad o recovery.
-- No commitees `.env`, bases `.db`, logs ni reportes generados desde datos locales.
+- No borres código legacy sin verificar compatibilidad o recovery.
+- No commitees `.env`, bases `.db`, logs, reportes locales ni artefactos generados con datos privados.

@@ -143,6 +143,33 @@ class _NoPriceExchange:
         }
 
 
+class _NoPriceTimeoutLookupExchange(_NoPriceExchange):
+    def __init__(self):
+        super().__init__()
+        self.lookup_attempts = 0
+        self.client_order_id = None
+
+    def market_id(self, _symbol):
+        return "BTCUSDT"
+
+    def create_order(self, symbol, order_type, side, amount, price, params):
+        self.market_exit_calls += 1
+        self.client_order_id = params.get("newClientOrderId")
+        raise ccxt.RequestTimeout("market ack timeout")
+
+    def fapiPrivateGetOrder(self, _params):
+        self.lookup_attempts += 1
+        return {
+            "orderId": "mkt-recovered",
+            "status": "FILLED",
+            "clientOrderId": self.client_order_id,
+            "executedQty": "0.1",
+            "origQty": "0.1",
+            "avgPrice": "100.0",
+            "price": "0",
+        }
+
+
 class _ChaseLimitNoFillExchange:
     def __init__(self):
         self.timeout = 9000
@@ -185,13 +212,29 @@ class _RetryCreateOrderExchange:
         self.timeout = 9000
         self.params_seen = []
         self.create_attempts = 0
+        self.lookup_attempts = 0
+        self.client_order_id = None
+
+    def market_id(self, _symbol):
+        return "BTCUSDT"
 
     def create_order(self, symbol, order_type, side, amount, price, params):
         self.create_attempts += 1
         self.params_seen.append(dict(params or {}))
-        if self.create_attempts == 1:
-            raise ccxt.RequestTimeout("timeout after accept")
-        return {"id": "ro-1", "symbol": symbol, "status": "closed", "params": params}
+        self.client_order_id = params.get("newClientOrderId")
+        raise ccxt.RequestTimeout("timeout after accept")
+
+    def fapiPrivateGetOrder(self, _params):
+        self.lookup_attempts += 1
+        return {
+            "orderId": "ro-1",
+            "status": "FILLED",
+            "clientOrderId": self.client_order_id,
+            "executedQty": "0.1",
+            "origQty": "0.1",
+            "avgPrice": "100.0",
+            "price": "0",
+        }
 
 
 class _ConcurrentTimeoutExchange:
@@ -286,19 +329,18 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         self.assertEqual(service.exchange.lookup_attempts, 1)
 
     @patch("core.execution_service.time.sleep", return_value=None)
-    def test_reduce_only_market_retry_reuses_client_order_id(self, _sleep_mock):
+    def test_reduce_only_market_recovers_by_client_order_id_after_timeout(self, _sleep_mock):
         service = ExecutionService("k", "s")
         service.exchange = _RetryCreateOrderExchange()
         service.set_weight_tracker(None)
 
         result = service.create_reduce_only_market_order("BTC/USDT", "sell", 0.1)
 
-        self.assertEqual(result.get("status"), "closed")
-        self.assertEqual(service.exchange.create_attempts, 2)
+        self.assertEqual(result.get("status"), "filled")
+        self.assertEqual(service.exchange.create_attempts, 1)
+        self.assertEqual(service.exchange.lookup_attempts, 1)
         first = service.exchange.params_seen[0].get("newClientOrderId")
-        second = service.exchange.params_seen[1].get("newClientOrderId")
         self.assertTrue(first)
-        self.assertEqual(first, second)
 
     @patch("core.execution_service.Config.PAPER_MODE", False)
     def test_real_get_balance_raises_instead_of_returning_cached_balance(self):
@@ -342,6 +384,27 @@ class ExecutionServiceResilienceTest(unittest.TestCase):
         self.assertIsNotNone(escalated)
         self.assertEqual(escalated.get("type"), "market")
         self.assertEqual(service.exchange.market_exit_calls, 1)
+
+    @patch("core.execution_service.Config.NO_PRICE_ALLOW_MARKET_EXIT", True)
+    @patch("core.execution_service.Config.NO_PRICE_EXIT_ESCALATION_SECONDS", 1)
+    @patch("core.execution_service.Config.NO_PRICE_EXIT_MIN_ESCALATION_SECONDS", 1)
+    @patch(
+        "core.execution_service.time.monotonic",
+        side_effect=[10.0, 10.2, 12.5, 12.5, 12.5],
+    )
+    def test_no_price_market_exit_recovers_by_client_order_id(self, _mono_mock):
+        service = ExecutionService("k", "s")
+        service.exchange = _NoPriceTimeoutLookupExchange()
+        service.set_weight_tracker(None)
+
+        self.assertIsNone(service.close_position("BTC/USDT", side="BUY", amount=0.1))
+        self.assertIsNone(service.close_position("BTC/USDT", side="BUY", amount=0.1))
+        recovered = service.close_position("BTC/USDT", side="BUY", amount=0.1)
+
+        self.assertIsNotNone(recovered)
+        self.assertEqual(recovered.get("id"), "mkt-recovered")
+        self.assertEqual(service.exchange.market_exit_calls, 1)
+        self.assertEqual(service.exchange.lookup_attempts, 1)
 
     @patch("core.execution_service.Config.NO_PRICE_ALLOW_MARKET_EXIT", False)
     @patch("core.execution_service.Config.NO_PRICE_EXIT_ESCALATION_SECONDS", 1)
