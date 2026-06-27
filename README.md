@@ -58,7 +58,7 @@ Binance Futures → Triage Dinámico → HMM BTC → Agentes MT/SR/G
 
 ## ✨ Últimas Fases
 
-### 🧱 Phase 22 — FVG Tracker + Idempotencia de Salidas (Junio 2026)
+### 🧱 Phase 22 — FVG Tracker + Idempotencia de Salidas + Readiness (Junio 2026)
 Endurecimiento incremental sin activar nuevas decisiones de trading por defecto:
 
 | Área | Resultado |
@@ -67,7 +67,8 @@ Endurecimiento incremental sin activar nuevas decisiones de trading por defecto:
 | Idempotencia | Writes críticos de salida recuperan por `clientOrderId` tras timeout ambiguo |
 | Coverage crítico | `trade_exit` 78%, `ghost_agent` 83%, `orchestrator` 95%, `shocks` 89%, `consensus_nn` 79% |
 | Dependencias | `msgpack` actualizado por `pip-audit` |
-| Validación | 1003 tests OK · 76% coverage · chaos/recovery/Docker OK |
+| Pending Improvements Readiness | Script `tools/pending_improvements_readiness.py` + runbook `paper-shadow-observation.md` |
+| Validación | 1003 tests OK · 76% coverage · chaos/recovery/Docker OK · readiness OK |
 
 ### 🛡️ Phase 21 — Runtime Safety + CI Closure (Junio 2026)
 Sweep de seguridad y validación completa antes de publicar en GitHub:
@@ -387,6 +388,12 @@ Funciones disponibles en `tools/github_projects_kanban.py`:
 | `REGIME_TUNING_ENABLED` | Auto-tuning SL/TP | `true` |
 | `FVG_TRACKER_ENABLED` | Tracker FVG read-only; no participa en ejecución | `false` |
 | `FVG_MAX_SYMBOLS_PER_CYCLE` | Límite de símbolos FVG por ciclo | `20` |
+| `GLOBAL_MARKET_PROVIDER_ENABLED` | Proveedor macro CoinGecko read-only | `false` |
+| `GLOBAL_FEAR_GREED_FILTER_ENABLED` | Veto por Fear & Greed extremo | `true` |
+| `GLOBAL_BTC_DOM_FILTER_ENABLED` | Boost SELL por dominancia BTC | `true` |
+| `SIGNAL_AGENT_OVERRIDE_ENABLED` | Dirección por consenso de agentes | `true` |
+| `EXIT_RANGE_ACTIVATION_MULT` | Trailing más permisivo en RANGE | `1.5` |
+| `EXIT_RANGE_BREAKEVEN_PULLBACK_MULT` | Pullback de breakeven en RANGE | `2.0` |
 | `TOP_TRIAGE_COUNT` | Universo de pares a escanear | `30` |
 | `TELEGRAM_TOKEN` | Token del bot de Telegram | — |
 
@@ -478,9 +485,12 @@ SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m coverage run -m unittest d
 docker build -t sniper-ai .
 ```
 
-**Estado verificado:** `1003` tests OK · `2` skipped · `76%` coverage · `pip-audit` limpio · Docker build OK.
+**Estado verificado:** `1003` tests OK · `2` skipped · `76%` coverage · `pip-audit` limpio · Docker build OK · readiness OK.
+
 
 **Coverage ratchet:** gate actual `fail-under=75`; siguiente objetivo `80%` priorizando `bot_guardian`, `bot_cycles`, `bot_io_loops`, `bot_runtime_monitor` y `data_service`.
+
+> 💡 **Nuevo:** Ejecuta `tools/pending_improvements_readiness.py` antes de activar flags de observación en PAPER/SHADOW para validar que tu configuración está lista.
 
 ---
 
@@ -526,7 +536,7 @@ Pbot-V5ARCH-DEV/
 │   ├── signals/                # Filtros y ejecución de señales
 │   └── strategy/               # Agentes MT · SR · G
 ├── tests/                      # 1003 tests unittest
-├── tools/                      # Herramientas de análisis y validación
+├── tools/                      # Herramientas de análisis y validación (incl. readiness)
 ├── deploy/systemd/legacy/      # Unidades systemd históricas
 ├── docs/runbooks/              # Guías operativas
 └── docker-compose.yml
@@ -554,6 +564,7 @@ Pbot-V5ARCH-DEV/
 | [`docs/runbooks/high-confidence-no-entry.md`](docs/runbooks/high-confidence-no-entry.md) | Señales fuertes sin entrada |
 | [`docs/runbooks/shadow-real-divergence.md`](docs/runbooks/shadow-real-divergence.md) | Divergencia SHADOW vs REAL |
 | [`docs/runbooks/github-projects-kanban.md`](docs/runbooks/github-projects-kanban.md) | Guía Kanban |
+| [`docs/runbooks/paper-shadow-observation.md`](docs/runbooks/paper-shadow-observation.md) | Validación de mejoras pendientes en PAPER/SHADOW |
 
 ---
 
