@@ -1,6 +1,7 @@
 import math
 
 from config import Config
+from core.trade_keys import has_trade
 
 
 def _safe_metric_to_int(value, default=0):
@@ -69,9 +70,9 @@ def update_radar(
     active_lock = getattr(bot, "lock", None)
     if active_lock:
         with active_lock:
-            has_position = symbol in bot.active_trades
+            has_position = has_trade(bot.active_trades, symbol)
     else:
-        has_position = symbol in bot.active_trades
+        has_position = has_trade(bot.active_trades, symbol)
     if has_position:
         display_verdict = f"⚡ OPEN | {display_verdict}"
 

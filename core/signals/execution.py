@@ -1,6 +1,7 @@
 import time
 
 from core.execution_telemetry import append_execution_event
+from core.trade_keys import has_trade
 
 
 def _execute_and_update_symbol(
@@ -95,7 +96,7 @@ def _execute_and_update_symbol(
             modo_str = "REAL" if not is_shadow_exec else "SHADOW"
             bot.log(f"✅ GATILLO {modo_str}: {symbol} [{audit_signal}] -> {audit_verdict}")
             with bot.lock:
-                if symbol in bot.active_trades:
+                if has_trade(bot.active_trades, symbol):
                     final_verdict_for_ui = "⚡ OPEN | 🔒 OPERACIÓN ACTIVA"
                 else:
                     final_verdict_for_ui = audit_verdict

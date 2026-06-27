@@ -9,6 +9,7 @@ import threading
 import time
 from typing import Any
 
+from core.trade_keys import find_trade_key
 from tools.github_projects_kanban import (
     actualizar_pnl_tarjeta,
     crear_tarjeta_operacion,
@@ -21,21 +22,30 @@ logger = logging.getLogger("SniperAI")
 def _is_real_trade(bot, symbol: str) -> bool:
     """Devuelve True solo si el trade es REAL o PAPER (no SHADOW)."""
     with bot.lock:
-        trade = bot.active_trades.get(symbol, {})
+        trade_key = find_trade_key(bot.active_trades, symbol)
+        trade = bot.active_trades.get(trade_key, {}) if trade_key else {}
     return not trade.get("is_shadow", True)
 
 
-def _safe_update_trade_state(bot, symbol: str, key: str, value: Any) -> None:
+def _safe_update_trade_state(
+    bot, symbol: str, key: str, value: Any, trade_key: str | None = None
+) -> None:
     with bot.lock:
-        if symbol in bot.active_trades:
-            bot.active_trades[symbol][key] = value
+        resolved_key = trade_key or find_trade_key(bot.active_trades, symbol)
+        if resolved_key in bot.active_trades:
+            bot.active_trades[resolved_key][key] = value
             # Persistir en BD para sobrevivir reinicios
             with bot.db_lock:
-                bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
+                bot.brain.save_active_trade_state(resolved_key, bot.active_trades[resolved_key])
 
 
 def async_crear_tarjeta(
-    bot, symbol: str, estrategia: str, capital: float, is_shadow: bool = False
+    bot,
+    symbol: str,
+    estrategia: str,
+    capital: float,
+    is_shadow: bool = False,
+    trade_key: str | None = None,
 ) -> None:
     """Crea la tarjeta en el Kanban. Solo actúa para trades REALES/PAPER."""
     if is_shadow:
@@ -48,11 +58,12 @@ def async_crear_tarjeta(
             logger.info(f"✅ Kanban: Tarjeta creada para {symbol} → item_id={item_id}")
 
             # Escribir item_id en el estado del trade ANTES de moverlo
-            _safe_update_trade_state(bot, symbol, "kanban_item_id", item_id)
+            _safe_update_trade_state(bot, symbol, "kanban_item_id", item_id, trade_key)
 
             # Leer el estado actual del trade para elegir columna de destino
             with bot.lock:
-                trade = bot.active_trades.get(symbol, {})
+                resolved_key = trade_key or find_trade_key(bot.active_trades, symbol)
+                trade = bot.active_trades.get(resolved_key, {}) if resolved_key else {}
                 status = trade.get("status", "")
 
             target_col = "Posiciones Abiertas" if status == "OPEN" else "Órdenes Pendientes"

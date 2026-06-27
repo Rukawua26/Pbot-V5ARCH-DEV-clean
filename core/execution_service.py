@@ -59,6 +59,9 @@ class ExecutionService:
     def set_weight_tracker(self, tracker):
         self.weight_tracker = tracker
 
+    def set_exchange(self, exchange):
+        self.exchange = exchange
+
     def _track_api_weight(self, endpoint: str, weight: int, category: str):
         if self.weight_tracker:
             self.weight_tracker.track(endpoint, weight, category)

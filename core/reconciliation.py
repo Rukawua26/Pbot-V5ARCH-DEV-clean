@@ -6,6 +6,7 @@ from core.config.operational import OperationalConfig
 from core.execution_telemetry import append_execution_event
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import parse_datetime_utc, utc_now, utc_now_iso
+from core.trade_keys import make_trade_key, normalize_trade_side
 from core.trade_state import TradeStatus
 from tools.notifier import send_telegram_msg
 
@@ -271,7 +272,8 @@ def reconcile_bootstrap_state(bot):
                         {"error": str(error)[:180], "source": "fetch_open_orders"},
                     )
                     return
-        exchange_positions = {}
+        raw_positions = []
+        sides_by_symbol = {}
         for pos in positions:
             amount = float(pos.get("contracts") or 0)
             if abs(amount) <= 0:
@@ -285,19 +287,44 @@ def reconcile_bootstrap_state(bot):
             elif pos.get("side") not in ("long", "short"):
                 raw_amt = float(pos.get("info", {}).get("positionAmt", 0) or 0)
                 side = "BUY" if raw_amt > 0 else "SELL"
-            exchange_positions[symbol] = {
+            side = normalize_trade_side(side)
+            raw_positions.append(
+                {
+                    "symbol": symbol,
+                    "side": side,
+                    "entry": float(pos.get("entryPrice") or 0),
+                    "amount": abs(amount),
+                }
+            )
+            sides_by_symbol.setdefault(symbol, set()).add(side)
+
+        db_snapshot = {}
+        for key, state in dict(bot.active_trades).items():
+            if not isinstance(state, dict):
+                db_snapshot[key] = state
+                continue
+            state.setdefault("trade_key", str(key))
+            db_snapshot[str(key)] = state
+
+        exchange_positions = {}
+        for pos in raw_positions:
+            symbol = pos["symbol"]
+            side = pos["side"]
+            side_key = make_trade_key(symbol, side, force_side=True)
+            force_side_key = len(sides_by_symbol.get(symbol, set())) > 1 or side_key in db_snapshot
+            trade_key = make_trade_key(symbol, side, force_side=force_side_key)
+            exchange_positions[trade_key] = {
                 "symbol": symbol,
                 "side": side,
-                "entry": float(pos.get("entryPrice") or 0),
-                "amount": abs(amount),
+                "entry": pos["entry"],
+                "amount": pos["amount"],
+                "trade_key": trade_key,
             }
 
         open_orders_by_coid, open_orders_by_symbol = _build_open_order_index(open_orders)
 
-        db_symbols = {s for s, t in db_snapshot.items() if not (t or {}).get("is_shadow", False)}
-        position_symbols = set(exchange_positions.keys())
-        order_symbols = set(open_orders_by_symbol.keys())
-        ex_symbols = position_symbols | order_symbols
+        db_keys = {s for s, t in db_snapshot.items() if not (t or {}).get("is_shadow", False)}
+        position_keys = set(exchange_positions.keys())
 
         adopted = 0
         lost = 0
@@ -305,9 +332,10 @@ def reconcile_bootstrap_state(bot):
         intent_expired = 0
 
         # Caso 1: posición en Exchange pero no en DB -> adopción forzosa
-        missing_in_db = sorted(position_symbols - db_symbols)
-        for symbol in missing_in_db:
-            info = exchange_positions[symbol]
+        missing_in_db = sorted(position_keys - db_keys)
+        for trade_key in missing_in_db:
+            info = exchange_positions[trade_key]
+            symbol = info["symbol"]
             entry_price = info["entry"]
             amount = info["amount"]
 
@@ -348,6 +376,7 @@ def reconcile_bootstrap_state(bot):
 
             sl = _compute_orphan_sl(entry_price, info["side"], market_price)
             adopted_trade = {
+                "trade_key": trade_key,
                 "symbol": symbol,
                 "side": info["side"],
                 "entry": entry_price,
@@ -391,18 +420,18 @@ def reconcile_bootstrap_state(bot):
                     adopted_trade["sl_exchange_order_id"] = sl_order.get("id")
                     adopted_trade["status"] = "OPEN"
                     with bot.lock:
-                        bot.active_trades[symbol] = adopted_trade
+                        bot.active_trades[trade_key] = adopted_trade
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, adopted_trade)
+                        bot.brain.save_active_trade_state(trade_key, adopted_trade)
                 else:
                     bot.is_paused = True
                     bot.integrity_lock_active = True
                     setattr(bot, "halt_system_active", True)
                     adopted_trade["status"] = "ADOPTED_UNPROTECTED"
                     with bot.lock:
-                        bot.active_trades[symbol] = adopted_trade
+                        bot.active_trades[trade_key] = adopted_trade
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, adopted_trade)
+                        bot.brain.save_active_trade_state(trade_key, adopted_trade)
                         bot.brain.save_error_snapshot(
                             symbol,
                             "ORPHAN_HARD_SL_ATTACH_FAILED",
@@ -420,9 +449,9 @@ def reconcile_bootstrap_state(bot):
                 setattr(bot, "halt_system_active", True)
                 adopted_trade["status"] = "ADOPTED_UNPROTECTED"
                 with bot.lock:
-                    bot.active_trades[symbol] = adopted_trade
+                    bot.active_trades[trade_key] = adopted_trade
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, adopted_trade)
+                    bot.brain.save_active_trade_state(trade_key, adopted_trade)
                     bot.brain.save_error_snapshot(
                         symbol,
                         "ORPHAN_HARD_SL_ATTACH_EXCEPTION",
@@ -441,12 +470,14 @@ def reconcile_bootstrap_state(bot):
             adopted += 1
 
         # Caso 2: en DB abierta pero no en Exchange -> LOST_IN_TRANSMISSION
-        safe_pending_symbols = set()
-        expired_symbols = set()
-        for symbol in sorted(db_symbols - position_symbols):
-            state = db_snapshot.get(symbol) or {}
+        safe_pending_keys = set()
+        expired_keys = set()
+        for trade_key in sorted(db_keys - position_keys):
+            state = db_snapshot.get(trade_key) or {}
             if not isinstance(state, dict):
                 continue
+            state.setdefault("trade_key", trade_key)
+            symbol = normalize_position_symbol(state.get("symbol", trade_key))
             entry_coid = str(state.get("entry_client_order_id") or "")
             if not entry_coid:
                 continue
@@ -489,11 +520,11 @@ def reconcile_bootstrap_state(bot):
                 state["status"] = "ORDER_LOOKUP_FAILED"
                 state["order_lookup_error"] = order_lookup_error
                 state["reconciled_at"] = utc_now_iso()
-                safe_pending_symbols.add(symbol)
+                safe_pending_keys.add(trade_key)
                 with bot.lock:
-                    bot.active_trades[symbol] = state
+                    bot.active_trades[trade_key] = state
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, state)
+                    bot.brain.save_active_trade_state(trade_key, state)
                     bot.brain.save_error_snapshot(
                         symbol,
                         "ORDER_LOOKUP_FAILED",
@@ -539,11 +570,11 @@ def reconcile_bootstrap_state(bot):
 
                     if age < stale_limit:
                         state.setdefault("intent_created_at_utc", utc_now_iso())
-                        safe_pending_symbols.add(symbol)
+                        safe_pending_keys.add(trade_key)
                         with bot.lock:
-                            bot.active_trades[symbol] = state
+                            bot.active_trades[trade_key] = state
                         with bot.db_lock:
-                            bot.brain.save_active_trade_state(symbol, state)
+                            bot.brain.save_active_trade_state(trade_key, state)
                         continue
 
                     with bot.db_lock:
@@ -557,7 +588,7 @@ def reconcile_bootstrap_state(bot):
                                 "reconciliation_ts": utc_now_iso(),
                             },
                         )
-                        bot.brain.delete_active_trade_state(symbol)
+                        bot.brain.delete_active_trade_state(trade_key)
                     append_execution_event(
                         bot,
                         "INTENT_EXPIRED",
@@ -569,14 +600,14 @@ def reconcile_bootstrap_state(bot):
                         },
                     )
                     with bot.lock:
-                        bot.active_trades.pop(symbol, None)
+                        bot.active_trades.pop(trade_key, None)
                     send_telegram_msg(
                         f"⚠️ *INTENT_EXPIRED* {symbol}\n"
                         f"PENDING_SEND sin orden exchange tras {age:.1f}s. "
                         "Intención descartada por reconciliación."
                     )
                     intent_expired += 1
-                    expired_symbols.add(symbol)
+                    expired_keys.add(trade_key)
                 continue
             if not isinstance(exchange_order, dict):
                 continue
@@ -590,10 +621,10 @@ def reconcile_bootstrap_state(bot):
                 state["reconciled_at"] = utc_now_iso()
                 state["intent_created_at_utc"] = state.get("intent_created_at_utc") or utc_now_iso()
                 with bot.lock:
-                    bot.active_trades[symbol] = state
+                    bot.active_trades[trade_key] = state
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, state)
-                safe_pending_symbols.add(symbol)
+                    bot.brain.save_active_trade_state(trade_key, state)
+                safe_pending_keys.add(trade_key)
                 pending_open += 1
             elif normalized_status == "FILLED":
                 state["status"] = TradeStatus.ENTRY_FILLED_AWAITING_POSITION_SYNC.value
@@ -602,25 +633,25 @@ def reconcile_bootstrap_state(bot):
                 state["reconciled_at"] = utc_now_iso()
                 state["intent_created_at_utc"] = state.get("intent_created_at_utc") or utc_now_iso()
                 with bot.lock:
-                    bot.active_trades[symbol] = state
+                    bot.active_trades[trade_key] = state
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, state)
-                safe_pending_symbols.add(symbol)
+                    bot.brain.save_active_trade_state(trade_key, state)
+                safe_pending_keys.add(trade_key)
 
-        missing_in_exchange = sorted(
-            ((db_symbols - ex_symbols) - safe_pending_symbols) - expired_symbols
-        )
-        for symbol in missing_in_exchange:
+        missing_in_exchange = sorted(((db_keys - position_keys) - safe_pending_keys) - expired_keys)
+        for trade_key in missing_in_exchange:
+            state = db_snapshot.get(trade_key) or {}
+            symbol = normalize_position_symbol((state or {}).get("symbol", trade_key))
             with bot.db_lock:
                 bot.brain.save_error_snapshot(
                     symbol,
                     "LOST_IN_TRANSMISSION",
                     {"reconciliation_ts": utc_now_iso()},
                 )
-                bot.brain.delete_active_trade_state(symbol)
+                bot.brain.delete_active_trade_state(trade_key)
             with bot.lock:
-                if symbol in bot.active_trades:
-                    del bot.active_trades[symbol]
+                if trade_key in bot.active_trades:
+                    del bot.active_trades[trade_key]
             lost += 1
 
         # En PAPER_MODE el balance es virtual; no se compara contra custodia real.

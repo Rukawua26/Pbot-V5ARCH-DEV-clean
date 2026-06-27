@@ -20,6 +20,7 @@ from core.trade_helpers import (
 from core.trade_helpers import (
     _exchange_position_is_flat as _helper_exchange_position_is_flat,
 )
+from core.trade_keys import find_trade_key, split_trade_key
 from core.trade_state import TradeStatus
 from tools.learning import shadow_logger
 
@@ -94,8 +95,10 @@ def _log_mtf_winrate_report(bot=None) -> None:
 from tools.notifier import Priority, send_telegram_msg, send_telegram_photo
 
 
-def _exchange_position_is_flat(bot, symbol: str) -> bool:
-    return _helper_exchange_position_is_flat(bot, symbol)
+def _exchange_position_is_flat(bot, symbol: str, side: str | None = None) -> bool:
+    if side is None:
+        return _helper_exchange_position_is_flat(bot, symbol)
+    return _helper_exchange_position_is_flat(bot, symbol, side)
 
 
 def close_trade(
@@ -105,9 +108,15 @@ def close_trade(
     exit_price: float,
     exit_confidence: float = 0.0,
     latency_context: dict[str, Any] | None = None,
+    side: str | None = None,
+    trade_key: str | None = None,
 ):
+    key_symbol, key_side = split_trade_key(trade_key or symbol)
+    real_symbol = key_symbol or symbol
+    desired_side = side or key_side
+    resolved_trade_key = trade_key or find_trade_key(bot.active_trades, real_symbol, desired_side)
     with bot.lock:
-        trade = bot.active_trades.get(symbol)
+        trade = bot.active_trades.get(resolved_trade_key) if resolved_trade_key else None
         if trade and trade.get("closing_in_progress"):
             return
         if trade:
@@ -115,9 +124,12 @@ def close_trade(
             trade["status"] = TradeStatus.CLOSING_INITIATED.value
     if not trade:
         return
+    trade_key = str(trade.get("trade_key") or resolved_trade_key or real_symbol)
+    symbol = str(trade.get("symbol") or real_symbol)
+    side = str(trade.get("side") or desired_side or "")
 
     with bot.db_lock:
-        bot.brain.save_active_trade_state(symbol, trade)
+        bot.brain.save_active_trade_state(trade_key, trade)
 
     try:
         fees = 0
@@ -146,7 +158,7 @@ def close_trade(
                         f"Cierre no finalizado para {symbol}; exit_state={exit_state}"
                     )
 
-                if not _exchange_position_is_flat(bot, symbol):
+                if not _exchange_position_is_flat(bot, symbol, trade.get("side")):
                     order_status = str((order or {}).get("status") or "UNKNOWN")
                     raise RuntimeError(
                         f"Cierre no confirmado en exchange para {symbol}; "
@@ -184,7 +196,7 @@ def close_trade(
                     close_failed = True
                 else:
                     try:
-                        if not _exchange_position_is_flat(bot, symbol):
+                        if not _exchange_position_is_flat(bot, symbol, trade.get("side")):
                             bot.log(f"⚠️ Posición remota no está plana tras close para {symbol}")
                             close_failed = True
                     except Exception as flat_error:
@@ -197,11 +209,13 @@ def close_trade(
                     bot.is_paused = True
                     bot.integrity_lock_active = True
                     setattr(bot, "halt_system_active", True)
-                    if symbol in bot.active_trades:
-                        bot.active_trades[symbol]["status"] = TradeStatus.EXIT_STUCK.value
-                        bot.active_trades[symbol]["closing_in_progress"] = False
+                    if trade_key in bot.active_trades:
+                        bot.active_trades[trade_key]["status"] = TradeStatus.EXIT_STUCK.value
+                        bot.active_trades[trade_key]["closing_in_progress"] = False
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, bot.active_trades.get(symbol, {}))
+                        bot.brain.save_active_trade_state(
+                            trade_key, bot.active_trades.get(trade_key, {})
+                        )
                     append_execution_event(
                         bot,
                         "REAL_CLOSE_FAILED_HALT",
@@ -369,11 +383,11 @@ def close_trade(
             bot.recent_closed_trades = recent[:6]
 
         with bot.lock:
-            if symbol in bot.active_trades:
-                del bot.active_trades[symbol]
+            if trade_key in bot.active_trades:
+                del bot.active_trades[trade_key]
 
         with bot.db_lock:
-            bot.brain.delete_active_trade_state(symbol)
+            bot.brain.delete_active_trade_state(trade_key)
 
         # --- INTEGRACIÓN KANBAN ---
         # Solo movemos a Historial si el trade era REAL/PAPER (no SHADOW)
@@ -598,7 +612,7 @@ def close_trade(
         )
 
         with bot.lock:
-            current = bot.active_trades.get(symbol)
+            current = bot.active_trades.get(trade_key)
             if current:
                 current["closing_in_progress"] = False
                 if is_stuck_or_unconfirmed and not (
@@ -627,7 +641,7 @@ def close_trade(
                     current["status"] = TradeStatus.OPEN.value
         with bot.db_lock:
             if current:
-                bot.brain.save_active_trade_state(symbol, current)
+                bot.brain.save_active_trade_state(trade_key, current)
         bot.log(f"Error cerrando {symbol}: {e}")
 
 

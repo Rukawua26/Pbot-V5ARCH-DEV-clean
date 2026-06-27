@@ -60,6 +60,84 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
         bot.execution.place_hard_sl.assert_called_once()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
+    def test_sync_wallet_preserves_dual_hedge_legs_for_same_symbol(self):
+        bot = self._base_bot()
+        bot.active_trades = {
+            "BTC/USDT|BUY": {
+                "trade_key": "BTC/USDT|BUY",
+                "symbol": "BTC/USDT",
+                "side": "BUY",
+                "entry": 100.0,
+                "amount": 1.0,
+                "sl": 99.0,
+                "is_shadow": False,
+                "open_time": datetime.now(),
+                "sl_exchange_order_id": "sl-buy",
+            },
+            "BTC/USDT|SELL": {
+                "trade_key": "BTC/USDT|SELL",
+                "symbol": "BTC/USDT",
+                "side": "SELL",
+                "entry": 101.0,
+                "amount": 2.0,
+                "sl": 102.0,
+                "is_shadow": False,
+                "open_time": datetime.now(),
+                "sl_exchange_order_id": "sl-sell",
+            },
+        }
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "BTC/USDT:USDT",
+                    "contracts": 1.5,
+                    "side": "long",
+                    "entryPrice": 100.5,
+                    "unrealizedPnl": 1.0,
+                    "info": {},
+                },
+                {
+                    "symbol": "BTC/USDT:USDT",
+                    "contracts": 2.5,
+                    "side": "short",
+                    "entryPrice": 101.5,
+                    "unrealizedPnl": -1.0,
+                    "info": {},
+                },
+            ],
+            fetch_open_orders=lambda _symbol=None: [
+                {
+                    "id": "sl-buy",
+                    "symbol": "BTC/USDT",
+                    "status": "open",
+                    "type": "stop_market",
+                    "side": "SELL",
+                    "reduceOnly": True,
+                    "amount": 1.5,
+                },
+                {
+                    "id": "sl-sell",
+                    "symbol": "BTC/USDT",
+                    "status": "open",
+                    "type": "stop_market",
+                    "side": "BUY",
+                    "reduceOnly": True,
+                    "amount": 2.5,
+                },
+            ],
+            place_hard_sl=MagicMock(),
+        )
+
+        sync_wallet(bot)
+
+        self.assertEqual(set(bot.active_trades), {"BTC/USDT|BUY", "BTC/USDT|SELL"})
+        self.assertEqual(bot.active_trades["BTC/USDT|BUY"]["entry"], 100.5)
+        self.assertEqual(bot.active_trades["BTC/USDT|BUY"]["amount"], 1.5)
+        self.assertEqual(bot.active_trades["BTC/USDT|SELL"]["entry"], 101.5)
+        self.assertEqual(bot.active_trades["BTC/USDT|SELL"]["amount"], 2.5)
+        bot.execution.place_hard_sl.assert_not_called()
+
+    @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
     def test_reuses_existing_exchange_stop_without_duplicating(self):
         bot = self._base_bot()
         bot.active_trades = {

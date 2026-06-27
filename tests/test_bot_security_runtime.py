@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 from core.bot_connection import connect_to_binance
 from core.bot_io_loops import telegram_listener
 from core.command_router import handle_basic_command
+from core.execution_adapters import ShadowExecutionAdapter
 
 
 class BotSecurityRuntimeTest(unittest.TestCase):
@@ -314,6 +315,95 @@ class BotSecurityRuntimeTest(unittest.TestCase):
         sandbox_exchange.set_sandbox_mode.assert_called_once_with(True)
         self.assertIs(bot.execution.exchange, public_exchange)
         self.assertEqual(bot_execution.load_markets.call_count, 2)
+        bot.sync_wallet.assert_not_called()
+
+    @patch("core.bot_connection.Config.BINANCE_API_KEY", "")
+    @patch("core.bot_connection.Config.BINANCE_API_SECRET", "")
+    @patch("core.bot_connection.Config.USE_TESTNET", False)
+    @patch("core.bot_connection.Config.PAPER_MODE", True)
+    @patch("core.bot_connection.ccxt.binance")
+    def test_connect_to_binance_supports_shadow_live_adapter(self, mocked_binance):
+        exchange = MagicMock()
+        mocked_binance.return_value = exchange
+
+        class _LiveExecution:
+            def __init__(self):
+                self.exchange = SimpleNamespace(load_markets=MagicMock())
+                self.logger = MagicMock()
+                self.last_hard_sl_error = ""
+                self.last_entry_reject_error = ""
+
+            def set_exchange(self, new_exchange):
+                self.exchange = new_exchange
+
+            def load_markets(self):
+                return self.exchange.load_markets()
+
+        live_execution = _LiveExecution()
+        adapter = ShadowExecutionAdapter(live_execution, min_latency_ms=0, max_latency_ms=0)
+        bot = SimpleNamespace(
+            log=MagicMock(),
+            execution=adapter,
+            data_service=SimpleNamespace(exchange=None),
+            sync_wallet=MagicMock(),
+            balance=0.0,
+            available_balance=0.0,
+            daily_initial_balance=0.0,
+        )
+
+        connect_to_binance(bot)
+
+        exchange.load_markets.assert_called_once()
+        self.assertIs(adapter.exchange, exchange)
+        self.assertIs(live_execution.exchange, exchange)
+        self.assertIs(bot.data_service.exchange, exchange)
+        bot.sync_wallet.assert_not_called()
+
+    @patch("core.bot_connection.Config.BINANCE_API_KEY", "")
+    @patch("core.bot_connection.Config.BINANCE_API_SECRET", "")
+    @patch("core.bot_connection.Config.USE_TESTNET", True)
+    @patch("core.bot_connection.Config.PAPER_MODE", True)
+    @patch("core.bot_connection.ccxt.binance")
+    def test_paper_testnet_fallback_updates_shadow_live_inner_exchange(self, mocked_binance):
+        sandbox_exchange = MagicMock()
+        sandbox_exchange.load_markets.side_effect = RuntimeError(
+            "binance does not have a testnet/sandbox URL for public endpoints"
+        )
+        public_exchange = MagicMock()
+        mocked_binance.side_effect = [sandbox_exchange, public_exchange]
+
+        class _LiveExecution:
+            def __init__(self):
+                self.exchange = SimpleNamespace(load_markets=MagicMock())
+                self.logger = MagicMock()
+                self.last_hard_sl_error = ""
+                self.last_entry_reject_error = ""
+
+            def set_exchange(self, new_exchange):
+                self.exchange = new_exchange
+
+            def load_markets(self):
+                return self.exchange.load_markets()
+
+        live_execution = _LiveExecution()
+        adapter = ShadowExecutionAdapter(live_execution, min_latency_ms=0, max_latency_ms=0)
+        bot = SimpleNamespace(
+            log=MagicMock(),
+            execution=adapter,
+            data_service=SimpleNamespace(exchange=None),
+            sync_wallet=MagicMock(),
+            balance=0.0,
+            available_balance=0.0,
+            daily_initial_balance=0.0,
+        )
+
+        connect_to_binance(bot)
+
+        sandbox_exchange.set_sandbox_mode.assert_called_once_with(True)
+        public_exchange.load_markets.assert_called_once()
+        self.assertIs(adapter.exchange, public_exchange)
+        self.assertIs(live_execution.exchange, public_exchange)
+        self.assertIs(bot.data_service.exchange, public_exchange)
         bot.sync_wallet.assert_not_called()
 
     @patch("core.bot_connection.Config.ALLOW_REAL_TRADING", True)

@@ -31,6 +31,34 @@ class ActiveTradeStoreTest(unittest.TestCase):
 
             self.assertEqual(brain.load_active_trade_states(), {})
 
+    def test_can_persist_two_hedge_legs_for_same_symbol(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            brain = Brain(str(Path(tmp) / "brain.db"))
+
+            self.assertTrue(
+                brain.save_active_trade_state(
+                    "BTC/USDT|BUY",
+                    {"trade_key": "BTC/USDT|BUY", "symbol": "BTC/USDT", "side": "BUY"},
+                )
+            )
+            self.assertTrue(
+                brain.save_active_trade_state(
+                    "BTC/USDT|SELL",
+                    {"trade_key": "BTC/USDT|SELL", "symbol": "BTC/USDT", "side": "SELL"},
+                )
+            )
+
+            loaded = brain.load_active_trade_states()
+
+            self.assertEqual(set(loaded), {"BTC/USDT|BUY", "BTC/USDT|SELL"})
+            self.assertEqual(loaded["BTC/USDT|BUY"]["symbol"], "BTC/USDT")
+            self.assertEqual(loaded["BTC/USDT|SELL"]["side"], "SELL")
+
+            brain.delete_active_trade_state("BTC/USDT|BUY")
+            loaded = brain.load_active_trade_states()
+
+            self.assertEqual(set(loaded), {"BTC/USDT|SELL"})
+
 
 if __name__ == "__main__":
     unittest.main()

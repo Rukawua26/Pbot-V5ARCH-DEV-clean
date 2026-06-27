@@ -305,7 +305,7 @@ class DataService:
             if not snapshot:
                 return False
             current_hash = hash(json.dumps(snapshot, sort_keys=True))
-            if not force and current_hash == self._last_maturity_hash:
+            if current_hash == self._last_maturity_hash:
                 return False
             self._maturity_save_future = self._maturity_save_executor.submit(
                 self._write_maturity_snapshot, snapshot

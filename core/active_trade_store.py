@@ -6,6 +6,9 @@ from datetime import datetime
 
 def save_active_trade_state(brain, symbol, state_data) -> bool:
     data_to_save = state_data.copy()
+    trade_key = str(data_to_save.get("trade_key") or symbol)
+    data_to_save["trade_key"] = trade_key
+    data_to_save["symbol"] = str(data_to_save.get("symbol") or symbol).split("|")[0]
     if "open_time" in data_to_save and isinstance(data_to_save["open_time"], datetime):
         data_to_save["open_time"] = data_to_save["open_time"].isoformat()
 
@@ -18,7 +21,7 @@ def save_active_trade_state(brain, symbol, state_data) -> bool:
                 INSERT OR REPLACE INTO active_trades_state (symbol, state_data)
                 VALUES (?, ?)
             """,
-                (symbol, json.dumps(data_to_save)),
+                (trade_key, json.dumps(data_to_save)),
             )
             conn.commit()
             conn.close()
@@ -48,7 +51,9 @@ def load_active_trade_states(brain) -> dict:
             state_data = json.loads(row["state_data"])
             if "open_time" in state_data and isinstance(state_data["open_time"], str):
                 state_data["open_time"] = datetime.fromisoformat(state_data["open_time"])
-            loaded_states[row["symbol"]] = state_data
+            trade_key = str(state_data.get("trade_key") or row["symbol"])
+            state_data["trade_key"] = trade_key
+            loaded_states[trade_key] = state_data
         return loaded_states
     except Exception as error:
         print(f"❌ Error cargando estados de trades activos: {error}")

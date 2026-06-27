@@ -129,13 +129,14 @@ def _emergency_market_close(
     _send_tg = send_telegram_fn if send_telegram_fn else send_telegram_msg
 
     if close_ok and persist_state and trade:
+        trade_key = str(trade.get("trade_key") or symbol)
         with bot.db_lock:
             bot.brain.save_error_snapshot(
                 symbol,
                 "EMERGENCY_CLOSE_NO_VALID_SL",
                 {"sl_error": str(sl_error)[:200] if sl_error else ""},
             )
-            bot.brain.delete_active_trade_state(symbol)
+            bot.brain.delete_active_trade_state(trade_key)
         _append_event(
             bot,
             "EMERGENCY_CLOSE_EXECUTED",
@@ -146,8 +147,8 @@ def _emergency_market_close(
             },
         )
         with bot.lock:
-            if symbol in bot.active_trades:
-                del bot.active_trades[symbol]
+            if trade_key in bot.active_trades:
+                del bot.active_trades[trade_key]
         bot.log(f"🧯 EMERGENCY CLOSE {symbol}: SL inválido por gap, cierre MARKET ejecutado")
 
     if not close_ok and halt_on_failure:
@@ -155,10 +156,11 @@ def _emergency_market_close(
         bot.integrity_lock_active = True
         setattr(bot, "halt_system_active", True)
         if trade:
+            trade_key = str(trade.get("trade_key") or symbol)
             trade["status"] = "EMERGENCY_CLOSE_PENDING"
             trade["closing_in_progress"] = True
             with bot.db_lock:
-                bot.brain.save_active_trade_state(symbol, trade)
+                bot.brain.save_active_trade_state(trade_key, trade)
         bot.log(
             f"☢️ FALLO CRÍTICO {symbol}: no se pudo adjuntar SL ni cerrar por mercado tras 3 intentos."
         )
@@ -396,7 +398,7 @@ def _order_looks_filled(order: dict) -> bool:
     return status in {"closed", "filled"}
 
 
-def _exchange_position_is_flat(bot, symbol: str) -> bool:
+def _exchange_position_is_flat(bot, symbol: str, side: str | None = None) -> bool:
     fetch_positions = getattr(getattr(bot, "execution", None), "fetch_positions", None)
     if not callable(fetch_positions):
         raise RuntimeError("No se puede confirmar exposición cero: fetch_positions no disponible")
@@ -407,6 +409,15 @@ def _exchange_position_is_flat(bot, symbol: str) -> bool:
             continue
         if normalize_position_symbol(pos.get("symbol", "")) != symbol:
             continue
+        if side:
+            raw_side = str(pos.get("side") or "").lower()
+            if raw_side in {"long", "short"}:
+                pos_side = "BUY" if raw_side == "long" else "SELL"
+            else:
+                raw_amt = float((pos.get("info") or {}).get("positionAmt", 0) or 0)
+                pos_side = "BUY" if raw_amt > 0 else "SELL"
+            if pos_side != str(side).upper():
+                continue
         contracts = pos.get("contracts")
         if contracts is None:
             contracts = (pos.get("info") or {}).get("positionAmt", 0)

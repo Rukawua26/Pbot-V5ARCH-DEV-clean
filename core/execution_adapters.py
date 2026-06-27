@@ -46,6 +46,13 @@ class ShadowExecutionAdapter:
         self._lock = threading.RLock()
         self._orders_by_id: dict[str, dict] = {}
 
+    def set_exchange(self, exchange) -> None:
+        self._live.exchange = exchange
+        self.exchange = exchange
+
+    def load_markets(self):
+        return self._live.load_markets()
+
     def fetch_ticker(self, symbol: str) -> dict:
         return self._live.fetch_ticker(symbol)
 

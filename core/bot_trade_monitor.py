@@ -98,13 +98,14 @@ def monitor_open_trades(bot):
     if not symbols:
         return
 
-    for symbol in symbols:
+    for trade_key in symbols:
         try:
             # [v118.6] IGNITION COOLDOWN: No bailouts en los primeros 15 minutos (micro-ruido inicial)
             # Permite que el trade respire y absorba el ruido de ejecución/spread.
-            trade = bot.active_trades.get(symbol)
+            trade = bot.active_trades.get(trade_key)
             if not trade:
                 continue
+            symbol = str(trade.get("symbol") or trade_key).split("|")[0]
             if (
                 trade.get("closing_in_progress")
                 or trade.get("status") == TradeStatus.CLOSING_INITIATED.value
@@ -211,7 +212,7 @@ def monitor_open_trades(bot):
 
                 # Cierre inmediato ignorando TP/SL mediante ExecutionService
                 bot.close_trade(
-                    symbol,
+                    trade_key,
                     reason=f"DEGRADED_{deg_reason}",
                     exit_price=current_price,
                     exit_confidence=prob_final,

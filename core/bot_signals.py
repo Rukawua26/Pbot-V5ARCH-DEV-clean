@@ -8,6 +8,7 @@ from config import Config
 from core.cooldown_state import is_symbol_in_cooldown
 from core.execution_telemetry import append_execution_event
 from core.market_breadth import calculate_market_breadth
+from core.trade_keys import has_trade
 
 _ANALYSIS_MISSING = object()
 
@@ -262,7 +263,7 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
             # --- BLOQUEO DE CONCURRENCIA POR SÍMBOLO (INSTRUCCIÓN 1) ---
             # Verificar que no haya operaciones activas en este símbolo ANTES de evaluar señales
             with bot.lock:
-                if symbol in bot.active_trades:
+                if has_trade(bot.active_trades, symbol):
                     bot.log(f"🔒 BLOQUEADO {symbol}: Ya existe operación activa en este símbolo")
                     bot.update_radar(
                         symbol_raw,

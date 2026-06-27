@@ -40,6 +40,8 @@ def _sl_tightened(side: str, previous_sl: float, new_sl: float) -> bool:
 
 
 def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -> None:
+    trade_key = str(trade.get("trade_key") or symbol)
+    symbol = str(trade.get("symbol") or symbol).split("|")[0]
     if Config.PAPER_MODE or trade.get("is_shadow", False):
         return
     new_sl = float(trade.get("sl") or 0.0)
@@ -70,7 +72,7 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
         setattr(bot, "halt_system_active", True)
         trade["status"] = "HARD_SL_AMEND_FAILED"
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(trade_key, trade)
         append_execution_event(
             bot,
             "HARD_SL_AMEND_FAILED_HALT",
@@ -100,7 +102,7 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
     trade["hard_sl_price"] = new_sl
     trade["sl_amend_count"] = amend_count
     with bot.db_lock:
-        bot.brain.save_active_trade_state(symbol, trade)
+        bot.brain.save_active_trade_state(trade_key, trade)
     append_execution_event(
         bot,
         "HARD_SL_AMENDED",

@@ -22,6 +22,28 @@ def _build_exchange(session):
     return ccxt.binance(exchange_config)
 
 
+def _set_execution_exchange(bot, exchange) -> None:
+    setter = getattr(bot.execution, "set_exchange", None)
+    if callable(setter):
+        setter(exchange)
+    else:
+        bot.execution.exchange = exchange
+    bot.data_service.exchange = exchange
+
+
+def _load_execution_markets(bot) -> None:
+    load_markets = getattr(bot.execution, "load_markets", None)
+    if callable(load_markets):
+        load_markets()
+        return
+    exchange = getattr(bot.execution, "exchange", None)
+    exchange_load_markets = getattr(exchange, "load_markets", None)
+    if callable(exchange_load_markets):
+        exchange_load_markets()
+        return
+    raise RuntimeError("Execution backend no soporta load_markets()")
+
+
 def _is_public_sandbox_limitation(error) -> bool:
     return "does not have a testnet/sandbox URL for public endpoints" in str(error)
 
@@ -85,10 +107,9 @@ def connect_to_binance(bot):
                     f"No se pudo activar testnet/sandbox en Binance Futures: {error}"
                 ) from error
 
-        bot.execution.exchange = exchange
-        bot.data_service.exchange = bot.execution.exchange
+        _set_execution_exchange(bot, exchange)
         try:
-            bot.execution.load_markets()
+            _load_execution_markets(bot)
         except Exception as error:
             if Config.PAPER_MODE and Config.USE_TESTNET and _is_public_sandbox_limitation(error):
                 bot.log(
@@ -96,9 +117,8 @@ def connect_to_binance(bot):
                     "Continuando en PAPER con mercado público real."
                 )
                 exchange = _build_exchange(session)
-                bot.execution.exchange = exchange
-                bot.data_service.exchange = bot.execution.exchange
-                bot.execution.load_markets()
+                _set_execution_exchange(bot, exchange)
+                _load_execution_markets(bot)
             else:
                 raise
 

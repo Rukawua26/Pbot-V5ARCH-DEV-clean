@@ -469,10 +469,18 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                 )
                 return True
 
+            keys_to_clear = [
+                key
+                for key, trade in bot.active_trades.items()
+                if isinstance(trade, dict)
+                and str(trade.get("symbol") or key).split("|")[0] == symbol
+            ] or [symbol]
             with bot.db_lock:
-                bot.brain.delete_active_trade_state(symbol)
+                for key in keys_to_clear:
+                    bot.brain.delete_active_trade_state(key)
             with bot.lock:
-                bot.active_trades.pop(symbol, None)
+                for key in keys_to_clear:
+                    bot.active_trades.pop(key, None)
 
             send_telegram_msg(
                 f"🧹 FORCE CLEAR aplicado en {symbol}. Estado local y DB liberados sin evidencia en Exchange."

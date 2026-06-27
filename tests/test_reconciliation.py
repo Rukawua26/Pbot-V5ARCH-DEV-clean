@@ -428,7 +428,7 @@ class ReconciliationTest(unittest.TestCase):
         self.assertEqual(state.get("exchange_open_order_id"), "777")
         bot.brain.delete_active_trade_state.assert_not_called()
 
-    def test_does_not_mark_lost_when_symbol_exists_in_open_orders(self):
+    def test_marks_open_trade_lost_when_only_residual_order_exists(self):
         bot = SimpleNamespace()
         bot.lock = RLock()
         bot.db_lock = RLock()
@@ -437,7 +437,8 @@ class ReconciliationTest(unittest.TestCase):
                 "symbol": "XRP/USDT",
                 "side": "BUY",
                 "is_shadow": False,
-                "status": "PENDING_SEND",
+                "status": "OPEN",
+                "entry_client_order_id": "entry-xrp",
             }
         }
         bot.balance = 100.0
@@ -448,9 +449,10 @@ class ReconciliationTest(unittest.TestCase):
             fetch_positions=lambda: [],
             fetch_open_orders=lambda: [
                 {
-                    "id": "open-xyz",
+                    "id": "sl-xyz",
                     "symbol": "XRP/USDT",
                     "status": "open",
+                    "clientOrderId": "sl-xrp",
                 }
             ],
             fetch_order_by_client_id=lambda _symbol, _coid: None,
@@ -465,8 +467,10 @@ class ReconciliationTest(unittest.TestCase):
 
         reconcile_bootstrap_state(bot)
 
-        self.assertIn("XRP/USDT", bot.active_trades)
-        bot.brain.delete_active_trade_state.assert_not_called()
+        self.assertNotIn("XRP/USDT", bot.active_trades)
+        bot.brain.save_error_snapshot.assert_called_once()
+        self.assertEqual(bot.brain.save_error_snapshot.call_args[0][1], "LOST_IN_TRANSMISSION")
+        bot.brain.delete_active_trade_state.assert_called_once_with("XRP/USDT")
 
     @patch("core.reconciliation.Config.PAPER_MODE", True)
     def test_reconciliation_aborts_without_mutating_state_when_positions_fail(self):
@@ -884,6 +888,44 @@ class RealBootstrapReconciliationFailureTest(unittest.TestCase):
             "BOOTSTRAP_RECONCILIATION_FAILED",
             {"error": "orders down", "source": "fetch_open_orders"},
         )
+
+    @patch("core.reconciliation.send_telegram_msg")
+    @patch("core.reconciliation.Config.PAPER_MODE", False)
+    def test_real_dual_hedge_position_same_symbol_adopts_both_legs(self, mocked_tg):
+        execution = SimpleNamespace(
+            fetch_positions=MagicMock(
+                return_value=[
+                    {
+                        "symbol": "BTC/USDT:USDT",
+                        "contracts": 0.1,
+                        "side": "long",
+                        "entryPrice": 50000,
+                    },
+                    {
+                        "symbol": "BTC/USDT:USDT",
+                        "contracts": 0.1,
+                        "side": "short",
+                        "entryPrice": 50100,
+                    },
+                ]
+            ),
+            fetch_open_orders=MagicMock(return_value=[]),
+            fetch_ticker=MagicMock(return_value={"last": 50050}),
+            place_hard_sl=MagicMock(side_effect=[{"id": "sl-buy"}, {"id": "sl-sell"}]),
+        )
+        bot = self._bot(execution)
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertFalse(bot.is_paused)
+        self.assertFalse(bot.integrity_lock_active)
+        self.assertFalse(bot.halt_system_active)
+        self.assertEqual(set(bot.active_trades), {"BTC/USDT|BUY", "BTC/USDT|SELL"})
+        self.assertEqual(bot.active_trades["BTC/USDT|BUY"]["sl_exchange_order_id"], "sl-buy")
+        self.assertEqual(bot.active_trades["BTC/USDT|SELL"]["sl_exchange_order_id"], "sl-sell")
+        self.assertEqual(bot.brain.save_active_trade_state.call_count, 2)
+        bot.brain.delete_active_trade_state.assert_not_called()
+        self.assertEqual(mocked_tg.call_count, 2)
 
 
 class HaltRecoveryTest(unittest.TestCase):

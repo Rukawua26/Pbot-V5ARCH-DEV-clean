@@ -34,6 +34,7 @@ from core.trade_helpers import (
 from core.trade_helpers import (
     _validate_entry_preconditions as _helper_validate_entry_preconditions,
 )
+from core.trade_keys import find_trade_key, make_trade_key, normalize_trade_side
 from core.trade_state import TradeStatus
 from tools.learning import shadow_logger
 from tools.notifier import Priority, send_telegram_msg
@@ -325,7 +326,11 @@ def execute_order(
             f"\U0001f4d5 TACTICAL REDUCE {symbol}: size \u00d7 {reduced_mult:.2f} (decision matrix)"
         )
 
-    open_symbols = list(bot.active_trades.keys()) if hasattr(bot, "active_trades") else []
+    open_symbols = [
+        str(t.get("symbol") or key)
+        for key, t in getattr(bot, "active_trades", {}).items()
+        if isinstance(t, dict)
+    ]
     corr_mult, corr_details = compute_correlation_reduction(bot, symbol, open_symbols)
     if corr_mult < 1.0 and corr_details:
         calculated_position_size *= corr_mult
@@ -395,12 +400,21 @@ def execute_order(
         if not is_shadow:
             base_coin = bot._get_base_coin(symbol)
             for active_symbol, active_trade in bot.active_trades.items():
+                active_real_symbol = str(active_trade.get("symbol") or active_symbol)
+                active_side = normalize_trade_side(active_trade.get("side"))
+                hedge_opposite_leg = (
+                    bool(getattr(bot, "is_hedge_mode", False))
+                    and active_real_symbol == symbol
+                    and active_side in {"BUY", "SELL"}
+                    and active_side != normalize_trade_side(side)
+                )
                 if (
                     not active_trade.get("is_shadow", False)
-                    and bot._get_base_coin(active_symbol) == base_coin
+                    and bot._get_base_coin(active_real_symbol) == base_coin
+                    and not hedge_opposite_leg
                 ):
                     bot.log(
-                        f"⚠️ BLOQUEADO REAL {symbol}: Ya existe posición REAL abierta en {active_symbol}"
+                        f"⚠️ BLOQUEADO REAL {symbol}: Ya existe posición REAL abierta en {active_real_symbol}"
                     )
                     with bot.db_lock:
                         bot.brain.save_error_snapshot(
@@ -426,7 +440,12 @@ def execute_order(
             if sector_count >= Config.MAX_SECTOR_EXPOSURE:
                 return _discard_pending_signal(f"MAX_SECTOR_EXPOSURE ({current_sector})")
 
-        if symbol in bot.active_trades:
+        same_leg_key = find_trade_key(
+            bot.active_trades,
+            symbol,
+            side if bool(getattr(bot, "is_hedge_mode", False)) else None,
+        )
+        if same_leg_key is not None:
             return _discard_pending_signal("ALREADY_ACTIVE")
         if not is_shadow:
             in_cd, _remaining = is_symbol_in_cooldown(bot, symbol)
@@ -467,7 +486,22 @@ def execute_order(
                 )
             return _discard_pending_signal("MAX_SHADOW")
 
+    has_same_symbol_real = any(
+        isinstance(t, dict)
+        and not t.get("is_shadow", False)
+        and str(t.get("symbol") or k) == symbol
+        for k, t in bot.active_trades.items()
+    )
+    trade_key = make_trade_key(
+        symbol,
+        side,
+        force_side=bool(getattr(bot, "is_hedge_mode", False))
+        and not is_shadow
+        and has_same_symbol_real,
+    )
+
     pending_state = {
+        "trade_key": trade_key,
         "symbol": symbol,
         "side": side,
         "entry": price,
@@ -500,7 +534,7 @@ def execute_order(
         },
     )
     with bot.db_lock:
-        persisted = bot.brain.save_active_trade_state(symbol, pending_state)
+        persisted = bot.brain.save_active_trade_state(trade_key, pending_state)
     append_execution_event(
         bot,
         "PENDING_SEND_PERSISTED",
@@ -518,7 +552,7 @@ def execute_order(
 
     def _drop_pending_intent():
         with bot.db_lock:
-            bot.brain.delete_active_trade_state(symbol)
+            bot.brain.delete_active_trade_state(trade_key)
 
     try:
         regime_spreads = getattr(Config, "REGIME_SPREAD_THRESHOLDS", {})
@@ -757,9 +791,9 @@ def execute_order(
                         pending_state["closing_in_progress"] = True
                         pending_state["last_hard_sl_error"] = sl_error[:180]
                         with bot.db_lock:
-                            bot.brain.save_active_trade_state(symbol, pending_state)
+                            bot.brain.save_active_trade_state(trade_key, pending_state)
                         with bot.lock:
-                            bot.active_trades[symbol] = pending_state
+                            bot.active_trades[trade_key] = pending_state
                         append_execution_event(
                             bot,
                             "FAIL_SAFE_CLOSE_FAILED_HALT",
@@ -832,9 +866,9 @@ def execute_order(
                     int(pending_state.get("intent_check_attempts", 0) or 0) + 1
                 )
                 with bot.lock:
-                    bot.active_trades[symbol] = pending_state
+                    bot.active_trades[trade_key] = pending_state
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, pending_state)
+                    bot.brain.save_active_trade_state(trade_key, pending_state)
                 append_execution_event(
                     bot,
                     "ENTRY_ACK_UNKNOWN_PERSISTED",
@@ -849,7 +883,7 @@ def execute_order(
                     bot.integrity_lock_active = True
                     setattr(bot, "halt_system_active", True)
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, pending_state)
+                        bot.brain.save_active_trade_state(trade_key, pending_state)
                     return "ENTRY_ACK_UNKNOWN"
                 _drop_pending_intent()
                 return "EXECUTION_FAILED"
@@ -918,6 +952,7 @@ def execute_order(
             adjusted_confidence = max(0.0, min(100.0, base_confidence + similarity_boost))
 
             trade_state = {
+                "trade_key": trade_key,
                 "symbol": symbol,
                 "side": side,
                 "entry": float(avg_fill_price if not is_shadow else price),
@@ -966,10 +1001,11 @@ def execute_order(
                 "similarity_verdict": similarity_verdict,
             }
 
-            if symbol not in bot.active_trades:
-                bot.active_trades[symbol] = trade_state
+            current_trade_key = find_trade_key(bot.active_trades, symbol, side) or trade_key
+            if current_trade_key not in bot.active_trades:
+                bot.active_trades[current_trade_key] = trade_state
                 with bot.db_lock:
-                    persisted = bot.brain.save_active_trade_state(symbol, trade_state)
+                    persisted = bot.brain.save_active_trade_state(current_trade_key, trade_state)
                 if not persisted:
                     _release_simulated_margin(bot, trade_state, 0.0)
                     bot.integrity_lock_active = True
@@ -1002,9 +1038,14 @@ def execute_order(
                     estrategia=trade_state.get("market_regime", "N/A"),
                     capital=float(final_usd),
                     is_shadow=is_shadow,
+                    trade_key=current_trade_key,
                 )
             else:
-                bot.active_trades[symbol].update(trade_state)
+                bot.active_trades[current_trade_key].update(trade_state)
+                with bot.db_lock:
+                    bot.brain.save_active_trade_state(
+                        current_trade_key, bot.active_trades[current_trade_key]
+                    )
 
             cooldown_minutes = (
                 Config.SHADOW_COOLDOWN_MINUTES if is_shadow else Config.TRADE_COOLDOWN_MINUTES
@@ -1030,7 +1071,7 @@ def execute_order(
                     {
                         "error": str(e)[:200],
                         "order": str(order)[:200],
-                        "side": str(trade_state.get("side")),
+                        "side": str(side),
                     },
                 )
             send_telegram_msg(

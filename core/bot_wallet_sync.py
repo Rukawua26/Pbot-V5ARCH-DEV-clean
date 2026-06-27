@@ -6,6 +6,7 @@ from core.reconciliation import generate_child_client_order_id, generate_order_i
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import parse_datetime_utc, utc_now
 from core.trade_helpers import _emergency_market_close
+from core.trade_keys import find_trade_key, make_trade_key, normalize_trade_side
 from tools.notifier import send_telegram_msg
 
 _OPEN_ENTRY_ORDER_LOOKUP_FAILED = object()
@@ -209,7 +210,7 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
         trade["sl_exchange_order_id"] = existing_sl.get("id")
         trade["status"] = "OPEN"
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         bot.log(f"🛡️ SL existente detectado para {symbol}: {existing_sl.get('id')}")
         return False
 
@@ -242,7 +243,7 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
         trade["hard_sl_attach_fail_count"] = 0
         trade["status"] = "OPEN"
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         bot.log(f"🛡️ HARD SL recuperado para {symbol}: {sl_order.get('id')}")
     else:
         sl_error = str(getattr(bot.execution, "last_hard_sl_error", "") or "")
@@ -253,7 +254,7 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
         trade["hard_sl_attach_fail_count"] = fail_count
         trade["status"] = "HARD_SL_UNPROTECTED"
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         max_retries = int(getattr(Config, "HARD_SL_ATTACH_MAX_RETRIES", 3) or 3)
         if fail_count >= max_retries:
             bot.log(
@@ -343,7 +344,7 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
         trade["status"] = "PARTIAL_FILL_PENDING"
         trade["partial_fill_pending"] = True
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         return
 
     if open_entry_order is None:
@@ -351,7 +352,7 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
         trade["partial_fill_pending"] = False
         trade["status"] = "OPEN"
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         append_execution_event(
             bot,
             "PARTIAL_FILL_COMPLETED",
@@ -378,7 +379,7 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
     timeout_s = int(getattr(Config, "PARTIAL_FILL_TIMEOUT_SECONDS", 300) or 300)
     if age_seconds < timeout_s:
         with bot.db_lock:
-            bot.brain.save_active_trade_state(symbol, trade)
+            bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         return
 
     cancel_order = getattr(bot.execution, "cancel_order", None)
@@ -391,7 +392,7 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
             trade["status"] = "OPEN"
             trade["partial_fill_pending"] = False
             with bot.db_lock:
-                bot.brain.save_active_trade_state(symbol, trade)
+                bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
             append_execution_event(
                 bot,
                 "PARTIAL_FILL_TIMEOUT_CANCEL",
@@ -415,7 +416,7 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
                 bot.integrity_lock_active = True
                 setattr(bot, "halt_system_active", True)
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(symbol, trade)
+                    bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
             append_execution_event(
                 bot,
                 "PARTIAL_FILL_CANCEL_FAILED",
@@ -459,6 +460,8 @@ def sync_wallet(bot):
             if bot.get_current_balance() == 0:
                 return  # Si balance es 0 y pos es 0, ok. Si no, sospechoso.
 
+        raw_positions = []
+        sides_by_symbol = {}
         for pos in positions:
             amount = float(pos.get("contracts") or 0)
             if abs(amount) > 0:
@@ -476,12 +479,35 @@ def sync_wallet(bot):
                 # Normalización robusta para evitar purgas erróneas
                 symbol = normalize_position_symbol(pos.get("symbol", ""))
 
-                real_active_on_binance[symbol] = {
-                    "amount": abs(amount),
-                    "side": side,
-                    "entry": float(pos.get("entryPrice") or 0),
-                    "pnl": float(pos.get("unrealizedPnl") or 0),
-                }
+                side = normalize_trade_side(side)
+                raw_positions.append(
+                    {
+                        "symbol": symbol,
+                        "side": side,
+                        "amount": abs(amount),
+                        "entry": float(pos.get("entryPrice") or 0),
+                        "pnl": float(pos.get("unrealizedPnl") or 0),
+                    }
+                )
+                sides_by_symbol.setdefault(symbol, set()).add(side)
+
+        for info in raw_positions:
+            symbol = info["symbol"]
+            side = info["side"]
+            side_key = make_trade_key(symbol, side, force_side=True)
+            local_key = find_trade_key(bot.active_trades, symbol, side)
+            force_side_key = (
+                len(sides_by_symbol.get(symbol, set())) > 1 or side_key in bot.active_trades
+            )
+            trade_key = local_key or make_trade_key(symbol, side, force_side=force_side_key)
+            real_active_on_binance[trade_key] = {
+                "symbol": symbol,
+                "trade_key": trade_key,
+                "amount": info["amount"],
+                "side": side,
+                "entry": info["entry"],
+                "pnl": info["pnl"],
+            }
 
         # LOG DE DIAGNÓSTICO: Ver qué detecta Binance
         if real_active_on_binance:
@@ -499,31 +525,35 @@ def sync_wallet(bot):
             emergency_closed_symbols = set()
 
             # A. ACTUALIZACIÓN DE PRECIOS REALES (Corrige el PnL)
-            for symbol, info in real_active_on_binance.items():
-                if symbol in bot.active_trades and not bot.active_trades[symbol].get("is_shadow"):
+            for trade_key, info in real_active_on_binance.items():
+                symbol = info["symbol"]
+                if trade_key in bot.active_trades and not bot.active_trades[trade_key].get(
+                    "is_shadow"
+                ):
                     # Sincronizamos el precio de entrada del bot con el de Binance
                     # Validamos que el precio sea > 0 para evitar errores de API
-                    if info["entry"] > 0 and bot.active_trades[symbol]["entry"] != info["entry"]:
+                    if info["entry"] > 0 and bot.active_trades[trade_key]["entry"] != info["entry"]:
                         bot.log(
-                            f"⚖️ Sincronizando precio {symbol}: {bot.active_trades[symbol]['entry']} -> {info['entry']}"
+                            f"⚖️ Sincronizando precio {symbol}: {bot.active_trades[trade_key]['entry']} -> {info['entry']}"
                         )
-                        bot.active_trades[symbol]["entry"] = info["entry"]
-                        bot.active_trades[symbol]["amount"] = info["amount"]
-                        bot.active_trades[symbol]["size_usd"] = info["entry"] * info["amount"]
+                        bot.active_trades[trade_key]["entry"] = info["entry"]
+                        bot.active_trades[trade_key]["amount"] = info["amount"]
+                        bot.active_trades[trade_key]["size_usd"] = info["entry"] * info["amount"]
 
                     emergency_closed = _ensure_hard_sl_attached(
-                        bot, symbol, bot.active_trades[symbol], info
+                        bot, symbol, bot.active_trades[trade_key], info
                     )
-                    _manage_partial_fill_trade(bot, symbol, bot.active_trades[symbol], info)
+                    _manage_partial_fill_trade(bot, symbol, bot.active_trades[trade_key], info)
                     if emergency_closed:
-                        emergency_closed_symbols.add(symbol)
+                        emergency_closed_symbols.add(trade_key)
 
             # B. PURGAR trades huerfanos (No están en Binance pero sí en el bot)
-            for symbol in list(bot.active_trades.keys()):
-                trade = bot.active_trades[symbol]
+            for trade_key in list(bot.active_trades.keys()):
+                trade = bot.active_trades[trade_key]
+                symbol = str(trade.get("symbol") or trade_key).split("|")[0]
                 if (
                     not trade.get("is_shadow")
-                    and symbol not in real_active_on_binance
+                    and trade_key not in real_active_on_binance
                     and not Config.PAPER_MODE
                 ):
                     # PROTECCIÓN DE LATENCIA: No purgar si el trade tiene menos de 120 segundos
@@ -547,15 +577,16 @@ def sync_wallet(bot):
                         continue
 
                     bot.log(f"🧹 Purgando manual: {symbol}")
-                    del bot.active_trades[symbol]
+                    del bot.active_trades[trade_key]
                     with bot.db_lock:
-                        bot.brain.delete_active_trade_state(symbol)
+                        bot.brain.delete_active_trade_state(trade_key)
 
             # C. ADOPTAR trades nuevos (Si abres algo manual en Binance)
-            for symbol, info in real_active_on_binance.items():
-                if symbol in emergency_closed_symbols:
+            for trade_key, info in real_active_on_binance.items():
+                symbol = info["symbol"]
+                if trade_key in emergency_closed_symbols:
                     continue
-                if symbol not in bot.active_trades:
+                if trade_key not in bot.active_trades:
                     bot.log(
                         f"📥 CARTERA: Detectado nuevo trade en Binance: {symbol}. Sincronizando..."
                     )
@@ -575,7 +606,8 @@ def sync_wallet(bot):
                         symbol, info["side"], utc_now().timestamp(), "wallet-sync"
                     )
 
-                    bot.active_trades[symbol] = {
+                    bot.active_trades[trade_key] = {
+                        "trade_key": trade_key,
                         "symbol": symbol,
                         "side": info["side"],
                         "entry": info["entry"],
@@ -603,8 +635,8 @@ def sync_wallet(bot):
                         "sl_exchange_order_id": None,
                     }
                     with bot.db_lock:
-                        bot.brain.save_active_trade_state(symbol, bot.active_trades[symbol])
-                    _ensure_hard_sl_attached(bot, symbol, bot.active_trades[symbol], info)
+                        bot.brain.save_active_trade_state(trade_key, bot.active_trades[trade_key])
+                    _ensure_hard_sl_attached(bot, symbol, bot.active_trades[trade_key], info)
     except Exception as error:
         bot.log(f"⚠️ Error Sync: {error}")
         if not Config.PAPER_MODE:
