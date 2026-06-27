@@ -279,8 +279,66 @@ def _is_shadow_learning_runtime(bot) -> bool:
     return paper_mode and (execution_mode in {"shadow", "shadow_live"} or backend == "shadow_live")
 
 
+def _apply_side_quality_parity_filter(
+    audit_signal: str,
+    ctx: dict,
+    vol_rel: float,
+    votos: dict | None = None,
+) -> tuple[bool, str | None]:
+    """Filtro de paridad: BUY y SELL exigen la misma calidad mínima.
+
+    Reglas:
+    - ADX >= SIDE_PARITY_MIN_ADX (25 por defecto)
+    - vol_rel >= SIDE_PARITY_MIN_VOL_REL (0.30 por defecto)
+    - En RANGE: RSI dentro de rangos (BUY <= 60, SELL >= 40)
+    - Soporte de agentes: mínimo 2 de 3 agentes activos
+    """
+    if not bool(getattr(Config, "SIDE_PARITY_FILTER_ENABLED", True)):
+        return True, None
+
+    min_adx = float(getattr(Config, "SIDE_PARITY_MIN_ADX", 25.0))
+    min_vol = float(getattr(Config, "SIDE_PARITY_MIN_VOL_REL", 0.30))
+    range_buy_max_rsi = float(getattr(Config, "SIDE_PARITY_RANGE_BUY_MAX_RSI", 60.0))
+    range_sell_min_rsi = float(getattr(Config, "SIDE_PARITY_RANGE_SELL_MIN_RSI", 40.0))
+    min_agents = int(getattr(Config, "SIDE_PARITY_MIN_AGENT_SUPPORT", 2))
+
+    rsi = float(ctx.get("rsi", 50.0))
+    adx = float(ctx.get("adx", 20.0))
+    trend = str(ctx.get("trend", "RANGO"))
+
+    # 1. ADX mínimo (sin tendencia no hay señal de calidad)
+    if adx < min_adx:
+        return False, f"SIDE_PARITY: ADX {adx:.1f} < {min_adx:.0f}"
+
+    # 2. Volumen mínimo
+    if vol_rel < min_vol:
+        return False, f"SIDE_PARITY: volumen {vol_rel:.2f} < {min_vol:.2f}"
+
+    # 3. RSI bounds en RANGE
+    if trend == "RANGO":
+        if audit_signal == "BUY" and rsi > range_buy_max_rsi:
+            return (
+                False,
+                f"SIDE_PARITY: BUY tarde en RANGE (RSI {rsi:.1f} > {range_buy_max_rsi:.0f})",
+            )
+        if audit_signal == "SELL" and rsi < range_sell_min_rsi:
+            return (
+                False,
+                f"SIDE_PARITY: SELL tarde en RANGE (RSI {rsi:.1f} < {range_sell_min_rsi:.0f})",
+            )
+
+    # 4. Soporte de agentes (si hay votos disponibles)
+    if votos and isinstance(votos, dict):
+        # Un agente activo si vota fuera del rango neutral (45-55)
+        active = sum(1 for v in votos.values() if abs(float(v) - 50.0) > 5.0)
+        if active < min_agents:
+            return False, f"SIDE_PARITY: solo {active}/{min_agents} agentes activos"
+
+    return True, None
+
+
 def _apply_entry_filters_and_adjust_prob(
-    bot, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel
+    bot, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel, votos=None
 ):
     # Aplicar filtros de RSI, ADX y horario antes de evaluar.
     rsi_val = ctx.get("rsi", 50)
@@ -395,6 +453,16 @@ def _apply_entry_filters_and_adjust_prob(
             },
         )
 
+    # [SIDE_PARITY] Calidad mínima simétrica para BUY y SELL
+    if filter_passed:
+        parity_ok, parity_reason = _apply_side_quality_parity_filter(
+            audit_signal, ctx, vol_rel, votos
+        )
+        if not parity_ok:
+            filter_passed = False
+            filter_reason = parity_reason
+            bot.log(f"⛔ {symbol}: {parity_reason}")
+
     # [BEAR_TREND PREVETO] Veto directo si hay alta probabilidad de reversión alcista
     if filter_passed and audit_signal == "BUY" and btc_regime == "BEAR_TREND":
         bearish_reversal_min = float(getattr(Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0))
@@ -422,6 +490,35 @@ def _apply_entry_filters_and_adjust_prob(
             bot.log(
                 f"⛔ {symbol}: veto LONG por Market Breadth FEAR ({dump_ratio * 100:.0f}% dump)"
             )
+
+    # --- GLOBAL MARKET FILTERS (veto/boost por macro) ---
+    if filter_passed:
+        try:
+            fear_greed = int(ctx.get("fear_greed_index", 50) or 50)
+            btc_dom = float(ctx.get("btc_dominance", 0.0) or 0.0)
+            fg_veto = int(getattr(Config, "GLOBAL_FEAR_VETO_THRESHOLD", 20))
+            dom_boost = float(getattr(Config, "GLOBAL_BTC_DOM_BOOST_THRESHOLD", 65.0))
+            FEAR_GREED_ENABLED = bool(getattr(Config, "GLOBAL_FEAR_GREED_FILTER_ENABLED", True))
+            BTC_DOM_FILTER_ENABLED = bool(getattr(Config, "GLOBAL_BTC_DOM_FILTER_ENABLED", True))
+
+            if FEAR_GREED_ENABLED and audit_signal == "BUY" and 0 < fear_greed < fg_veto:
+                filter_passed = False
+                filter_reason = f"FEAR_{fear_greed}_VETO: pánico extremo"
+                bot.log(f"⛔ {symbol}: {filter_reason} (Fear & Greed={fear_greed})")
+
+            if (
+                filter_passed
+                and BTC_DOM_FILTER_ENABLED
+                and audit_signal == "SELL"
+                and btc_dom > dom_boost
+            ):
+                prob_final = min(100.0, prob_final * 1.10)
+                ctx["macro_boost_reason"] = f"BTC_DOM={btc_dom:.1f}%"
+                bot.log(
+                    f"📈 {symbol}: macro boost SELL (BTC dominance {btc_dom:.1f}% > {dom_boost:.0f}%)"
+                )
+        except Exception:
+            None
 
     # [OI DELTA v118.3] Veto por senal falsa (short squeeze / long liquidation)
     # OI siempre se fetchea para el Context Vault; el filtro solo se aplica si está habilitado

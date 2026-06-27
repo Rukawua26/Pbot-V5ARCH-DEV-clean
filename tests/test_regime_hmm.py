@@ -385,23 +385,24 @@ class RegimeRangeFilterTests(unittest.TestCase):
 
         with patch.object(filters.Config, "HMM_RANGE_PENALTY", 0.5):
             with patch.object(filters.Config, "HMM_RANGE_VETO", False):
-                with patch.object(
-                    filters.Strategy,
-                    "check_entry_filters",
-                    return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
-                ):
-                    prob_final, filter_passed, filter_reason, updated_ctx = (
-                        filters._apply_entry_filters_and_adjust_prob(
-                            bot,
-                            "TEST/USDT",
-                            "TEST/USDT",
-                            pd.DataFrame(),
-                            "BUY",
-                            80.0,
-                            ctx,
-                            1.0,
+                with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                    with patch.object(
+                        filters.Strategy,
+                        "check_entry_filters",
+                        return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
+                    ):
+                        prob_final, filter_passed, filter_reason, updated_ctx = (
+                            filters._apply_entry_filters_and_adjust_prob(
+                                bot,
+                                "TEST/USDT",
+                                "TEST/USDT",
+                                pd.DataFrame(),
+                                "BUY",
+                                80.0,
+                                ctx,
+                                1.0,
+                            )
                         )
-                    )
 
         self.assertEqual(prob_final, 40.0)
         self.assertTrue(filter_passed)
@@ -472,23 +473,29 @@ class RegimeRangeFilterTests(unittest.TestCase):
         with patch.object(filters.Config, "HMM_RANGE_PENALTY", 0.5):
             with patch.object(filters.Config, "HMM_RANGE_VETO", True):
                 with patch.object(filters.Config, "PAPER_MODE", True):
-                    with patch.object(
-                        filters.Strategy,
-                        "check_entry_filters",
-                        return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
-                    ):
-                        prob_final, filter_passed, filter_reason, updated_ctx = (
-                            filters._apply_entry_filters_and_adjust_prob(
-                                bot,
-                                "TEST/USDT",
-                                "TEST/USDT",
-                                pd.DataFrame(),
-                                "BUY",
-                                80.0,
-                                ctx,
-                                1.0,
+                    with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                        with patch.object(
+                            filters.Strategy,
+                            "check_entry_filters",
+                            return_value=(
+                                True,
+                                "OK",
+                                "CALM",
+                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            ),
+                        ):
+                            prob_final, filter_passed, filter_reason, updated_ctx = (
+                                filters._apply_entry_filters_and_adjust_prob(
+                                    bot,
+                                    "TEST/USDT",
+                                    "TEST/USDT",
+                                    pd.DataFrame(),
+                                    "BUY",
+                                    80.0,
+                                    ctx,
+                                    1.0,
+                                )
                             )
-                        )
 
         self.assertEqual(prob_final, 40.0)
         self.assertTrue(filter_passed)
@@ -563,28 +570,29 @@ class RegimeRangeFilterTests(unittest.TestCase):
             with patch.object(filters.Config, "PAPER_MODE", False):
                 with patch.object(filters.Config, "MARKOV_BREAKOUT_MIN", 75.0):
                     with patch.object(filters.Config, "MARKOV_RANGE_BREAKOUT_WEIGHT", 0.90):
-                        with patch.object(
-                            filters.Strategy,
-                            "check_entry_filters",
-                            return_value=(
-                                True,
-                                "OK",
-                                "CALM",
-                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
-                            ),
-                        ):
-                            prob_final, filter_passed, filter_reason, updated_ctx = (
-                                filters._apply_entry_filters_and_adjust_prob(
-                                    bot,
-                                    "TEST/USDT",
-                                    "TEST/USDT",
-                                    pd.DataFrame(),
-                                    "BUY",
-                                    80.0,
-                                    ctx,
-                                    1.0,
+                        with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                            with patch.object(
+                                filters.Strategy,
+                                "check_entry_filters",
+                                return_value=(
+                                    True,
+                                    "OK",
+                                    "CALM",
+                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                ),
+                            ):
+                                prob_final, filter_passed, filter_reason, updated_ctx = (
+                                    filters._apply_entry_filters_and_adjust_prob(
+                                        bot,
+                                        "TEST/USDT",
+                                        "TEST/USDT",
+                                        pd.DataFrame(),
+                                        "BUY",
+                                        80.0,
+                                        ctx,
+                                        1.0,
+                                    )
                                 )
-                            )
 
         self.assertEqual(prob_final, 72.0)
         self.assertTrue(filter_passed)
@@ -618,28 +626,29 @@ class RegimeRangeFilterTests(unittest.TestCase):
             with patch.object(filters.Config, "PAPER_MODE", False):
                 with patch.object(filters.Config, "MARKOV_DEAD_ZONE_MAX", 30.0):
                     with patch.object(filters.Config, "MARKOV_RANGE_STANDARD_WEIGHT", 0.75):
-                        with patch.object(
-                            filters.Strategy,
-                            "check_entry_filters",
-                            return_value=(
-                                True,
-                                "OK",
-                                "CALM",
-                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
-                            ),
-                        ):
-                            prob_final, filter_passed, filter_reason, updated_ctx = (
-                                filters._apply_entry_filters_and_adjust_prob(
-                                    bot,
-                                    "TEST/USDT",
-                                    "TEST/USDT",
-                                    pd.DataFrame(),
-                                    "BUY",
-                                    80.0,
-                                    ctx,
-                                    1.0,
+                        with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                            with patch.object(
+                                filters.Strategy,
+                                "check_entry_filters",
+                                return_value=(
+                                    True,
+                                    "OK",
+                                    "CALM",
+                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                ),
+                            ):
+                                prob_final, filter_passed, filter_reason, updated_ctx = (
+                                    filters._apply_entry_filters_and_adjust_prob(
+                                        bot,
+                                        "TEST/USDT",
+                                        "TEST/USDT",
+                                        pd.DataFrame(),
+                                        "BUY",
+                                        80.0,
+                                        ctx,
+                                        1.0,
+                                    )
                                 )
-                            )
 
         # Penalización: 80 * 0.75 = 60.0 — no veto total (HOTFIX v118.1)
         self.assertEqual(prob_final, 60.0)
@@ -669,23 +678,29 @@ class RegimeRangeFilterTests(unittest.TestCase):
         with patch.object(filters.Config, "MARKOV_SNAPSHOT_MAX_AGE_SECONDS", 3600.0):
             with patch.object(filters.Config, "MARKOV_SNAPSHOT_STALE_SECONDS", 6 * 3600.0):
                 with patch.object(filters.Config, "MARKOV_BULL_STRONG_WEIGHT", 1.10):
-                    with patch.object(
-                        filters.Strategy,
-                        "check_entry_filters",
-                        return_value=(True, "OK", "CALM", {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0}),
-                    ):
-                        prob_final, filter_passed, filter_reason, updated_ctx = (
-                            filters._apply_entry_filters_and_adjust_prob(
-                                bot,
-                                "TEST/USDT",
-                                "TEST/USDT",
-                                pd.DataFrame(),
-                                "BUY",
-                                80.0,
-                                ctx,
-                                1.0,
+                    with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                        with patch.object(
+                            filters.Strategy,
+                            "check_entry_filters",
+                            return_value=(
+                                True,
+                                "OK",
+                                "CALM",
+                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            ),
+                        ):
+                            prob_final, filter_passed, filter_reason, updated_ctx = (
+                                filters._apply_entry_filters_and_adjust_prob(
+                                    bot,
+                                    "TEST/USDT",
+                                    "TEST/USDT",
+                                    pd.DataFrame(),
+                                    "BUY",
+                                    80.0,
+                                    ctx,
+                                    1.0,
+                                )
                             )
-                        )
 
         self.assertEqual(prob_final, 80.0)
         self.assertTrue(filter_passed)

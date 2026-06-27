@@ -178,6 +178,7 @@ class FvgTracker:
         telegram_alerts: bool = True,
         max_symbols_per_cycle: int = 20,
         store_path: str | None = None,
+        notifier=None,
     ):
         self.enabled = enabled
         self.min_gap_pct = min_gap_pct
@@ -193,6 +194,7 @@ class FvgTracker:
         self._lock = threading.Lock()
         self._last_alert: dict[str, float] = {}
         self._loaded = False
+        self._notifier = notifier
 
     def _ensure_loaded(self):
         if not self._loaded:
@@ -213,7 +215,26 @@ class FvgTracker:
             if ng["id"] not in existing_ids:
                 merged.append(ng)
                 existing_ids.add(ng["id"])
+                self._notify_gap_detected(ng)
         return merged
+
+    def _notify_gap_detected(self, gap: dict) -> None:
+        if self._notifier is None:
+            return
+        payload = {
+            "id": gap.get("id"),
+            "symbol": gap.get("symbol"),
+            "type": gap.get("type"),
+            "gap_high": gap.get("gap_high"),
+            "gap_low": gap.get("gap_low"),
+            "gap_pct": gap.get("gap_pct"),
+            "formed_at": gap.get("formed_at"),
+            "status": gap.get("status"),
+        }
+        try:
+            self._notifier.notify("fvg.gap_detected", payload)
+        except Exception:
+            return
 
     def scan_candles(self, df: pd.DataFrame, symbol: str) -> list[dict]:
         return _detect_fvg(df, symbol, self.min_gap_pct, self.expiration_bars)

@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 import tools.notifier as notifier
-from tools.notifier import NotificationQueue, Priority, send_telegram_photo
+from tools.notifier import NotificationQueue, Priority, SatelliteNotifier, send_telegram_photo
 
 
 class _Response:
@@ -153,6 +153,28 @@ class BootAndNotifierTest(unittest.TestCase):
         self.assertTrue(queue.queue.empty())
         queue.stop()
         notifier._telegram_config_warning_sent = False
+
+    def test_satellite_notifier_dispatches_callbacks(self):
+        received = []
+        satellite = SatelliteNotifier()
+
+        satellite.register(lambda event, payload: received.append((event, payload)))
+        satellite.notify("fvg.gap_detected", {"symbol": "BTC/USDT"})
+
+        self.assertEqual(received, [("fvg.gap_detected", {"symbol": "BTC/USDT"})])
+
+    def test_satellite_notifier_isolates_callback_failures(self):
+        received = []
+        satellite = SatelliteNotifier(
+            callbacks=[
+                lambda _event, _payload: (_ for _ in ()).throw(RuntimeError("boom")),
+                lambda event, payload: received.append((event, payload)),
+            ]
+        )
+
+        satellite.notify("event", {"ok": True})
+
+        self.assertEqual(received, [("event", {"ok": True})])
 
     def test_shadow_logger_does_not_start_until_used(self):
         from tools.learning import LazyShadowLogger

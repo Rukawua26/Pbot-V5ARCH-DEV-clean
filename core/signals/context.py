@@ -74,6 +74,16 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
     ctx["market_breadth_sentiment"] = str(market_breadth.get("sentiment", "") or "")
     ctx["market_breadth_dump_ratio"] = float(market_breadth.get("dump_ratio", 0.0) or 0.0)
     ctx["market_breadth_pump_ratio"] = float(market_breadth.get("pump_ratio", 0.0) or 0.0)
+    global_m = getattr(bot, "global_market_cache", None) or {}
+    ctx["btc_dominance"] = float(global_m.get("btc_dominance", 0.0) or 0.0)
+    ctx["eth_dominance"] = float(global_m.get("eth_dominance", 0.0) or 0.0)
+    ctx["total_market_cap"] = float(global_m.get("total_market_cap", 0.0) or 0.0)
+    ctx["total_volume_24h"] = float(global_m.get("total_volume_24h", 0.0) or 0.0)
+    ctx["fear_greed_index"] = int(global_m.get("fear_greed", 50) or 50)
+    ctx["active_cryptos"] = int(global_m.get("active_cryptos", 0) or 0)
+    trending = global_m.get("trending_coins", []) or []
+    ctx["trending_coins"] = ",".join(trending[:5]) if trending else ""
+
     hmm_snapshot = getattr(bot, "hmm_markov_snapshot", None)
     if isinstance(hmm_snapshot, dict):
         ctx["hmm_data"] = hmm_snapshot

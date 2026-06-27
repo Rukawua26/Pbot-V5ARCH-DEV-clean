@@ -67,6 +67,11 @@
         ::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--neon-blue); }
 
+        :focus-visible {
+            outline: 2px solid var(--neon-blue);
+            outline-offset: 3px;
+            box-shadow: 0 0 0 4px rgba(0, 242, 255, 0.14);
+        }
         .panel {
             background: var(--panel-bg);
             backdrop-filter: blur(12px);
@@ -77,9 +82,9 @@
         .glow-blue { text-shadow: 0 0 10px rgba(0, 242, 255, 0.5); color: var(--neon-blue); }
         .glow-red { text-shadow: 0 0 10px rgba(255, 0, 85, 0.5); color: var(--neon-red); }
         .glow-green { text-shadow: 0 0 10px rgba(57, 255, 20, 0.5); color: var(--neon-green); }
-        [data-theme="light"] .glow-blue { text-shadow: 0 0 6px rgba(2, 132, 199, 0.4); }
-        [data-theme="light"] .glow-red { text-shadow: 0 0 6px rgba(220, 38, 38, 0.4); }
-        [data-theme="light"] .glow-green { text-shadow: 0 0 6px rgba(22, 163, 74, 0.4); }
+        [data-theme="light"] .glow-blue { text-shadow: none; color: #0369a1; }
+        [data-theme="light"] .glow-red { text-shadow: none; color: #be123c; }
+        [data-theme="light"] .glow-green { text-shadow: none; color: #15803d; }
 
         .text-muted { color: var(--text-muted); }
         .text-dim { color: var(--text-dim); }
@@ -92,7 +97,7 @@
         @keyframes pulse-anim { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
         /* TABS */
-        .tab-nav { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0; }
+        .tab-nav { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0; overflow-x: auto; scrollbar-width: thin; }
         .tab-btn {
             padding: 12px 20px; font-size: 12px; font-weight: 600; cursor: pointer;
             border: none; background: transparent; color: var(--text-muted);
@@ -105,8 +110,9 @@
             color: var(--neon-blue); border-bottom-color: var(--neon-blue);
             background: var(--panel-bg);
         }
-        .tab-pane { display: none !important; flex-direction: column; flex: 1; }
-        .tab-pane[active] { display: flex !important; }
+        .tab-pane { display: none !important; flex-direction: column; flex: 1; opacity: 0; transform: translateY(6px); }
+        .tab-pane[active] { display: flex !important; animation: pane-enter 0.22s ease-out forwards; }
+        @keyframes pane-enter { to { opacity: 1; transform: translateY(0); } }
 
         /* BUTTONS */
         .btn-ctrl, .btn-panic {
@@ -141,15 +147,17 @@
         .btn-filter.active { background: rgba(0,242,255,0.1); border-color: var(--neon-blue); color: var(--neon-blue); }
 
         /* TABLES */
-        .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 460px; }
-        .tbl-wrap table { width: 100%; font-size: 11px; font-family: 'JetBrains Mono', monospace; border-collapse: collapse; }
+        .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 460px; -webkit-overflow-scrolling: touch; }
+        .tbl-wrap table { width: 100%; min-width: 720px; font-size: 11px; font-family: 'JetBrains Mono', monospace; border-collapse: collapse; }
         .tbl-wrap th {
             position: sticky; top: 0; background: var(--thead-bg); padding: 8px 10px;
             text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em;
             color: var(--text-muted); border-bottom: 1px solid var(--border); z-index: 2;
         }
         .tbl-wrap td { padding: 6px 10px; border-bottom: 1px solid var(--border); }
+        .tbl-wrap tr { transition: transform 0.16s ease, background 0.16s ease; }
         .tbl-wrap tr:hover td { background: var(--hover); }
+        .tbl-wrap tr:hover { transform: translateX(2px); }
 
         .badge { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; white-space: nowrap; }
         .badge-green { background: rgba(57,255,20,0.12); color: var(--neon-green); }
@@ -160,7 +168,9 @@
         .stat-card {
             padding: 14px 10px; border-radius: 10px; border: 1px solid var(--border);
             background: var(--inset-bg); text-align: center;
+            animation: stat-enter 0.22s ease-out both;
         }
+        @keyframes stat-enter { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         .stat-card .val { font-size: 22px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
         .stat-card .lbl { font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
 
@@ -173,7 +183,8 @@
         .chart-box { position: relative; width: 100%; height: 200px; }
         .chart-box canvas { width: 100% !important; height: 100% !important; }
 
-        .empty-state { padding: 30px 20px; text-align: center; color: var(--text-muted); font-style: italic; font-size: 13px; }
+        .empty-state { padding: 30px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+        .empty-state strong { display:block; color: var(--text); font-style: normal; margin-bottom: 4px; }
         .section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text-muted); margin-bottom: 10px; }
         .insight-card {
             padding: 12px; border-radius: 12px; border: 1px solid var(--border);
@@ -191,19 +202,55 @@
             width: 100%; border-radius: 10px; border: 1px solid var(--border-panel);
             background: var(--inset-bg); color: var(--text); padding: 9px 10px; font-size: 12px;
         }
+        .radar-scope {
+            position: relative; width: 56px; height: 56px; border-radius: 50%;
+            border: 1px solid rgba(0,242,255,0.45);
+            background: radial-gradient(circle at center, rgba(0,242,255,0.2) 0 2px, transparent 3px),
+                        radial-gradient(circle, rgba(0,242,255,0.12), transparent 63%);
+            overflow: hidden; box-shadow: inset 0 0 18px rgba(0,242,255,0.15), 0 0 18px rgba(0,242,255,0.08);
+        }
+        .radar-scope:before {
+            content: ""; position: absolute; inset: 50% 50% 0 50%; transform-origin: top left;
+            width: 28px; height: 1px; background: linear-gradient(90deg, var(--neon-blue), transparent);
+            animation: radar-sweep 2.8s linear infinite;
+        }
+        .radar-scope:after {
+            content: ""; position: absolute; inset: 12px; border-radius: 50%; border: 1px solid rgba(0,242,255,0.16);
+            box-shadow: 0 0 0 12px rgba(0,242,255,0.05);
+        }
+        @keyframes radar-sweep { to { transform: rotate(360deg); } }
+        .mobile-stack { min-width: 0; }
+
+        @media (max-width: 768px) {
+            #app { padding: 12px !important; }
+            header { gap: 14px; }
+            .header-controls { width: 100%; display: grid !important; grid-template-columns: 1fr auto; }
+            .header-controls .panel { min-width: 0; }
+            .tab-btn { padding: 11px 14px; font-size: 11px; }
+            .chart-box { height: 240px; }
+            .mobile-stack { width: 100%; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+            .pulse { animation: none; }
+        }
     </style>
 </head>
 <body>
     <div id="app" class="p-4 lg:p-5" style="max-width:1640px;margin:0 auto;">
         <!-- ===== HEADER ===== -->
         <header class="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
-            <div>
-                <h1 class="text-2xl font-black italic tracking-tighter mono" style="line-height:1">
-                    SNIPER <span id="mode-display" class="glow-blue">v118-PRO</span>
-                </h1>
-                <p class="text-[9px] uppercase tracking-[0.25em] text-muted font-semibold">Neural Trading Architecture / Master Monitor</p>
+            <div class="flex items-center gap-3 mobile-stack">
+                <div class="radar-scope" aria-hidden="true"></div>
+                <div>
+                    <h1 class="text-2xl font-black italic tracking-tighter mono" style="line-height:1">
+                        SNIPER <span id="mode-display" class="glow-blue">v118-PRO</span>
+                    </h1>
+                    <p class="text-[9px] uppercase tracking-[0.25em] text-muted font-semibold">Risk Radar / Master Monitor</p>
+                </div>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 header-controls">
                 <div class="px-3 py-1.5 panel rounded-lg" style="border-left:3px solid var(--neon-blue);">
                     <p class="text-[9px] text-muted font-bold uppercase leading-tight">BTC Sentiment</p>
                     <p id="sentiment-display" class="text-sm font-bold glow-blue">🌀 CARGANDO...</p>
@@ -300,7 +347,7 @@
                     <div class="tbl-wrap" style="max-height:520px;">
                         <table>
                             <thead><tr><th>#</th><th>Symbol</th><th>Signal</th><th>Prob</th><th style="text-align:center;">RSI</th><th>Trend</th><th>Resultado</th></tr></thead>
-                            <tbody id="radar-body"><tr><td colspan="7" class="empty-state">Cargando radar...</td></tr></tbody>
+                            <tbody id="radar-body"><tr><td colspan="7" class="empty-state"><strong>Radar inicializando</strong>Conecta la API y confirma que el bot este emitiendo estado.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -324,7 +371,7 @@
                     <div class="tbl-wrap" style="max-height:320px;">
                         <table>
                             <thead><tr><th>Fecha</th><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th><th>PnL %</th><th>PnL $</th><th>Razón</th><th>Tipo</th><th>Intel</th></tr></thead>
-                            <tbody id="trades-table-body"><tr><td colspan="10" class="empty-state">Cargando trades...</td></tr></tbody>
+                            <tbody id="trades-table-body"><tr><td colspan="10" class="empty-state"><strong>Cargando historial</strong>Si no aparece actividad, revisa el filtro SHADOW/REAL.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -338,7 +385,7 @@
                     <div class="tbl-wrap" style="max-height:520px;">
                         <table>
                             <thead><tr><th>Fecha</th><th>Symbol</th><th>Side</th><th>Razón del Veto</th><th>Prob</th><th>Régimen BTC</th><th>Tipo</th></tr></thead>
-                            <tbody id="blocked-table-body"><tr><td colspan="7" class="empty-state">Cargando bloqueos...</td></tr></tbody>
+                            <tbody id="blocked-table-body"><tr><td colspan="7" class="empty-state"><strong>Cargando vetos</strong>Los bloqueos aparecen cuando los filtros descartan senales.</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -354,14 +401,14 @@
                             <p class="text-xs font-bold mb-2" style="color:var(--neon-green);">🟢 Ganados (<span id="winners-count-exec">0</span>)</p>
                             <div class="tbl-wrap" style="max-height:180px;">
                                 <table><thead><tr><th>Symbol</th><th>Entry</th><th>Exit</th><th>PnL %</th><th>Salida</th></tr></thead>
-                                <tbody id="winners-table-body"><tr><td colspan="5" class="empty-state" style="padding:15px;">Sin datos</td></tr></tbody></table>
+                                <tbody id="winners-table-body"><tr><td colspan="5" class="empty-state" style="padding:15px;"><strong>Sin ganadores</strong>Espera cierres positivos o revisa el filtro activo.</td></tr></tbody></table>
                             </div>
                         </div>
                         <div class="panel p-3" style="border-color:rgba(255,0,85,0.15);">
                             <p class="text-xs font-bold mb-2" style="color:var(--neon-red);">🔴 Perdidos (<span id="losers-count-exec">0</span>)</p>
                             <div class="tbl-wrap" style="max-height:180px;">
                                 <table><thead><tr><th>Symbol</th><th>Entry</th><th>Exit</th><th>PnL %</th><th>Salida</th></tr></thead>
-                                <tbody id="losers-table-body"><tr><td colspan="5" class="empty-state" style="padding:15px;">Sin datos</td></tr></tbody></table>
+                                <tbody id="losers-table-body"><tr><td colspan="5" class="empty-state" style="padding:15px;"><strong>Sin perdedores</strong>Cuando cierre una perdida aparecera aqui para auditoria.</td></tr></tbody></table>
                             </div>
                         </div>
                     </div>
@@ -492,7 +539,7 @@
         function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
         function badgeP(v) { var n=Number(v); if(n>0)return'<span class="badge badge-green">+'+n.toFixed(2)+'%</span>'; if(n<0)return'<span class="badge badge-red">'+n.toFixed(2)+'%</span>'; return'<span class="badge badge-blue">0.00%</span>'; }
 
-        function fillEmpty(id, msg) { document.getElementById(id).innerHTML='<div class="empty-state">'+esc(msg||'Sin datos')+'</div>'; }
+        function fillEmpty(id, msg) { document.getElementById(id).innerHTML='<div class="empty-state"><strong>Sin datos disponibles</strong>'+esc(msg||'Verifica API, modo del bot y filtros activos.')+'</div>'; }
 
         /* ===== SIDEBAR: STATE ===== */
         function fetchState() {
@@ -536,7 +583,7 @@
 
         function renderRadar(arr) {
             var b=document.getElementById('radar-body'), c=document.getElementById('radar-count');
-            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="7" class="empty-state">Esperando datos del radar...</td></tr>';c.textContent='(0)';return;}
+            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="7" class="empty-state"><strong>Esperando radar</strong>Verifica que el bot este activo en PAPER o SHADOW y que la API responda.</td></tr>';c.textContent='(0)';return;}
             c.textContent='('+arr.length+')';
             b.innerHTML=arr.map(function(e,i){
                 var sig=e.signal||'WAIT', sc=sig==='BUY'?'text-emerald-400':sig==='SELL'?'text-rose-400':'text-muted';
@@ -576,7 +623,7 @@
 
         function renderTradeTable(arr) {
             var b=document.getElementById('trades-table-body');
-            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="10" class="empty-state">No hay trades en este filtro</td></tr>';return;}
+            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="10" class="empty-state"><strong>Sin trades en este filtro</strong>Cambia entre ALL, SHADOW o REAL para ampliar la busqueda.</td></tr>';return;}
             b.innerHTML=arr.map(function(t){
                 var r=t.reason||t.exit_reason||'OTHER';
                 var intelBtn = t.id ? '<button class="btn-filter" onclick="openTradePostmortem('+Number(t.id)+')">PM</button>' : '<span class="text-muted">-</span>';
@@ -643,7 +690,7 @@
 
         function renderBlockedTable(arr) {
             var b=document.getElementById('blocked-table-body');
-            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="7" class="empty-state">No hay bloqueos registrados</td></tr>';return;}
+            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="7" class="empty-state"><strong>Sin bloqueos registrados</strong>Cuando un filtro vete una senal, veras aqui la razon exacta.</td></tr>';return;}
             b.innerHTML=arr.map(function(e){
                 var pr=e.prob_final!=null?Number(e.prob_final).toFixed(1)+'%':'-';
                 var et=e.event_type||'UNKNOWN', ec=et==='FILTER'?'badge-red':et==='MTF_VETO'?'badge-amber':et==='RANGE_VETO'?'badge-blue':'badge-amber';
@@ -677,7 +724,7 @@
 
         function renderExecTable(id, arr) {
             var b=document.getElementById(id);
-            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="5" class="empty-state" style="padding:12px;">Sin datos</td></tr>';return;}
+            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="5" class="empty-state" style="padding:12px;"><strong>Sin cierres</strong>Los trades cerrados apareceran aqui con su razon de salida.</td></tr>';return;}
             b.innerHTML=arr.slice(0,25).map(function(t){
                 var r=t.reason||t.exit_reason||'OTHER';
                 return '<tr class="reason-row"><td class="font-bold text-theme">'+esc(t.symbol)+'</td><td class="text-dim">'+(t.entry_price?Number(t.entry_price).toFixed(6):'-')+'</td>'+
@@ -688,7 +735,7 @@
 
         function renderExitReasons(arr) {
             var el=document.getElementById('exit-reasons-body');
-            if(!arr||!arr.length){el.innerHTML='<div class="empty-state">Sin datos de salidas</div>';return;}
+            if(!arr||!arr.length){el.innerHTML='<div class="empty-state"><strong>Sin datos de salidas</strong>Espera cierres o ejecuta una revision de historial.</div>';return;}
             var h='<table><thead><tr><th>Razón</th><th>Total</th><th>Ganados</th><th>Perdidos</th><th>Win %</th><th>Avg PnL %</th></tr></thead><tbody>';
             arr.forEach(function(r){
                 var wr=r.count>0?(r.wins/r.count*100).toFixed(0):'0';
@@ -704,7 +751,7 @@
             if(!hasApiKey())return;
             fetch(API+'/equity',{headers:H}).then(function(r){if(!r.ok)return;r.json().then(function(d){
                 var pts=d.points||[];
-                if(pts.length<2){document.getElementById('equity-cards').innerHTML='<div class="empty-state">Datos insuficientes</div>';return;}
+                if(pts.length<2){document.getElementById('equity-cards').innerHTML='<div class="empty-state"><strong>Datos insuficientes</strong>La curva necesita al menos dos puntos de balance.</div>';return;}
                 var first=pts[0], last=pts[pts.length-1];
                 var minVal=Math.min.apply(Math,pts.map(function(p){return p.balance;}));
                 var maxVal=Math.max.apply(Math,pts.map(function(p){return p.balance;}));
@@ -783,14 +830,14 @@
             var clusters = focus.top_clusters || [];
             document.getElementById('intel-weekly-clusters').innerHTML = clusters.length ? clusters.map(function(c){
                 return '<span class="badge badge-blue" title="'+esc(c.label)+'">'+esc(c.label).slice(0,32)+' · '+Number(c.count||0)+'</span>';
-            }).join('') : '<span class="text-xs text-muted">Sin clusters</span>';
+            }).join('') : '<span class="text-xs text-muted">Sin clusters; genera intelligence cuando haya mas historial.</span>';
 
             document.getElementById('intel-advisories').innerHTML = advisories.length ? advisories.map(function(a){
                 return '<div class="p-2.5 rounded-xl border border-theme bg-inset">'+
                     '<div class="flex items-center justify-between gap-2 mb-1"><span class="badge badge-amber">'+esc(a.advisory_type)+'</span><span class="text-[10px] text-muted">'+esc(fmtTs(a.created_at))+'</span></div>'+
                     '<div class="text-sm text-theme">'+esc(a.summary||'')+'</div>'+
                 '</div>';
-            }).join('') : '<div class="empty-state">Sin advisories persistidos</div>';
+            }).join('') : '<div class="empty-state"><strong>Sin advisories</strong>Usa Generar para crear una recomendacion consultiva con el estado actual.</div>';
 
             document.getElementById('intel-annotations').innerHTML = annotations.length ? annotations.map(function(a){
                 return '<div class="p-2.5 rounded-xl border border-theme bg-inset">'+
@@ -798,7 +845,7 @@
                     '<div class="text-[11px] text-dim mb-1">'+esc(a.context_label)+' / '+esc(a.risk_label)+'</div>'+
                     '<div class="text-sm text-theme">'+esc(a.narrative||'')+'</div>'+
                 '</div>';
-            }).join('') : '<div class="empty-state">Sin anotaciones recientes</div>';
+            }).join('') : '<div class="empty-state"><strong>Sin anotaciones recientes</strong>Las notas aparecen despues de nuevos trades o ciclos intelligence.</div>';
         }
 
         function fetchPostmortem() {

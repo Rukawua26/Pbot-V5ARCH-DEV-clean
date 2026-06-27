@@ -1,5 +1,9 @@
 # AGENTS
 
+## Knowledge Base
+- Nota de proyecto en `~/docs/agent-context/summaries/pbot.md` (con YAML frontmatter y wikilinks).
+- MOC central: `~/docs/_MOC.md`.
+
 ## Fuentes De Verdad
 
 - Bot de trading Binance Futures con modos `PAPER`, `SHADOW` y `REAL`; cambios en ejecución, órdenes, posiciones, wallet sync, reconciliación, watchdog, recovery, `HALT` o stop loss son runtime crítico.

@@ -6,6 +6,7 @@ from collections import deque
 from config import Config
 from core.cooldown_state import load_cooldowns
 from core.execution_runtime_state import load_execution_runtime_state
+from core.providers.global_market import GlobalMarketProvider
 from core.time_utils import monotonic_now
 
 
@@ -136,6 +137,10 @@ def init_realtime_and_monitoring(
         cvd_window_seconds=int(getattr(Config, "CVD_WINDOW_SECONDS", 300)),
     )
     bot.ws_manager.start_background()
+
+    bot.global_market_provider = GlobalMarketProvider()
+    bot.global_market_provider.start()
+    bot.global_market_cache = {}
 
     if ml_monitor_available and ml_monitor_cls is not None:
         bot.ml_monitor = ml_monitor_cls("models")

@@ -206,6 +206,13 @@ def run_market_context_cycle(bot, tickers):
         bot.log(f"⚠️ Error en Radar de Sentimiento: {error}")
         bot.log(f"📋 Traceback: {traceback.format_exc(limit=3)}")
 
+    # --- Global market metrics (satellite, fail-silent) ---
+    try:
+        if hasattr(bot, "global_market_provider") and bot.global_market_provider.enabled:
+            bot.global_market_cache = bot.global_market_provider.fetch_global_metrics()
+    except Exception:
+        bot.log("⚠️ GlobalMarketProvider fetch falló (fail-silent)")
+
     return pnl_real_hoy
 
 

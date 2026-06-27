@@ -902,14 +902,14 @@ def execute_order(
             bot.last_shadow_signal_ts = time.time()
 
         with bot.lock:
-            if is_shadow and clean_snapshot:
+            if clean_snapshot:
                 try:
                     bot.brain.save_trade_context_snapshot(
                         symbol=symbol,
                         side=side,
                         context_json=clean_snapshot,
                         entry_timestamp=utc_now_iso(),
-                        is_shadow=True,
+                        is_shadow=is_shadow,
                     )
                 except Exception as ctx_error:
                     bot.log(f"⚠️ Error guardando trade context snapshot: {ctx_error}")

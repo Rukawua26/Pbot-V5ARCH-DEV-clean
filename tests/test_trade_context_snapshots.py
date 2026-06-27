@@ -174,10 +174,10 @@ class TradeContextSnapshotsTest(unittest.TestCase):
         deleted = self.brain.cleanup_stale_snapshots(max_age_days=30)
         self.assertGreaterEqual(deleted, 1)
 
-    def test_extract_similarity_vector_returns_11_features(self):
+    def test_extract_similarity_vector_returns_15_features(self):
         ctx = self._fake_context()
         vec = self.brain._extract_similarity_vector(ctx)
-        self.assertEqual(len(vec), 11)
+        self.assertEqual(len(vec), 15)
 
 
 if __name__ == "__main__":

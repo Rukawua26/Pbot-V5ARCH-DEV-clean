@@ -36,3 +36,72 @@ FVG Tracker ya implementado. Pendiente:
 4. Si solo genera ruido, mantener como herramienta observacional.
 
 Criterio de exito: informacion incremental medible sobre trades existentes. Sin evidencia, no integrar al Risk Engine ni a ejecucion.
+
+### 2. Global Market Provider (CoinGecko REST) — IMPLEMENTADO
+
+Satelite read-only en `core/providers/global_market.py`. Inyecta 7 campos macro en `ctx`:
+- `btc_dominance`, `eth_dominance`, `total_market_cap`, `total_volume_24h`
+- `fear_greed_index`, `active_cryptos`, `trending_coins`
+
+Flags: `GLOBAL_MARKET_PROVIDER_ENABLED`, `GLOBAL_MARKET_CACHE_TTL`, `GLOBAL_MARKET_USE_MCP`.
+
+Pendiente:
+1. Activar `GLOBAL_MARKET_PROVIDER_ENABLED=true` en PAPER o SHADOW.
+2. Revisar calidad de datos: CoinGecko gratis tiene rate limit, validar que no haya huecos.
+3. Si se necesita MCP, implementar `_fetch_from_mcp()` en el provider.
+
+### 3. Filtros Macro-Reactivos — IMPLEMENTADO
+
+Veto/boost en `core/signals/filters.py` basado en Fear & Greed y BTC dominance.
+Flags: `GLOBAL_FEAR_GREED_FILTER_ENABLED`, `GLOBAL_BTC_DOM_FILTER_ENABLED`,
+`GLOBAL_FEAR_VETO_THRESHOLD`, `GLOBAL_BTC_DOM_BOOST_THRESHOLD`.
+
+Pendiente:
+1. Validar en PAPER/SHADOW que los thresholds actuales (fear<20 veto, dom>65% boost) sean óptimos.
+2. Añadir más reglas: total_market_cap drop % veto, eth_dominance altseason boost.
+
+### 4. Auto-Replication de Estrategias Ganadoras — PENDIENTE (Futuro)
+
+Cuando el RAG detecte que las condiciones actuales tienen ≥90% de similitud con 3+ trades ganadores,
+ejecutar automáticamente la señal en SHADOW (sin esperar consenso ML completo).
+
+Estado: NO implementado. Requiere datos suficientes en `trade_context_snapshots` primero.
+
+Pasos:
+1. Recolectar datos SHADOW con Fase 1 y 3 activas por al menos 1 semana.
+2. Validar que los vectores de similitud con macro (btc_dominance, fear_greed) mejoran la correlación.
+3. Implementar bloque en `core/trade_entry.py` post-similarity-search.
+4. Restringir a SHADOW inicialmente (`REPLICATION_MODE=shadow`).
+5. Flags: `REPLICATION_ENABLED`, `REPLICATION_MIN_WINNERS`, `REPLICATION_MIN_SIMILARITY`.
+
+Criterio de exito: winrate > 65% en trades replicados vs ~50% baseline, con al menos 20 muestras.
+
+### 5. Dashboard API — SNIPER_API_KEY requerida
+
+`tools/dashboard_api_server.py` requiere `SNIPER_API_KEY` con al menos 16 caracteres para iniciar.
+Si no esta configurada, el dashboard API lanza warning pero el bot sigue operando normal.
+
+Pendiente:
+1. Definir `SNIPER_API_KEY` segura en `.env` si se va a usar el dashboard.
+2. Si el dashboard no se usa, evaluar flag para no iniciar el API y silenciar el warning.
+3. Documentar la variable en `.env.example` si aplica.
+
+Criterio de exito: bot arranca sin warning cuando dashboard esta habilitado, o dashboard queda apagado explicitamente cuando no se use.
+
+### 6. Direccion por Consenso de Agentes + Trailing Adaptativo — IMPLEMENTADO
+
+Cambios aplicados:
+1. `tools/strategy.py`: `_resolve_signal_from_agents()` permite que MT/SR/G reviertan la direccion EMA cuando hay consenso fuerte.
+2. `core/strategy/orchestrator.py`: `calculate_consensus()` devuelve `final_weights` para resolver direccion ponderada.
+3. `core/bot_guardian.py`: trailing adaptativo por regimen, mas permisivo en `RANGE`.
+4. `core/config/strategy.py`: trailing menos agresivo (`TRAILING_ACTIVATION_PNL=1.20`, `TRAILING_BREAKEVEN_PNL=3.0`, `TRAILING_BREAKEVEN_PULLBACK=2.0`).
+5. `core/config/manager.py`: flags `SIGNAL_AGENT_OVERRIDE_ENABLED`, `SIGNAL_AGENT_OVERRIDE_THRESHOLD`, `EXIT_RANGE_BREAKEVEN_PULLBACK_MULT`, `EXIT_RANGE_ACTIVATION_MULT`.
+
+Pendiente:
+1. Recolectar al menos 10 trades SHADOW cerrados post-cambio.
+2. Comparar contra baseline previo: 17 SHADOW trades, 35.3% WR, PnL total -12.17%.
+3. Medir si aparecen mas BUY utiles sin degradar proteccion macro BTC.
+4. Ajustar `SIGNAL_AGENT_OVERRIDE_THRESHOLD` si los agentes revierten demasiado o demasiado poco.
+5. Ajustar multiplicadores de trailing si las ganadoras siguen cerrando temprano.
+
+Criterio de exito: winrate SHADOW >45% y mejor relacion avg win/avg loss sin aumentar drawdown ni saltarse filtros macro.

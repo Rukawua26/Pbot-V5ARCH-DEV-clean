@@ -577,10 +577,10 @@ class Bot:
         )
 
     def _apply_entry_filters_and_adjust_prob(
-        self, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel
+        self, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel, votos=None
     ):
         return _apply_entry_filters_and_adjust_prob(
-            self, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel
+            self, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel, votos=votos
         )
 
     def _plan_execution_mode(

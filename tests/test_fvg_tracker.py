@@ -267,6 +267,58 @@ class TestFvgTrackerIntegration(unittest.TestCase):
         self.assertEqual(len(gaps), 1)
         self.assertEqual(gaps[0]["type"], "BULLISH_FVG")
 
+    def test_run_cycle_notifies_new_gap(self):
+        events = []
+        notifier = MagicMock()
+        notifier.notify.side_effect = lambda event, payload: events.append((event, payload))
+        tracker = FvgTracker(
+            enabled=True,
+            min_gap_pct=0.1,
+            telegram_alerts=False,
+            store_path=self.store_path,
+            notifier=notifier,
+        )
+        bot = MagicMock()
+        bot.live_prices = {"BTC/USDT": "100.0"}
+        bot.data_service.fetch_and_update_data.return_value = pd.DataFrame(
+            [
+                _candle(1000, 95, 100, 90, 98),
+                _candle(2000, 100, 104, 98, 103),
+                _candle(3000, 106, 110, 105, 109),
+            ]
+        )
+
+        tracker.run_cycle(bot)
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0][0], "fvg.gap_detected")
+        self.assertEqual(events[0][1]["symbol"], "BTC/USDT")
+        self.assertEqual(events[0][1]["type"], "BULLISH_FVG")
+
+    def test_notifier_failure_does_not_break_cycle(self):
+        notifier = MagicMock()
+        notifier.notify.side_effect = RuntimeError("boom")
+        tracker = FvgTracker(
+            enabled=True,
+            min_gap_pct=0.1,
+            telegram_alerts=False,
+            store_path=self.store_path,
+            notifier=notifier,
+        )
+        bot = MagicMock()
+        bot.live_prices = {"BTC/USDT": "100.0"}
+        bot.data_service.fetch_and_update_data.return_value = pd.DataFrame(
+            [
+                _candle(1000, 95, 100, 90, 98),
+                _candle(2000, 100, 104, 98, 103),
+                _candle(3000, 106, 110, 105, 109),
+            ]
+        )
+
+        tracker.run_cycle(bot)
+
+        self.assertEqual(len(tracker.get_active_gaps()), 1)
+
     def test_persistence_across_cycles(self):
         bot = MagicMock()
         bot.live_prices = {"BTC/USDT": "100.0"}

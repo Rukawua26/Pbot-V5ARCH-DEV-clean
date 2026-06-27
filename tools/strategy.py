@@ -34,6 +34,45 @@ except ImportError:
 logger = logging.getLogger("SniperAI")
 
 
+def _resolve_signal_from_agents(
+    votes: dict[str, float],
+    weights: dict[str, float],
+    base_trend: str,
+) -> str:
+    """Determina dirección de la señal por consenso de agentes.
+
+    Los agentes votan 0-100 (0=SELL extremo, 50=Neutral, 100=BUY extremo).
+    Se convierte cada voto a un score direccional (-100 a +100) centrado en 50,
+    se promedia ponderado usando los weights del régimen, y se compara contra
+    un threshold para decidir si revocar la dirección de la EMA.
+
+    Si los agentes no tienen consenso suficiente, se fallback a la EMA.
+    """
+    if not bool(getattr(Config, "SIGNAL_AGENT_OVERRIDE_ENABLED", True)):
+        return "BUY" if base_trend == "UP" else "SELL"
+
+    override_threshold = float(
+        getattr(Config, "SIGNAL_AGENT_OVERRIDE_THRESHOLD", 15.0)
+    )
+
+    # Convertir cada voto a dirección (-100 a +100)
+    directional: dict[str, float] = {}
+    for agent, vote in votes.items():
+        directional[agent] = (float(vote) - 50.0) * 2.0
+
+    # Promedio ponderado
+    weighted_dir = sum(
+        directional[a] * weights.get(a, 0.0) for a in votes
+    )
+
+    # Decidir dirección
+    if weighted_dir >= override_threshold:
+        return "BUY"
+    if weighted_dir <= -override_threshold:
+        return "SELL"
+    return "BUY" if base_trend == "UP" else "SELL"
+
+
 class Strategy:
     """
     [PUNTO DE ENTRADA ESTRATEGIA v118]
@@ -158,14 +197,14 @@ class Strategy:
             primary_ids=["MT", "SR", "G"],
         )
 
-        score_final, votos = cls._orchestrator.calculate_consensus(
+        score_final, votos, agent_weights = cls._orchestrator.calculate_consensus(
             context, agent_performances
         )
 
         # 6. Filtros finales (Sello Institucional 1H)
         score_final = max(0.0, min(100.0, score_final))
 
-        signal = "BUY" if base_trend == "UP" else "SELL"
+        signal = _resolve_signal_from_agents(votos, agent_weights, base_trend)
 
         # Veto direccional macro 4H (duro, no suma puntaje)
         macro_veto_reason = None

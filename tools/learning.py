@@ -3048,6 +3048,10 @@ class Brain:
                 max(-1.0, min(1.0, float(context.get("funding_rate", 0.0)) * 100.0)),
                 float(context.get("heuristic_confidence", 50.0)) / 100.0,
                 min(float(context.get("spread", 0.0)) * 1000.0, 1.0),
+                min(float(context.get("btc_dominance", 0.0)) / 100.0, 1.0),
+                min(float(context.get("eth_dominance", 0.0)) / 100.0, 1.0),
+                float(context.get("fear_greed_index", 50.0)) / 100.0,
+                min(float(context.get("total_market_cap", 0.0)) / 5e12, 1.0),
             ]
         except Exception:
             return []

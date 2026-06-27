@@ -450,17 +450,25 @@ def run_guardian_loop(bot):
                     # PARÁMETROS UNIFICADOS: Trailing basado en ATR dinámico
                     # [v119] Trailing activo cuando PnL >= 2.0x ATR (antes 0.8% fijo)
                     trailing_activation_atr = Config.ATR_TP1_MULTIPLIER  # 2.0x ATR
+                    regime = getattr(bot, "market_regime", "RANGE") or "RANGE"
+                    range_mult = float(
+                        getattr(Config, "EXIT_RANGE_ACTIVATION_MULT", 1.5)
+                        if regime == "RANGE"
+                        else 1.0
+                    )
                     if trailing_activation_atr > 0:
                         entry_atr = float(t.get("entry_atr", 0) or 0)
                         entry_price = float(t.get("entry", 0) or 0)
                         if entry_atr > 0 and entry_price > 0:
                             trailing_pnl_pct = (
-                                entry_atr * trailing_activation_atr / entry_price
-                            ) * 100
+                                (entry_atr * trailing_activation_atr / entry_price)
+                                * 100
+                                * range_mult
+                            )
                         else:
-                            trailing_pnl_pct = Config.TRAILING_ACTIVATION_PNL
+                            trailing_pnl_pct = Config.TRAILING_ACTIVATION_PNL * range_mult
                     else:
-                        trailing_pnl_pct = Config.TRAILING_ACTIVATION_PNL
+                        trailing_pnl_pct = Config.TRAILING_ACTIVATION_PNL * range_mult
 
                     if t["pnl"] >= trailing_pnl_pct:
                         t["trailing_active"] = True
@@ -687,14 +695,24 @@ def run_guardian_loop(bot):
                             trail_distance = Config.TRAILING_ACTIVATION_PNL
 
                     # Usamos Config.TRAILING_ACTIVATION_PNL para consistencia
+                    effective_pullback = Config.TRAILING_BREAKEVEN_PULLBACK
+                    if regime == "RANGE":
+                        effective_pullback *= float(
+                            getattr(Config, "EXIT_RANGE_BREAKEVEN_PULLBACK_MULT", 2.0)
+                        )
+                    effective_activation = Config.TRAILING_ACTIVATION_PNL
+                    if regime == "RANGE":
+                        effective_activation *= float(
+                            getattr(Config, "EXIT_RANGE_ACTIVATION_MULT", 1.5)
+                        )
                     if (
                         t["pnl"] <= (t.get("peak_pnl", 0) - trail_distance)
-                        and t["pnl"] > Config.TRAILING_ACTIVATION_PNL
+                        and t["pnl"] > effective_activation
                     ):
                         bot.close_trade(s, "Trailing (ATR)", t["last_price"])
                     # NUEVO: Protección de breakeven para trades con buen profit
                     if t["pnl"] > Config.TRAILING_BREAKEVEN_PNL and t["pnl"] <= (
-                        t.get("peak_pnl", 0) - Config.TRAILING_BREAKEVEN_PULLBACK
+                        t.get("peak_pnl", 0) - effective_pullback
                     ):
                         bot.close_trade(
                             s,

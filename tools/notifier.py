@@ -9,6 +9,7 @@ import threading
 import queue
 import itertools
 from enum import Enum
+from collections.abc import Callable
 from config import Config
 from core.telegram_api import sanitize_telegram_error, telegram_post
 
@@ -19,6 +20,26 @@ class Priority(Enum):
     WARNING = 3
     ERROR = 4
     CRITICAL = 5
+
+
+NotificationCallback = Callable[[str, dict], None]
+
+
+class SatelliteNotifier:
+    """Callback notifier for read-only satellite modules."""
+
+    def __init__(self, callbacks=None):
+        self._callbacks: list[NotificationCallback] = list(callbacks or [])
+
+    def register(self, callback: NotificationCallback) -> None:
+        self._callbacks.append(callback)
+
+    def notify(self, event: str, payload: dict) -> None:
+        for callback in list(self._callbacks):
+            try:
+                callback(event, dict(payload))
+            except Exception:
+                continue
 
 
 class NotificationQueue:

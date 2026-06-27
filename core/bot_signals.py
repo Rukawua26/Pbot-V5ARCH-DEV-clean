@@ -199,6 +199,7 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
                     prob_final=prob_final,
                     ctx=ctx,
                     vol_rel=vol_rel,
+                    votos=votos,
                 )
             )
 

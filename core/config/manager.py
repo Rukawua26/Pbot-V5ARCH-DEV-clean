@@ -161,6 +161,15 @@ class Config(OperationalConfig, StrategyConfig):
 
     # --- Exit Engine v118 (dinámico) ---
     EXIT_ENGINE_V1_ENABLED = _env_bool("EXIT_ENGINE_V1_ENABLED", True)
+
+    # --- Agent Direction Override ---
+    SIGNAL_AGENT_OVERRIDE_ENABLED = _env_bool("SIGNAL_AGENT_OVERRIDE_ENABLED", True)
+    SIGNAL_AGENT_OVERRIDE_THRESHOLD = _env_float("SIGNAL_AGENT_OVERRIDE_THRESHOLD", 15.0)
+
+    # --- Regime-Adaptive Trailing ---
+    EXIT_RANGE_BREAKEVEN_PULLBACK_MULT = _env_float("EXIT_RANGE_BREAKEVEN_PULLBACK_MULT", 2.0)
+    EXIT_RANGE_ACTIVATION_MULT = _env_float("EXIT_RANGE_ACTIVATION_MULT", 1.5)
+
     EXIT_TIME_DECAY_BARS = _env_int("EXIT_TIME_DECAY_BARS", 4)
     EXIT_ESCAPE_VELOCITY_PCT = _env_float("EXIT_ESCAPE_VELOCITY_PCT", 0.2)
     EXIT_STRUCTURAL_ATR_BUFFER = _env_float("EXIT_STRUCTURAL_ATR_BUFFER", 0.25)
@@ -176,6 +185,25 @@ class Config(OperationalConfig, StrategyConfig):
     EXIT_BREAKEVEN_LOCK_PCT = _env_float("EXIT_BREAKEVEN_LOCK_PCT", 0.1)
     EXIT_FLAT_TIME_DECAY_BARS = _env_int("EXIT_FLAT_TIME_DECAY_BARS", 3)
     EXIT_FLAT_TIME_DECAY_ATR_MULT = _env_float("EXIT_FLAT_TIME_DECAY_ATR_MULT", 0.5)
+
+    # --- Global Market Provider (CoinGecko/CoinCap satélite read-only) ---
+    GLOBAL_MARKET_PROVIDER_ENABLED = _env_bool("GLOBAL_MARKET_PROVIDER_ENABLED", False)
+    GLOBAL_MARKET_CACHE_TTL = _env_int("GLOBAL_MARKET_CACHE_TTL", 300)
+    GLOBAL_MARKET_USE_MCP = _env_bool("GLOBAL_MARKET_USE_MCP", False)
+
+    # --- Global Market Filters (macro veto/boost en señales) ---
+    GLOBAL_FEAR_GREED_FILTER_ENABLED = _env_bool("GLOBAL_FEAR_GREED_FILTER_ENABLED", True)
+    GLOBAL_BTC_DOM_FILTER_ENABLED = _env_bool("GLOBAL_BTC_DOM_FILTER_ENABLED", True)
+    GLOBAL_FEAR_VETO_THRESHOLD = _env_int("GLOBAL_FEAR_VETO_THRESHOLD", 20)
+    GLOBAL_BTC_DOM_BOOST_THRESHOLD = _env_float("GLOBAL_BTC_DOM_BOOST_THRESHOLD", 65.0)
+
+    # --- Side Quality Parity Filter ---
+    SIDE_PARITY_FILTER_ENABLED = _env_bool("SIDE_PARITY_FILTER_ENABLED", True)
+    SIDE_PARITY_MIN_ADX = _env_float("SIDE_PARITY_MIN_ADX", 25.0)
+    SIDE_PARITY_MIN_VOL_REL = _env_float("SIDE_PARITY_MIN_VOL_REL", 0.30)
+    SIDE_PARITY_RANGE_BUY_MAX_RSI = _env_float("SIDE_PARITY_RANGE_BUY_MAX_RSI", 60.0)
+    SIDE_PARITY_RANGE_SELL_MIN_RSI = _env_float("SIDE_PARITY_RANGE_SELL_MIN_RSI", 40.0)
+    SIDE_PARITY_MIN_AGENT_SUPPORT = _env_int("SIDE_PARITY_MIN_AGENT_SUPPORT", 2)
 
     # --- FVG / Gap Tracker (satélite read-only) ---
     FVG_TRACKER_ENABLED = _env_bool("FVG_TRACKER_ENABLED", False)

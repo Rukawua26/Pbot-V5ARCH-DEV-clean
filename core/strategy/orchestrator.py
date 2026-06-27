@@ -170,8 +170,12 @@ class StrategyOrchestrator:
         self,
         context: dict[str, Any],
         agent_performances: dict[str, float] | None = None,
-    ) -> tuple[float, dict[str, float]]:
-        """Ejecuta los 3 agentes, aplica pesos y consenso neuronal."""
+    ) -> tuple[float, dict[str, float], dict[str, float]]:
+        """Ejecuta los 3 agentes, aplica pesos y consenso neuronal.
+
+        Returns:
+            (p_final, votes, final_weights)
+        """
         votes: dict[str, float] = {}
 
         # Ejecución de agentes
@@ -227,4 +231,4 @@ class StrategyOrchestrator:
             if regime in ("RANGE", "BEAR_TREND"):
                 p_final *= 0.95  # 5% penalización sin breakout confirmado
 
-        return float(p_final), votes
+        return float(p_final), votes, final_weights

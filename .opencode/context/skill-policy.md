@@ -11,5 +11,8 @@ Skill triggers:
 - `repo-validation`: before closing a task, when validation is requested, or when choosing test commands.
 - `python-testing`: when creating, changing, or reviewing tests.
 - `opencode-customization`: `.opencode/`, `opencode.json`, agents, skills, plugins, MCP, or permission rules.
+- `code-simplification`: removing dead code, unused imports, orphaned files, simplifying logic without behavior change.
+- `debugging-and-error-recovery`: test failures, build breaks, runtime errors, unexpected behavior in the trading bot.
+- `code-review-and-quality`: before merging changes, multi-axis review (correctness, readability, architecture, security, performance).
 
 Keep skill files short. Move stable reference material to `.opencode/context/` instead of expanding skill bodies.

@@ -281,7 +281,7 @@ class StrategyOrchestratorCoverageTest(unittest.TestCase):
         orch.consensus_nn = SimpleNamespace(predict=MagicMock(return_value=(0.9, 0.8)))
 
         with patch("core.strategy.orchestrator.shadow_logger.log") as mock_log:
-            score, votes = orch.calculate_consensus(
+            score, votes, agent_weights = orch.calculate_consensus(
                 {"symbol": "BTC", "regime": "RANGE", "adx": 25, "rsi": 50, "breakout_ready": False}
             )
 
