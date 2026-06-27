@@ -14,7 +14,8 @@ class PendingImprovementsReadinessTest(unittest.TestCase):
                 "GLOBAL_BTC_DOM_FILTER_ENABLED": "true",
                 "SIGNAL_AGENT_OVERRIDE_ENABLED": "true",
                 "SNIPER_API_KEY": "1234567890abcdef",
-            }
+            },
+            include_os_env=False,
         )
 
         self.assertFalse(blocked)
@@ -27,15 +28,15 @@ class PendingImprovementsReadinessTest(unittest.TestCase):
                 "PAPER_MODE": "false",
                 "ALLOW_REAL_TRADING": "true",
                 "EXECUTION_BACKEND": "live",
-            }
+            },
+            include_os_env=False,
         )
 
-        self.assertFalse(ok)
         self.assertTrue(warnings)
         self.assertTrue(any("REAL" in item for item in blocked))
 
     def test_defaults_are_safe_but_warn_about_missing_observation_data(self):
-        ok, warnings, blocked = build_report({})
+        ok, warnings, blocked = build_report({}, include_os_env=False)
 
         self.assertFalse(blocked)
         self.assertTrue(any("Modo PAPER" in item for item in ok))

@@ -6,7 +6,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -23,29 +22,51 @@ def _load_dotenv(path: Path) -> dict[str, str]:
     return values
 
 
-def _env_value(env: dict[str, str], key: str, default: str = "") -> str:
-    return str(env.get(key, os.getenv(key, default)))
+def _env_value(
+    env: dict[str, str], key: str, default: str = "", *, include_os_env: bool = True
+) -> str:
+    if key in env:
+        return str(env[key])
+    if include_os_env:
+        return str(os.getenv(key, default))
+    return default
 
 
-def _env_bool(env: dict[str, str], key: str, default: bool) -> bool:
-    raw = _env_value(env, key, "true" if default else "false").strip().lower()
+def _env_bool(
+    env: dict[str, str], key: str, default: bool, *, include_os_env: bool = True
+) -> bool:
+    raw = _env_value(
+        env, key, "true" if default else "false", include_os_env=include_os_env
+    ).strip().lower()
     return raw in {"1", "true", "yes", "y", "on"}
 
 
-def build_report(env: dict[str, str]) -> tuple[list[str], list[str], list[str]]:
+def build_report(
+    env: dict[str, str], *, include_os_env: bool = True
+) -> tuple[list[str], list[str], list[str]]:
     ok: list[str] = []
     warnings: list[str] = []
     blocked: list[str] = []
 
-    paper_mode = _env_bool(env, "PAPER_MODE", True)
-    allow_real = _env_bool(env, "ALLOW_REAL_TRADING", False)
-    execution_backend = _env_value(env, "EXECUTION_BACKEND", "live")
-    fvg_enabled = _env_bool(env, "FVG_TRACKER_ENABLED", False)
-    global_market_enabled = _env_bool(env, "GLOBAL_MARKET_PROVIDER_ENABLED", False)
-    fear_filter_enabled = _env_bool(env, "GLOBAL_FEAR_GREED_FILTER_ENABLED", True)
-    btc_dom_filter_enabled = _env_bool(env, "GLOBAL_BTC_DOM_FILTER_ENABLED", True)
-    override_enabled = _env_bool(env, "SIGNAL_AGENT_OVERRIDE_ENABLED", True)
-    api_key = _env_value(env, "SNIPER_API_KEY", "")
+    paper_mode = _env_bool(env, "PAPER_MODE", True, include_os_env=include_os_env)
+    allow_real = _env_bool(env, "ALLOW_REAL_TRADING", False, include_os_env=include_os_env)
+    execution_backend = _env_value(
+        env, "EXECUTION_BACKEND", "live", include_os_env=include_os_env
+    )
+    fvg_enabled = _env_bool(env, "FVG_TRACKER_ENABLED", False, include_os_env=include_os_env)
+    global_market_enabled = _env_bool(
+        env, "GLOBAL_MARKET_PROVIDER_ENABLED", False, include_os_env=include_os_env
+    )
+    fear_filter_enabled = _env_bool(
+        env, "GLOBAL_FEAR_GREED_FILTER_ENABLED", True, include_os_env=include_os_env
+    )
+    btc_dom_filter_enabled = _env_bool(
+        env, "GLOBAL_BTC_DOM_FILTER_ENABLED", True, include_os_env=include_os_env
+    )
+    override_enabled = _env_bool(
+        env, "SIGNAL_AGENT_OVERRIDE_ENABLED", True, include_os_env=include_os_env
+    )
+    api_key = _env_value(env, "SNIPER_API_KEY", "", include_os_env=include_os_env)
 
     if paper_mode:
         ok.append("Modo PAPER activo: seguro para observacion sin capital real.")
