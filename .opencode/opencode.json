@@ -28,7 +28,10 @@
     "bash": {
       "*": "ask",
       "git status": "allow",
-      "git diff*": "allow",
+      "git diff": "allow",
+      "git diff --stat": "allow",
+      "git diff --check": "allow",
+      "git diff --cached": "allow",
       "git log*": "allow",
       "./.venv/bin/python -m compileall*": "allow",
       "./.venv/bin/python tools/check_no_silent_pass.py": "allow",
