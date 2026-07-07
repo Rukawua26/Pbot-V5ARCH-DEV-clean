@@ -416,6 +416,36 @@ def _apply_entry_filters_and_adjust_prob(
     ctx["regime_weight"] = regime_weight
     ctx["regime_reason"] = regime_reason
 
+    # [HURST] Ajuste por memoria de mercado en la probabilidad de señal
+    hurst_value = ctx.get("hurst") if isinstance(ctx, dict) else None
+    if filter_passed and hurst_value is not None and bool(getattr(Config, "HURST_ENABLED", True)):
+        persistent_th = float(getattr(Config, "HURST_PERSISTENT_THRESHOLD", 0.55))
+        antipersistent_th = float(getattr(Config, "HURST_ANTIPERSISTENT_THRESHOLD", 0.45))
+        aligned_boost = float(getattr(Config, "HURST_ALIGNED_BOOST", 1.05))
+        counter_penalty = float(getattr(Config, "HURST_COUNTER_PENALTY", 0.90))
+        random_penalty = float(getattr(Config, "HURST_RANDOM_PENALTY", 0.95))
+
+        if hurst_value >= persistent_th:
+            if (audit_signal == "BUY" and btc_regime in ("BULL_TREND", "BULL_STRONG")) or (
+                audit_signal == "SELL" and btc_regime in ("BEAR_TREND", "BEAR_STRONG")
+            ):
+                prob_final = min(100.0, prob_final * aligned_boost)
+                ctx["hurst_boost"] = "PERSISTENT_ALIGNED"
+                bot.log(f"📈 {symbol}: Hurst persistente + régimen alineado → x{aligned_boost:.2f}")
+            else:
+                prob_final = max(0.0, prob_final * counter_penalty)
+                ctx["hurst_boost"] = "PERSISTENT_COUNTER"
+                bot.log(f"⚠️ {symbol}: Hurst persistente + contra-régimen → x{counter_penalty:.2f}")
+        elif hurst_value <= antipersistent_th:
+            if btc_regime == "RANGE":
+                prob_final = min(100.0, prob_final * aligned_boost)
+                ctx["hurst_boost"] = "ANTIPERSISTENT_RANGE"
+                bot.log(f"📈 {symbol}: Hurst antipersistente + RANGE → x{aligned_boost:.2f}")
+        else:
+            prob_final = max(0.0, prob_final * random_penalty)
+            ctx["hurst_boost"] = "RANDOM_PENALTY"
+            bot.log(f"⚠️ {symbol}: Hurst aleatorio (H≈0.5) → x{random_penalty:.2f}")
+
     allow_range_learning = range_veto and (
         bool(getattr(Config, "PAPER_MODE", True)) or _is_shadow_learning_runtime(bot)
     )

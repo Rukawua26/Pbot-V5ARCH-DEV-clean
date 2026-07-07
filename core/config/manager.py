@@ -76,6 +76,21 @@ class Config(OperationalConfig, StrategyConfig):
         },
     }
 
+    # --- Hurst exponent regime controls ---
+    HURST_ENABLED = _env_bool("HURST_ENABLED", True)
+    HURST_WINDOW = _env_int("HURST_WINDOW", 128)
+    HURST_MAX_LAG = _env_int("HURST_MAX_LAG", 64)
+    HURST_MIN_LAG = _env_int("HURST_MIN_LAG", 10)
+    HURST_PERSISTENT_THRESHOLD = _env_float("HURST_PERSISTENT_THRESHOLD", 0.55)
+    HURST_ANTIPERSISTENT_THRESHOLD = _env_float("HURST_ANTIPERSISTENT_THRESHOLD", 0.45)
+    HURST_CLASSIFY_PERSISTENT = _env_float("HURST_CLASSIFY_PERSISTENT", 0.60)
+    HURST_CLASSIFY_ANTIPERSISTENT = _env_float("HURST_CLASSIFY_ANTIPERSISTENT", 0.40)
+    HURST_MT_BOOST = _env_float("HURST_MT_BOOST", 0.10)
+    HURST_SR_BOOST = _env_float("HURST_SR_BOOST", 0.10)
+    HURST_RANDOM_PENALTY = _env_float("HURST_RANDOM_PENALTY", 0.95)
+    HURST_ALIGNED_BOOST = _env_float("HURST_ALIGNED_BOOST", 1.05)
+    HURST_COUNTER_PENALTY = _env_float("HURST_COUNTER_PENALTY", 0.90)
+
     # --- HMM/Markov regime probability controls ---
     MARKOV_BREAKOUT_MIN = _env_float("MARKOV_BREAKOUT_MIN", 75.0)
     MARKOV_DEAD_ZONE_MAX = _env_float("MARKOV_DEAD_ZONE_MAX", 30.0)
@@ -308,6 +323,10 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append("SHADOW_MODE_MAX debe ser >= SHADOW_MODE_MIN")
         if float(cls.MAX_SLIPPAGE) < 0 or float(cls.MAX_SLIPPAGE) > 0.05:
             errors.append("MAX_SLIPPAGE debe estar entre 0 y 0.05")
+        if float(cls.MAX_ENTRY_SL_PCT) < 3.0:
+            errors.append("MAX_ENTRY_SL_PCT debe ser >= 3.0")
+        if float(cls.SHOCK_MIN_DIST_PCT) > 0.2:
+            errors.append("SHOCK_MIN_DIST_PCT debe ser <= 0.2")
         if float(cls.BTC_RISK_MAX_PRICE_AGE_SECONDS) <= 0:
             errors.append("BTC_RISK_MAX_PRICE_AGE_SECONDS debe ser positivo")
         if int(cls.HALT_RECOVERY_MAX_ATTEMPTS) < 1:

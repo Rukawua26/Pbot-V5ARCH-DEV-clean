@@ -1,17 +1,46 @@
 import unittest
+from contextlib import contextmanager
 
+from config import Config
 from core.config.operational import OperationalConfig
 from tools.strategy import Strategy
 
 
+@contextmanager
+def _guardrail_config(max_entry_sl_pct, sl_modifier):
+    original_operational_max = getattr(OperationalConfig, "MAX_ENTRY_SL_PCT", 3.0)
+    original_operational_sl = getattr(OperationalConfig, "STOP_LOSS_ATR_MODIFIER", 2.0)
+    original_config_attrs = {
+        "MAX_ENTRY_SL_PCT": (
+            "MAX_ENTRY_SL_PCT" in Config.__dict__,
+            Config.__dict__.get("MAX_ENTRY_SL_PCT"),
+        ),
+        "STOP_LOSS_ATR_MODIFIER": (
+            "STOP_LOSS_ATR_MODIFIER" in Config.__dict__,
+            Config.__dict__.get("STOP_LOSS_ATR_MODIFIER"),
+        ),
+    }
+
+    OperationalConfig.MAX_ENTRY_SL_PCT = max_entry_sl_pct
+    OperationalConfig.STOP_LOSS_ATR_MODIFIER = sl_modifier
+    Config.MAX_ENTRY_SL_PCT = max_entry_sl_pct
+    Config.STOP_LOSS_ATR_MODIFIER = sl_modifier
+
+    try:
+        yield
+    finally:
+        OperationalConfig.MAX_ENTRY_SL_PCT = original_operational_max
+        OperationalConfig.STOP_LOSS_ATR_MODIFIER = original_operational_sl
+        for name, (had_own_attr, original_value) in original_config_attrs.items():
+            if had_own_attr:
+                setattr(Config, name, original_value)
+            elif name in Config.__dict__:
+                delattr(Config, name)
+
+
 class EntryRiskGuardrailsTest(unittest.TestCase):
     def test_kava_veto_uses_configurable_max_entry_sl_pct(self):
-        original_max_entry_sl_pct = getattr(OperationalConfig, "MAX_ENTRY_SL_PCT", 1.2)
-        original_sl_modifier = getattr(OperationalConfig, "STOP_LOSS_ATR_MODIFIER", 1.5)
-        OperationalConfig.MAX_ENTRY_SL_PCT = 2.5
-        OperationalConfig.STOP_LOSS_ATR_MODIFIER = 1.5
-
-        try:
+        with _guardrail_config(max_entry_sl_pct=2.5, sl_modifier=1.5):
             passed, reason, *_ = Strategy.check_entry_filters(
                 rsi=55,
                 adx=25,
@@ -27,17 +56,9 @@ class EntryRiskGuardrailsTest(unittest.TestCase):
             )
             self.assertTrue(passed)
             self.assertEqual(reason, "Filter Pass (v118-PRO)")
-        finally:
-            OperationalConfig.MAX_ENTRY_SL_PCT = original_max_entry_sl_pct
-            OperationalConfig.STOP_LOSS_ATR_MODIFIER = original_sl_modifier
 
     def test_kava_veto_uses_runtime_sl_modifier_and_genes(self):
-        original_max_entry_sl_pct = getattr(OperationalConfig, "MAX_ENTRY_SL_PCT", 1.2)
-        original_sl_modifier = getattr(OperationalConfig, "STOP_LOSS_ATR_MODIFIER", 1.5)
-        OperationalConfig.MAX_ENTRY_SL_PCT = 1.2
-        OperationalConfig.STOP_LOSS_ATR_MODIFIER = 1.5
-
-        try:
+        with _guardrail_config(max_entry_sl_pct=1.2, sl_modifier=1.5):
             passed, reason, *_ = Strategy.check_entry_filters(
                 rsi=55,
                 adx=25,
@@ -55,17 +76,9 @@ class EntryRiskGuardrailsTest(unittest.TestCase):
             )
             self.assertTrue(passed)
             self.assertEqual(reason, "Filter Pass (v118-PRO)")
-        finally:
-            OperationalConfig.MAX_ENTRY_SL_PCT = original_max_entry_sl_pct
-            OperationalConfig.STOP_LOSS_ATR_MODIFIER = original_sl_modifier
 
     def test_kava_default_3_0_passes_sl_2_8(self):
-        original_max_entry_sl_pct = getattr(OperationalConfig, "MAX_ENTRY_SL_PCT", 3.0)
-        original_sl_modifier = getattr(OperationalConfig, "STOP_LOSS_ATR_MODIFIER", 2.0)
-        OperationalConfig.MAX_ENTRY_SL_PCT = 3.0
-        OperationalConfig.STOP_LOSS_ATR_MODIFIER = 2.0
-
-        try:
+        with _guardrail_config(max_entry_sl_pct=3.0, sl_modifier=2.0):
             passed, reason, *_ = Strategy.check_entry_filters(
                 rsi=55,
                 adx=25,
@@ -80,17 +93,9 @@ class EntryRiskGuardrailsTest(unittest.TestCase):
                 regime="DOWN",
             )
             self.assertTrue(passed)
-        finally:
-            OperationalConfig.MAX_ENTRY_SL_PCT = original_max_entry_sl_pct
-            OperationalConfig.STOP_LOSS_ATR_MODIFIER = original_sl_modifier
 
     def test_kava_default_3_0_vetoes_sl_over_3_0(self):
-        original_max_entry_sl_pct = getattr(OperationalConfig, "MAX_ENTRY_SL_PCT", 3.0)
-        original_sl_modifier = getattr(OperationalConfig, "STOP_LOSS_ATR_MODIFIER", 2.0)
-        OperationalConfig.MAX_ENTRY_SL_PCT = 3.0
-        OperationalConfig.STOP_LOSS_ATR_MODIFIER = 2.0
-
-        try:
+        with _guardrail_config(max_entry_sl_pct=3.0, sl_modifier=2.0):
             passed, reason, *_ = Strategy.check_entry_filters(
                 rsi=55,
                 adx=25,
@@ -106,6 +111,3 @@ class EntryRiskGuardrailsTest(unittest.TestCase):
             )
             self.assertFalse(passed)
             self.assertIn("VETO_KAVA", reason)
-        finally:
-            OperationalConfig.MAX_ENTRY_SL_PCT = original_max_entry_sl_pct
-            OperationalConfig.STOP_LOSS_ATR_MODIFIER = original_sl_modifier

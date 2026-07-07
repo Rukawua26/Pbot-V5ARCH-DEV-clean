@@ -46,6 +46,19 @@ class StrategyConfig:
     HMM_MIN_CONFIDENCE = 0.55
     HMM_RANGE_VETO = True
 
+    # --- Hurst exponent (manager.py prevalece por MRO) ---
+    HURST_ENABLED = True
+    HURST_WINDOW = 128
+    HURST_MAX_LAG = 64
+    HURST_MIN_LAG = 10
+    HURST_PERSISTENT_THRESHOLD = 0.55
+    HURST_ANTIPERSISTENT_THRESHOLD = 0.45
+    HURST_MT_BOOST = 0.10
+    HURST_SR_BOOST = 0.10
+    HURST_RANDOM_PENALTY = 0.95
+    HURST_ALIGNED_BOOST = 1.05
+    HURST_COUNTER_PENALTY = 0.90
+
     # Nota: HMM_RANGE_PENALTY está en manager.py como env (default 0.80).
     # El valor 0.5 aquí es legacy — manager.py prevalece por MRO.
 

@@ -13,7 +13,6 @@ import traceback
 import warnings
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
-from typing import Any
 
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
@@ -45,7 +44,7 @@ from core.bot_balance_ops import (
 from core.bot_balance_ops import (
     start_silent_sync as run_start_silent_sync,
 )
-from core.bot_cli_ops import prioritize_targets, terminal_command_listener
+from core.bot_cli_ops import terminal_command_listener
 from core.bot_connection import connect_to_binance
 from core.bot_consensus_display import (
     render_consensus_telemetry as show_consensus_telemetry,
@@ -73,9 +72,10 @@ from core.bot_io_loops import (
 )
 from core.bot_main_loop import run_main_logic
 from core.bot_maintenance import backup_database_placeholder, check_for_evolution
-from core.bot_market_state import detect_market_regime, warmup_hmm_regime
-from core.bot_misc_ops import (
-    get_vol_24h as resolve_vol_24h,
+from core.bot_market_state import (
+    detect_market_regime,
+    warmup_hmm_regime,
+    warmup_hurst,
 )
 from core.bot_misc_ops import (
     handle_command as dispatch_command,
@@ -91,23 +91,13 @@ from core.bot_ml_runtime import check_recent_mfe_health, init_ml_monitoring
 from core.bot_models_startup import init_models_and_startup_tasks
 from core.bot_pair_fetch import fetch_pair_data as run_fetch_pair_data
 from core.bot_performance_ops import (
-    get_ob_efficiency_report as build_ob_efficiency_report,
-)
-from core.bot_performance_ops import (
-    perform_healthcheck as run_healthcheck,
-)
-from core.bot_performance_ops import (
     update_dynamic_risk as run_update_dynamic_risk,
 )
 from core.bot_post_exit_analysis import calc_post_exit_drift, load_local_candles
 from core.bot_radar import update_radar as run_update_radar
 from core.bot_risk_cycles import run_btc_panic_cycle, run_crash_predictor_cycle
 from core.bot_runtime import run_bot_runtime_loop, run_initial_load
-from core.bot_runtime_monitor import (
-    append_runtime_metric,
-    get_rss_mb,
-    run_runtime_monitor_loop,
-)
+from core.bot_runtime_monitor import run_runtime_monitor_loop
 from core.bot_runtime_ops import (
     check_instinctive_safety as run_check_instinctive_safety,
 )
@@ -116,10 +106,7 @@ from core.bot_runtime_ops import (
     heartbeat_loop,
 )
 from core.bot_runtime_safety import check_safety_and_goals as evaluate_safety_and_goals
-from core.bot_scorecard import (
-    maybe_send_daily_exit_scorecard,
-    send_daily_exit_scorecard,
-)
+from core.bot_scorecard import maybe_send_daily_exit_scorecard
 from core.bot_shutdown import request_graceful_shutdown
 from core.bot_signals import run_signal_scan_cycle
 from core.bot_symbol_controls import (
@@ -222,6 +209,7 @@ class Bot:
         self._init_core_services_and_engines()
         self._init_runtime_state()
         self._warmup_hmm_regime()
+        self._warmup_hurst()
         self._init_realtime_and_monitoring()
         self._init_models_and_startup_tasks()
 
@@ -321,9 +309,6 @@ class Bot:
         base = clean_symbol.split("/")[0]
         return base
 
-    def _get_vol_24h(self, symbol, tickers):
-        return resolve_vol_24h(symbol, tickers)
-
     def _init_ml_monitoring(self):
         return self._delegate(init_ml_monitoring, ML_MONITOR_AVAILABLE)
 
@@ -343,12 +328,6 @@ class Bot:
         self.logs.append(msg)
         logger.info(msg)
 
-    def _get_rss_mb(self) -> float:
-        return self._delegate(get_rss_mb)
-
-    def _append_runtime_metric(self, payload: dict[str, Any]) -> None:
-        return self._delegate(append_runtime_metric, payload)
-
     def _runtime_monitor_loop(self):
         return self._delegate(run_runtime_monitor_loop)
 
@@ -360,6 +339,9 @@ class Bot:
 
     def _warmup_hmm_regime(self) -> bool:
         return self._delegate(warmup_hmm_regime)
+
+    def _warmup_hurst(self) -> bool:
+        return self._delegate(warmup_hurst)
 
     def connect(self):
         return self._delegate(connect_to_binance)
@@ -382,11 +364,6 @@ class Bot:
     def _guardian_loop(self):
         return self._delegate(run_guardian_loop)
 
-    def ai_coach_allows_escalation(self):
-        if self.current_sentiment[0] == "🔴 TENDENCIA BAJISTA":
-            return False
-        return True
-
     def check_safety_and_goals(self, current_pnl=None):
         return self._delegate(evaluate_safety_and_goals, current_pnl=current_pnl)
 
@@ -405,12 +382,6 @@ class Bot:
 
     def handle_reset_pnl(self):
         return self._delegate(run_handle_reset_pnl)
-
-    def perform_healthcheck(self):
-        return self._delegate(run_healthcheck)
-
-    def get_ob_efficiency_report(self):
-        return self._delegate(build_ob_efficiency_report)
 
     def check_weekly_schedule(self):
         return check_weekly_schedule(self, _module_available)
@@ -435,9 +406,6 @@ class Bot:
 
     def _perform_post_mortem(self):
         return self._delegate(perform_post_mortem)
-
-    def _prioritize_targets(self):
-        return self._delegate(prioritize_targets)
 
     def _load_runtime_symbol_controls(self):
         return self._delegate(load_runtime_symbol_controls)
@@ -465,9 +433,6 @@ class Bot:
 
     def _check_recent_mfe_health(self):
         return self._delegate(check_recent_mfe_health)
-
-    def _send_daily_exit_scorecard(self):
-        return self._delegate(send_daily_exit_scorecard)
 
     def _maybe_send_daily_exit_scorecard(self):
         return self._delegate(maybe_send_daily_exit_scorecard)
@@ -644,9 +609,6 @@ class Bot:
 
     def _main_logic(self):
         return run_main_logic(self)
-
-    def _perform_triage(self):
-        return self._get_active_market_snapshot()
 
     def save_cache(self, blocking=False):
         try:

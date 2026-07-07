@@ -1,3 +1,4 @@
+import logging
 import threading
 import time
 from datetime import UTC, datetime
@@ -5,12 +6,21 @@ from datetime import UTC, datetime
 import pandas as pd
 
 from config import Config
+
+logger = logging.getLogger("SniperAI")
+from core.strategy.hurst import HurstEstimator
 from core.strategy.regime_hmm import DynamicHMMRegime
 
 hmm_filter = DynamicHMMRegime(
     n_states=3,
     lookback_candles=int(getattr(Config, "HMM_LOOKBACK_CANDLES", 336)),
 )
+hurst_estimator = HurstEstimator(
+    window=int(getattr(Config, "HURST_WINDOW", 128)),
+    max_lag=int(getattr(Config, "HURST_MAX_LAG", 64)),
+    min_lag=int(getattr(Config, "HURST_MIN_LAG", 10)),
+)
+_hurst_cached_value: float | None = None
 _last_hmm_retrain_ts = 0.0
 _hmm_retrain_lock = threading.Lock()
 _hmm_retrain_in_progress = False
@@ -238,20 +248,93 @@ def _detect_market_regime_heuristic(bot, btc_data=None) -> str:
         return "RANGE"
 
 
+def warmup_hurst(bot) -> bool:
+    """Precompute Hurst exponent for BTC during bootstrap."""
+    global _hurst_cached_value
+    if not bool(getattr(Config, "HURST_ENABLED", True)):
+        _hurst_cached_value = None
+        return False
+    if _hurst_cached_value is not None:
+        return True
+
+    try:
+        data_service = getattr(bot, "data_service", None)
+        exchange = getattr(data_service, "exchange", None) if data_service else None
+        if exchange is None:
+            return False
+
+        btc_data = _get_cached_btc_1h(bot)
+        if btc_data is None or len(btc_data) < hurst_estimator.window:
+            ohlcv = exchange.fetch_ohlcv("BTC/USDT", "1h", limit=hurst_estimator.window * 2)
+            if hasattr(data_service, "_track_api_weight"):
+                data_service._track_api_weight("fetch_ohlcv", 1, "market")
+            if not ohlcv:
+                return False
+            columns = ["time", "open", "high", "low", "close", "volume"]
+            btc_data = pd.DataFrame(ohlcv, columns=columns)
+            if hasattr(data_service, "_clean_df"):
+                btc_data = data_service._clean_df(btc_data)
+
+        if btc_data is None or len(btc_data) < hurst_estimator.window:
+            return False
+
+        h = hurst_estimator.compute_from_df(btc_data)
+        _hurst_cached_value = h
+        bot.hurst_value = h
+        bot.hurst_classification = HurstEstimator.classify(h)
+        bot.log(
+            f"✅ Hurst warmup: H={h:.4f} ({bot.hurst_classification}) "
+            f"confianza={HurstEstimator.confidence(h):.2f}"
+        )
+        return True
+    except Exception as error:
+        bot.log(f"⚠️ Hurst warmup fallback: {error}")
+        _hurst_cached_value = None
+        return False
+
+
+def _compute_hurst_on_btc(bot, btc_data) -> float | None:
+    global _hurst_cached_value
+    if not bool(getattr(Config, "HURST_ENABLED", True)):
+        return None
+    try:
+        if btc_data is not None and len(btc_data) >= hurst_estimator.window:
+            h = hurst_estimator.compute_from_df(btc_data)
+            _hurst_cached_value = h
+            bot.hurst_value = h
+            bot.hurst_classification = HurstEstimator.classify(h)
+            return h
+    except Exception as error:
+        logger.debug("Hurst compute error (non-critical): %s", error)
+    return _hurst_cached_value
+
+
+def _ensure_btc_data(bot):
+    btc_data = _get_cached_btc_1h(bot)
+    if btc_data is None:
+        try:
+            btc_data = bot.data_service.fetch_and_update_data("BTC/USDT", "1h")
+        except Exception:
+            return None
+    return btc_data
+
+
 def detect_market_regime(bot) -> str:
     _load_persisted_hmm_snapshot_if_needed(bot)
+
     if not bool(getattr(Config, "HMM_REGIME_ENABLED", True)):
         regime = _detect_market_regime_heuristic(bot)
         bot.market_regime = regime
+        _compute_hurst_on_btc(bot, _get_cached_btc_1h(bot))
         return regime
 
+    btc_data = None
     try:
-        btc_data = _get_cached_btc_1h(bot)
-        if btc_data is None:
-            btc_data = bot.data_service.fetch_and_update_data("BTC/USDT", "1h")
+        btc_data = _ensure_btc_data(bot)
         if btc_data is None or len(btc_data) < 200:
             regime = _detect_market_regime_heuristic(bot, btc_data)
             bot.market_regime = regime
+            _compute_hurst_on_btc(bot, btc_data)
             return regime
 
         global _last_hmm_retrain_ts
@@ -264,6 +347,7 @@ def detect_market_regime(bot) -> str:
                     bot.log("⚠️ HMM regime fallback: reentrenamiento en progreso")
                 regime = _detect_market_regime_heuristic(bot, btc_data)
                 bot.market_regime = regime
+                _compute_hurst_on_btc(bot, btc_data)
                 return regime
 
         regime, confidence = hmm_filter.predict_regime(btc_data)
@@ -272,6 +356,7 @@ def detect_market_regime(bot) -> str:
             bot.log(f"⚠️ HMM regime fallback: regime={regime} confidence={confidence:.2f}")
             regime = _detect_market_regime_heuristic(bot, btc_data)
             bot.market_regime = regime
+            _compute_hurst_on_btc(bot, btc_data)
             return regime
 
         bot.market_regime_confidence = confidence
@@ -281,9 +366,13 @@ def detect_market_regime(bot) -> str:
             snapshot = hmm_filter.predict_markov_snapshot(btc_data)
             if isinstance(snapshot, dict) and snapshot.get("is_ready"):
                 _publish_hmm_snapshot(bot, snapshot)
+
+        _compute_hurst_on_btc(bot, btc_data)
+
         return regime
     except Exception as error:
         bot.log(f"⚠️ Error detecting HMM market regime: {error}")
         regime = _detect_market_regime_heuristic(bot)
         bot.market_regime = regime
+        _compute_hurst_on_btc(bot, btc_data)
         return regime

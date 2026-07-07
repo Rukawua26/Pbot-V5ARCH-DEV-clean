@@ -65,3 +65,17 @@ class ConfigPrecedenceTest(unittest.TestCase):
             Config.REAL_MODE_THRESHOLD = original_real
 
         self.assertTrue(any("SHADOW_MODE_MIN" in error for error in errors))
+
+    def test_config_validation_rejects_known_runtime_unsafe_thresholds(self):
+        original_max_entry_sl = Config.MAX_ENTRY_SL_PCT
+        original_shock_min_dist = Config.SHOCK_MIN_DIST_PCT
+        try:
+            Config.MAX_ENTRY_SL_PCT = 2.99
+            Config.SHOCK_MIN_DIST_PCT = 0.21
+            errors = Config.validate()
+        finally:
+            Config.MAX_ENTRY_SL_PCT = original_max_entry_sl
+            Config.SHOCK_MIN_DIST_PCT = original_shock_min_dist
+
+        self.assertTrue(any("MAX_ENTRY_SL_PCT" in error for error in errors))
+        self.assertTrue(any("SHOCK_MIN_DIST_PCT" in error for error in errors))

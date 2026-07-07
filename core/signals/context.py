@@ -88,6 +88,14 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
     if isinstance(hmm_snapshot, dict):
         ctx["hmm_data"] = hmm_snapshot
 
+    hurst_value = getattr(bot, "hurst_value", None)
+    if hurst_value is not None:
+        ctx["hurst"] = float(hurst_value)
+        ctx["hurst_class"] = str(getattr(bot, "hurst_classification", "UNKNOWN"))
+        from core.strategy.hurst import HurstEstimator
+
+        ctx["hurst_snapshot"] = HurstEstimator.to_snapshot(hurst_value)
+
     raw_log_count = int(getattr(bot, "_raw_snapshot_log_count", 0) or 0)
     if raw_log_count < 5:
         bot.log(

@@ -28,6 +28,13 @@ class StrategyOrchestrator:
 
     def __init__(self):
         self.adx_threshold = float(getattr(Config, "ADX_TREND_THRESHOLD", 20))
+        self.hurst_enabled = bool(getattr(Config, "HURST_ENABLED", True))
+        self.hurst_persistent_threshold = float(getattr(Config, "HURST_PERSISTENT_THRESHOLD", 0.55))
+        self.hurst_antipersistent_threshold = float(
+            getattr(Config, "HURST_ANTIPERSISTENT_THRESHOLD", 0.45)
+        )
+        self.hurst_mt_boost = float(getattr(Config, "HURST_MT_BOOST", 0.10))
+        self.hurst_sr_boost = float(getattr(Config, "HURST_SR_BOOST", 0.10))
         self.agents = {
             "MT": MTAgent(),
             "SR": SRAgent(),
@@ -118,11 +125,13 @@ class StrategyOrchestrator:
         agent_performances: dict[str, float] | None = None,
         adx: float | None = None,
         rsi: float | None = None,
+        hurst: float | None = None,
     ) -> dict[str, float]:
-        """Calcula los pesos finales basados en el régimen y rendimiento."""
+        """Calcula los pesos finales basados en el régimen, rendimiento y Hurst."""
         target_regime = regime if regime in self._base_weights else "RANGE"
         adx_value = float(adx) if adx is not None else None
         rsi_value = float(rsi) if rsi is not None else None
+        hurst_value = float(hurst) if hurst is not None else None
 
         weights = self._base_weights.get(target_regime, self._base_weights["RANGE"]).copy()
 
@@ -143,6 +152,15 @@ class StrategyOrchestrator:
             if rsi_value <= 35.0 or rsi_value >= 65.0:
                 weights["SR"] += 0.10
                 weights["MT"] = max(0.02, weights["MT"] - 0.03)
+
+        # [HURST] Ajuste dinámico por memoria de mercado
+        if self.hurst_enabled and hurst_value is not None:
+            if hurst_value >= self.hurst_persistent_threshold:
+                weights["MT"] += self.hurst_mt_boost
+                weights["SR"] = max(0.05, weights["SR"] - self.hurst_sr_boost * 0.5)
+            elif hurst_value <= self.hurst_antipersistent_threshold:
+                weights["SR"] += self.hurst_sr_boost
+                weights["MT"] = max(0.05, weights["MT"] - self.hurst_mt_boost * 0.5)
 
         weights = self._normalize_weights(weights)
 
@@ -190,7 +208,8 @@ class StrategyOrchestrator:
         regime = context.get("regime", "RANGE")
         adx = context.get("adx")
         rsi = context.get("rsi")
-        weights = self.get_adaptive_weights(regime, agent_performances, adx, rsi)
+        hurst = context.get("hurst")
+        weights = self.get_adaptive_weights(regime, agent_performances, adx, rsi, hurst)
 
         # Telemetría Asíncrona (Shadow Logging v118)
         shadow_logger.log(
