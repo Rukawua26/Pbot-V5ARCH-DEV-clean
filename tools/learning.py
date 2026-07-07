@@ -2110,7 +2110,7 @@ class Brain:
             return percent_real, usd_hoy
         except Exception as e:
             print(f"❌ Error obteniendo PnL diario: {e}")
-            return 0.0, 0.0
+            return None, None
 
     def get_weekly_stats(self):
         """Obtiene estadísticas de la semana actual (tendencia)."""

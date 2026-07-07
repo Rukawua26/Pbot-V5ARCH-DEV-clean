@@ -75,6 +75,10 @@ def _handle_audit_commands(bot, text: str) -> bool:
     if text == "/status":
         ai = bot.brain.get_ai_maturity()
         pnl_pct, pnl_usd = bot.brain.get_daily_real_pnl(bot.balance)
+        if pnl_pct is None:
+            pnl_pct = 0.0
+        if pnl_usd is None:
+            pnl_usd = 0.0
 
         exigencia_txt = "Normal"
         if bot.dynamic_offset > 0:

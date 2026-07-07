@@ -129,6 +129,8 @@ def run_triage_cycle(bot):
 def run_market_context_cycle(bot, tickers):
     base_bal = bot.daily_initial_balance if bot.daily_initial_balance > 0 else bot.balance
     pnl_real_hoy, _ = bot.brain.get_daily_real_pnl(base_bal)
+    if pnl_real_hoy is None:
+        pnl_real_hoy = 0.0
 
     ws_btc_price = 0.0
     ws_btc_age = float("inf")

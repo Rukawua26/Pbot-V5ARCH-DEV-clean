@@ -114,6 +114,83 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
     )
 
 
+def _tp1_reduce_confirmed(order: dict | None) -> bool:
+    if not isinstance(order, dict):
+        return False
+    exit_state = str(order.get("exit_state") or "").upper()
+    status = str(order.get("status") or "").lower()
+    return exit_state == "FILLED" or status in {"closed", "filled"}
+
+
+def _mark_tp1_local(bot, symbol: str, trade: dict) -> None:
+    trade_key = str(trade.get("trade_key") or symbol)
+    trade["tp1_triggered"] = True
+    trade["size_usd"] = float(trade.get("size_usd") or 0.0) * (1 - Config.TP1_PERCENT / 100)
+    trade["amount"] = float(trade.get("amount") or 0.0) * (1 - Config.TP1_PERCENT / 100)
+    with bot.db_lock:
+        bot.brain.save_active_trade_state(trade_key, trade)
+
+
+def _halt_tp1_ambiguous(bot, symbol: str, trade: dict, error: str) -> None:
+    trade_key = str(trade.get("trade_key") or symbol)
+    bot.is_paused = True
+    bot.integrity_lock_active = True
+    setattr(bot, "halt_system_active", True)
+    trade["status"] = "TP1_EXIT_AMBIGUOUS"
+    with bot.db_lock:
+        bot.brain.save_active_trade_state(trade_key, trade)
+    append_execution_event(bot, "TP1_EXIT_AMBIGUOUS_HALT", {"symbol": symbol, "error": error[:180]})
+    append_runtime_metric(
+        "halt", {"reason": "TP1_EXIT_AMBIGUOUS", "symbol": symbol, "error": error[:180]}
+    )
+    bot.log(f"🛑 TP1_EXIT_AMBIGUOUS {symbol}: {error}")
+
+
+def _handle_tp1(bot, symbol: str, trade: dict, current_price: float) -> bool:
+    """Handle TP1 partial close. Returns True when TP1 logic ran."""
+    if not Config.TP1_ENABLED or trade.get("tp1_triggered", False):
+        return False
+    if float(trade.get("pnl") or 0.0) < Config.TP1_LEVEL:
+        return False
+
+    close_amount_usd = float(trade.get("size_usd") or 0.0) * (Config.TP1_PERCENT / 100)
+    if close_amount_usd <= 0.0:
+        trade["tp1_triggered"] = True
+        return True
+
+    bot.log(f"🎯 TP1 HIT: {symbol} - Cerrando 50% @ +{Config.TP1_LEVEL}%")
+
+    if Config.PAPER_MODE or trade.get("is_shadow", False):
+        _mark_tp1_local(bot, symbol, trade)
+        return True
+
+    try:
+        params: dict[str, object] = {"reduceOnly": True}
+        if bot.is_hedge_mode:
+            params["positionSide"] = "LONG" if trade["side"] == "BUY" else "SHORT"
+        order = bot.execution.create_reduce_only_market_order(
+            symbol,
+            "SELL" if trade["side"] == "BUY" else "BUY",
+            close_amount_usd / current_price,
+            params=params,
+        )
+    except Exception as error:
+        _halt_tp1_ambiguous(bot, symbol, trade, str(error))
+        return True
+
+    if not _tp1_reduce_confirmed(order):
+        _halt_tp1_ambiguous(
+            bot,
+            symbol,
+            trade,
+            f"reduce-only TP1 not confirmed filled; status={(order or {}).get('status', 'N/A')}",
+        )
+        return True
+
+    _mark_tp1_local(bot, symbol, trade)
+    return True
+
+
 def run_guardian_loop(bot):
     bot.log("🛡️ Guardián OK.")
     last_heavy = 0.0
@@ -593,37 +670,11 @@ def run_guardian_loop(bot):
                         bot.close_trade(s, f"Hard SL ({max_loss}%)", curr)
                         continue
 
-                    # TP1: cerrar una fracción de la posición al primer objetivo.
-                    if Config.TP1_ENABLED and not t.get("tp1_triggered", False):
-                        if t["pnl"] >= Config.TP1_LEVEL:
-                            # Cerrar la fracción configurada del tamaño.
-                            close_amount = t.get("size_usd", 0) * (Config.TP1_PERCENT / 100)
-                            if close_amount > 0:
-                                bot.log(f"🎯 TP1 HIT: {s} - Cerrando 50% @ +{Config.TP1_LEVEL}%")
-                                # Cerrar posición parcial
-                                try:
-                                    params = {"reduceOnly": True}
-                                    if bot.is_hedge_mode:
-                                        params["positionSide"] = (
-                                            "LONG" if t["side"] == "BUY" else "SHORT"
-                                        )
-                                    bot.execution.create_reduce_only_market_order(
-                                        s,
-                                        "SELL" if t["side"] == "BUY" else "BUY",
-                                        close_amount / curr,
-                                        params=params,
-                                    )
-                                except Exception as e:
-                                    bot.log(f"⚠️ Error TP1: {e}")
-
-                                # [FIX v118] Marcar siempre como disparado para evitar bucles infinitos en errores de precisión/min_notional
-                                t["tp1_triggered"] = True
-                                t["size_usd"] = t.get("size_usd", 0) * (
-                                    1 - Config.TP1_PERCENT / 100
-                                )
-                                t["amount"] = t.get("amount", 0) * (1 - Config.TP1_PERCENT / 100)
-                            else:
-                                t["tp1_triggered"] = True
+                    _handle_tp1(bot, s, t, curr)
+                    if bool(getattr(bot, "halt_system_active", False)) or bool(
+                        getattr(bot, "integrity_lock_active", False)
+                    ):
+                        continue
 
                     # TP2: Cerrar resto a +2% con trailing
                     if (

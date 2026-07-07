@@ -7,7 +7,14 @@ def check_safety_and_goals(bot, current_pnl=None):
     _ = base_bal
 
     if current_pnl is None:
-        current_pnl = 0.0
+        activate_runtime_protection(
+            bot,
+            circuit_breaker=True,
+            log_message="🛑 Daily PnL no verificable. Proteccion runtime activada.",
+            reason="DAILY_PNL_UNVERIFIED",
+            source="runtime_safety",
+        )
+        return False
 
     if current_pnl > bot.peak_pnl:
         bot.peak_pnl = current_pnl

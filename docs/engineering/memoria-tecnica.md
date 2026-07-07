@@ -37,6 +37,38 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-06 - Fixes runtime criticos TP1, chase exit y daily drawdown
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/bot_guardian.py`: TP1 queda encapsulado en `_handle_tp1`; en `PAPER`/`SHADOW` solo simula estado local y nunca envia `create_reduce_only_market_order`.
+- `core/bot_guardian.py`: en `REAL`, TP1 solo reduce `amount`/`size_usd` y marca `tp1_triggered` si la orden reduce-only queda confirmada como filled/closed.
+- `core/bot_guardian.py`: si TP1 real falla o queda ambiguo, activa `HALT`, persiste `TP1_EXIT_AMBIGUOUS` y emite eventos runtime.
+- `core/execution_order_helpers.py`: si falla `cancel_order` en chase exit y no puede verificarse `fetch_open_orders`, retorna `STUCK` y no crea otra orden de salida.
+- `core/risk_engine.py`: `check_daily_drawdown()` calcula el porcentaje canonico desde `usd_hoy/current_balance`, evitando mezclar fraccion con porcentaje.
+- Tests de regresion agregados en `tests/test_runtime_safety_regressions.py`, `tests/test_execution_service_helpers.py` y `tests/test_risk_engine_coverage.py`.
+
+Reglas preventivas:
+
+- TP1 en `PAPER`/`SHADOW` no debe tocar exchange live aunque existan API keys.
+- Nunca mutar estado local de parcial real si la reduccion no esta confirmada por exchange.
+- Ante cancelacion ambigua de orden de salida, detener la persecucion y devolver `STUCK`; no colocar una nueva orden hasta reconciliar.
+- Daily drawdown debe comparar unidades homogeneas: porcentaje contra porcentaje o fraccion contra fraccion; preferir calcular desde USD y balance.
+
+Validacion registrada:
+
+- `ruff check core/ tests/` OK.
+- `ruff format --check core/ tests/` OK.
+- `compileall main.py core` OK.
+- `mypy` superficie CI OK.
+- `tools/check_no_silent_pass.py` OK.
+- `tools/regression_contracts.py` OK.
+- `tools/chaos_matrix.py`: 8/8 OK.
+- `tools/recovery_drill.py`: 3/3 OK.
+- Suite unitaria completa: `1030` tests OK, `2` skipped.
+
 ### 2026-06-20 - Runtime safety gates y coverage 75%
 
 Commit: `ba5a42a harden: add runtime safety gates and raise coverage`

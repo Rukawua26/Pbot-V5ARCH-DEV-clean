@@ -133,6 +133,32 @@ class TestRiskEngineDailyDrawdown(unittest.TestCase):
         self.assertFalse(allowed)
         self.assertEqual(reason, "DAILY_DRAWDOWN_UNVERIFIED")
 
+    def test_check_daily_drawdown_blocks_when_brain_returns_error_tuple(self):
+        self.engine.brain.get_daily_real_pnl = MagicMock(return_value=(None, None))
+
+        allowed, reason = self.engine.check_daily_drawdown(1000.0)
+
+        self.assertFalse(allowed)
+        self.assertEqual(reason, "DAILY_DRAWDOWN_UNVERIFIED")
+
+    @patch("core.risk_engine.Config.DAILY_LOSS_LIMIT", 2.0)
+    def test_check_daily_drawdown_blocks_at_configured_percent_from_usd(self):
+        self.engine.brain.get_daily_real_pnl = MagicMock(return_value=(-0.02, -20.0))
+
+        allowed, reason = self.engine.check_daily_drawdown(1000.0)
+
+        self.assertFalse(allowed)
+        self.assertEqual(reason, "DAILY_LIMIT_REACHED (-2.00%)")
+
+    @patch("core.risk_engine.Config.DAILY_LOSS_LIMIT", 2.0)
+    def test_check_daily_drawdown_allows_before_configured_percent_from_usd(self):
+        self.engine.brain.get_daily_real_pnl = MagicMock(return_value=(-50.0, -10.0))
+
+        allowed, reason = self.engine.check_daily_drawdown(1000.0)
+
+        self.assertTrue(allowed)
+        self.assertEqual(reason, "OK")
+
 
 class TestRiskEngineGetExitLevels(unittest.TestCase):
     def setUp(self):

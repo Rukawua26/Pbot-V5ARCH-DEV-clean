@@ -429,8 +429,13 @@ class RiskEngine:
             percent_real, usd_hoy = self.brain.get_daily_real_pnl(current_balance)
             if percent_real is None:
                 return False, "DAILY_DRAWDOWN_UNVERIFIED"
-            if percent_real <= -Config.DAILY_LOSS_LIMIT:
-                return False, f"DAILY_LIMIT_REACHED ({percent_real:.2f}%)"
+
+            balance = float(current_balance or 0.0)
+            if usd_hoy is not None and balance > 0.0:
+                percent_real = (float(usd_hoy) / balance) * 100.0
+
+            if float(percent_real) <= -Config.DAILY_LOSS_LIMIT:
+                return False, f"DAILY_LIMIT_REACHED ({float(percent_real):.2f}%)"
             return True, "OK"
         except Exception:
             return False, "DAILY_DRAWDOWN_UNVERIFIED"

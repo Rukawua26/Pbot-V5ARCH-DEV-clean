@@ -83,8 +83,22 @@ def _execute_chase_limit_steps(
                         order = recovered
                     else:
                         raise create_err
-                except Exception:
-                    raise create_err
+                except Exception as lookup_err:
+                    execution_service.logger.critical(
+                        f"🚨 CHASE_CREATE_AMBIGUOUS {symbol}: orden {client_order_id} "
+                        f"no verificable tras error de create_order: {lookup_err}. Marcando STUCK."
+                    )
+                    return _with_exit_state(
+                        {
+                            "id": client_order_id,
+                            "clientOrderId": client_order_id,
+                            "status": "unknown",
+                            "symbol": symbol,
+                            "side": exit_side,
+                            "price": limit_price,
+                        },
+                        "STUCK",
+                    )
             last_order = order
 
             if execution_service._wait_order_filled(
@@ -138,6 +152,7 @@ def _execute_chase_limit_steps(
                         execution_service.logger.warning(
                             f"⚠️ No se pudo verificar estado de orden tras cancel ambiguo {symbol}: {verify_err}"
                         )
+                        return _with_exit_state(order, "STUCK")
 
         except Exception as step_err:
             execution_service.logger.warning(

@@ -1,6 +1,8 @@
 import unittest
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
+from core.execution_order_helpers import _execute_chase_limit_steps
 from core.execution_service import OrderLookupError, _parse_order_float, _with_exit_state
 
 
@@ -85,7 +87,81 @@ class TestExecuteChaseLimitSteps(unittest.TestCase):
     @patch("core.execution_service.OrderLookupError", OrderLookupError)
     def test_returns_none_when_not_order_object(self):
         """Test that _execute_chase_limit_steps handles missing exchange gracefully."""
-        pass
+        service = SimpleNamespace(
+            exchange=SimpleNamespace(
+                price_to_precision=MagicMock(side_effect=RuntimeError("down"))
+            ),
+            logger=MagicMock(),
+        )
+
+        result = _execute_chase_limit_steps(
+            service,
+            "BTC/USDT",
+            "sell",
+            0.1,
+            100.0,
+            {"reduceOnly": True},
+            "close",
+        )
+
+        self.assertIsNone(result)
+
+    def test_cancel_ambiguity_returns_stuck_when_open_orders_verification_fails(self):
+        order = {"id": "exit-1", "status": "open"}
+        service = SimpleNamespace(
+            exchange=SimpleNamespace(
+                price_to_precision=MagicMock(return_value="99.0"),
+                create_order=MagicMock(return_value=order),
+                cancel_order=MagicMock(side_effect=RuntimeError("cancel down")),
+                fetch_open_orders=MagicMock(side_effect=RuntimeError("lookup down")),
+            ),
+            logger=MagicMock(),
+            _track_api_weight=MagicMock(),
+            _wait_order_filled=MagicMock(return_value=False),
+            _no_price_exit_state={},
+        )
+        service._call_exchange = MagicMock(side_effect=lambda _name, fn, **_kwargs: fn())
+        service._call_exchange_account = MagicMock(side_effect=lambda _name, fn, **_kwargs: fn())
+
+        result = _execute_chase_limit_steps(
+            service,
+            "BTC/USDT",
+            "sell",
+            0.1,
+            100.0,
+            {"reduceOnly": True},
+            "close",
+        )
+
+        self.assertEqual(result["exit_state"], "STUCK")
+        self.assertEqual(service.exchange.create_order.call_count, 1)
+
+    def test_create_ambiguity_returns_stuck_without_next_chase_step(self):
+        service = SimpleNamespace(
+            exchange=SimpleNamespace(
+                price_to_precision=MagicMock(return_value="99.0"),
+                create_order=MagicMock(side_effect=RuntimeError("create timeout")),
+            ),
+            logger=MagicMock(),
+            _track_api_weight=MagicMock(),
+            fetch_order_by_client_id=MagicMock(side_effect=RuntimeError("lookup down")),
+            _wait_order_filled=MagicMock(return_value=False),
+            _no_price_exit_state={},
+        )
+        service._call_exchange = MagicMock(side_effect=lambda _name, fn, **_kwargs: fn())
+
+        result = _execute_chase_limit_steps(
+            service,
+            "BTC/USDT",
+            "sell",
+            0.1,
+            100.0,
+            {"reduceOnly": True},
+            "close",
+        )
+
+        self.assertEqual(result["exit_state"], "STUCK")
+        self.assertEqual(service.exchange.create_order.call_count, 1)
 
 
 if __name__ == "__main__":
