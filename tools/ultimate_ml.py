@@ -6,28 +6,27 @@ SNIPER AI v118.0 - ULTIMATE ML SYSTEM
 - Meta-learning: combina ambos
 """
 
+import os
+import pickle
+import warnings
+
 import numpy as np
 import pandas as pd
-import pickle
-import os
-import warnings
+
 from core.model_loader import safe_pickle_load
 
 warnings.filterwarnings("ignore")
 
-from xgboost import XGBClassifier, XGBRegressor
 from lightgbm import LGBMClassifier, LGBMRegressor
 from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,
 )
 from sklearn.model_selection import (
+    TimeSeriesSplit,
     cross_val_score,
-    cross_val_predict,
-    StratifiedKFold,
-    KFold,
 )
-from sklearn.metrics import mean_squared_error, r2_score
+from xgboost import XGBClassifier, XGBRegressor
 
 
 class UltimateMLSystem:
@@ -66,7 +65,10 @@ class UltimateMLSystem:
         f["trend_num"] = 1 if trend == "UP" else -1
         f["trend_adx"] = f["trend_num"] * adx
 
-        ts = pd.Timestamp.now()
+        raw_ts = (
+            ctx.get("timestamp") or ctx.get("open_time") or ctx.get("close_time") or ctx.get("ts")
+        )
+        ts = pd.Timestamp(raw_ts) if raw_ts is not None else pd.Timestamp.now(tz="UTC")
         f["hour_sin"] = np.sin(2 * np.pi * ts.hour / 24)
         f["hour_cos"] = np.cos(2 * np.pi * ts.hour / 24)
         f["hour_high"] = 1 if 17 <= ts.hour <= 20 else 0
@@ -98,7 +100,7 @@ class UltimateMLSystem:
         print(f"   Avg PnL: {y_regress.mean():.2f}%")
         pos_weight = max(float(positive_class_weight), 1.0)
 
-        cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        cv = TimeSeriesSplit(n_splits=5)
 
         print("\n📈 CLASIFICADORES (Dirección):")
 
@@ -143,14 +145,15 @@ class UltimateMLSystem:
 
         print("\n📉 REGRESORES (PnL esperado):")
 
-        cv_reg = KFold(n_splits=5, shuffle=True, random_state=42)
+        cv_reg = TimeSeriesSplit(n_splits=5)
 
-        xgb_r = XGBRegressor(
-            n_estimators=200, max_depth=6, learning_rate=0.05, random_state=42
+        xgb_r = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.05, random_state=42)
+        r2 = cross_val_score(xgb_r, X, y_regress, cv=cv_reg, scoring="r2").mean()
+        rmse = np.sqrt(
+            -cross_val_score(
+                xgb_r, X, y_regress, cv=cv_reg, scoring="neg_mean_squared_error"
+            ).mean()
         )
-        preds = cross_val_predict(xgb_r, X, y_regress, cv=cv_reg)
-        r2 = r2_score(y_regress, preds)
-        rmse = np.sqrt(mean_squared_error(y_regress, preds))
         print(f"   XGBoost R2: {r2:.3f}, RMSE: {rmse:.2f}")
         xgb_r.fit(X, y_regress)
         self.reg_models["xgb"] = xgb_r
@@ -162,19 +165,21 @@ class UltimateMLSystem:
             random_state=42,
             verbose=-1,
         )
-        preds = cross_val_predict(lgb_r, X, y_regress, cv=cv_reg)
-        r2 = r2_score(y_regress, preds)
-        rmse = np.sqrt(mean_squared_error(y_regress, preds))
+        r2 = cross_val_score(lgb_r, X, y_regress, cv=cv_reg, scoring="r2").mean()
+        rmse = np.sqrt(
+            -cross_val_score(
+                lgb_r, X, y_regress, cv=cv_reg, scoring="neg_mean_squared_error"
+            ).mean()
+        )
         print(f"   LightGBM R2: {r2:.3f}, RMSE: {rmse:.2f}")
         lgb_r.fit(X, y_regress)
         self.reg_models["lgb"] = lgb_r
 
-        rf_r = RandomForestRegressor(
-            n_estimators=200, max_depth=10, random_state=42, n_jobs=-1
+        rf_r = RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42, n_jobs=-1)
+        r2 = cross_val_score(rf_r, X, y_regress, cv=cv_reg, scoring="r2").mean()
+        rmse = np.sqrt(
+            -cross_val_score(rf_r, X, y_regress, cv=cv_reg, scoring="neg_mean_squared_error").mean()
         )
-        preds = cross_val_predict(rf_r, X, y_regress, cv=cv_reg)
-        r2 = r2_score(y_regress, preds)
-        rmse = np.sqrt(mean_squared_error(y_regress, preds))
         print(f"   RandomForest R2: {r2:.3f}, RMSE: {rmse:.2f}")
         rf_r.fit(X, y_regress)
         self.reg_models["rf"] = rf_r
@@ -233,9 +238,7 @@ class UltimateMLSystem:
             score = clf_prob * 100
         elif clf_prob < 0.35 and expected_pnl < -0.5:
             decision = "STRONG_SELL"
-            score = (
-                (1 - clf_prob) * 0.6 + min(abs(expected_pnl) / 10, 0.4) * 0.4
-            ) * 100
+            score = ((1 - clf_prob) * 0.6 + min(abs(expected_pnl) / 10, 0.4) * 0.4) * 100
         elif clf_prob < 0.45:
             decision = "SELL"
             score = (1 - clf_prob) * 100
