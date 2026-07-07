@@ -380,6 +380,10 @@ def build_execution_gateway(config, execution_service_cls):
     backend = str(getattr(config, "EXECUTION_BACKEND", "live") or "live").lower()
     if backend not in {"live", "shadow_live"}:
         raise RuntimeError(f"EXECUTION_BACKEND inválido: {backend}")
+    if backend == "live" and bool(getattr(config, "PAPER_MODE", True)):
+        allow_paper_live = bool(getattr(config, "ALLOW_PAPER_LIVE_GATEWAY", False))
+        if not allow_paper_live:
+            backend = "shadow_live"
     if backend == "shadow_live":
         if not bool(getattr(config, "PAPER_MODE", True)):
             raise RuntimeError("EXECUTION_BACKEND=shadow_live no está permitido en modo REAL")

@@ -2,6 +2,7 @@ import hmac
 import json
 import os
 import sqlite3
+import stat
 import threading
 import time
 from collections import deque
@@ -30,6 +31,9 @@ if not API_KEY:
     )
 if len(API_KEY) < 16:
     raise RuntimeError("SNIPER_API_KEY debe tener al menos 16 caracteres.")
+CONTROL_API_KEY = os.getenv("SNIPER_CONTROL_API_KEY")
+if CONTROL_API_KEY is not None and len(CONTROL_API_KEY) < 16:
+    raise RuntimeError("SNIPER_CONTROL_API_KEY debe tener al menos 16 caracteres.")
 STATE_FILE = "/dev/shm/sniper_state.json"
 CMD_DIR = "/dev/shm/sniper_cmd"
 LOG_FILE = "sniper.log"
@@ -107,6 +111,25 @@ def verify_key(req: Request):
         raise HTTPException(401, "Unauthorized")
 
 
+def verify_control_key(req: Request):
+    if not CONTROL_API_KEY:
+        raise HTTPException(503, "Dashboard control API key not configured")
+    supplied = str(req.headers.get("X-Control-API-Key") or "")
+    if not hmac.compare_digest(supplied, CONTROL_API_KEY):
+        raise HTTPException(401, "Unauthorized")
+
+
+def _ensure_safe_cmd_dir() -> None:
+    os.makedirs(CMD_DIR, mode=0o700, exist_ok=True)
+    st = os.lstat(CMD_DIR)
+    if stat.S_ISLNK(st.st_mode) or not stat.S_ISDIR(st.st_mode):
+        raise HTTPException(500, "Unsafe command directory")
+    if st.st_uid != os.getuid():
+        raise HTTPException(500, "Unsafe command directory owner")
+    if st.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+        raise HTTPException(500, "Unsafe command directory permissions")
+
+
 @app.get("/")
 def index():
     path = os.path.join(STATIC_DIR, "index.html")
@@ -121,10 +144,9 @@ def health():
         age = time.time() - os.path.getmtime(STATE_FILE)
         return {
             "status": "ok",
-            "state_age_s": round(age, 1),
             "alive": age < 30,
         }
-    return {"status": "degraded", "state_age_s": None, "alive": False}
+    return {"status": "degraded", "alive": False}
 
 
 @app.get("/api/v1/state")
@@ -150,19 +172,22 @@ def get_logs(lines: int = 50, _=Depends(verify_key)):
 
 
 @app.post("/api/v1/command")
-def send_command(cmd: Command, _=Depends(verify_key)):
+def send_command(cmd: Command, _=Depends(verify_control_key)):
     action = cmd.action.strip()
     if action not in ALLOWED_COMMANDS:
         raise HTTPException(400, "Command not allowed")
-    os.makedirs(CMD_DIR, mode=0o700, exist_ok=True)
+    _ensure_safe_cmd_dir()
     path = os.path.join(CMD_DIR, "command.json")
     data = {"commands": [{"action": action, "ts": time.time()}]}
-    tmp = path + ".tmp"
-    with open(tmp, "w") as f:
+    tmp = os.path.join(CMD_DIR, f"command.json.{os.getpid()}.{time.time_ns()}.tmp")
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(tmp, flags, 0o600)
+    with os.fdopen(fd, "w") as f:
         json.dump(data, f)
         f.flush()
         os.fsync(f.fileno())
-    os.chmod(tmp, 0o600)
     os.replace(tmp, path)
     return {"ok": True, "action": action}
 

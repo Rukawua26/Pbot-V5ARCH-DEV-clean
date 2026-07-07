@@ -122,6 +122,17 @@ def _find_verified_hard_sl_order(bot, symbol: str, trade: dict, info: dict):
     return None
 
 
+def _halt_ambiguous_hard_sl_visibility(bot, symbol: str, trade: dict) -> None:
+    trade["status"] = "HARD_SL_VISIBILITY_AMBIGUOUS"
+    with bot.db_lock:
+        bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
+    _halt_wallet_sync(
+        bot,
+        "HARD_SL_VISIBILITY_AMBIGUOUS",
+        {"symbol": symbol, "sl_exchange_order_id": trade.get("sl_exchange_order_id")},
+    )
+
+
 def _is_immediate_trigger_rejection(error_text: str) -> bool:
     msg = str(error_text or "").lower()
     return (
@@ -194,9 +205,11 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
             )
             return False
         bot.log(
-            f"⚠️ HARD_SL_MISSING_ON_EXCHANGE {symbol}: id local {trade.get('sl_exchange_order_id')} no está abierto/cubriendo. Re-adjuntando."
+            f"🛑 HARD_SL_VISIBILITY_AMBIGUOUS {symbol}: id local "
+            f"{trade.get('sl_exchange_order_id')} no se verificó en open orders."
         )
-        trade["sl_exchange_order_id"] = None
+        _halt_ambiguous_hard_sl_visibility(bot, symbol, trade)
+        return False
 
     existing_sl = _find_existing_hard_sl_order(bot, symbol, trade)
     if existing_sl is _HARD_SL_ORDER_LOOKUP_FAILED:
@@ -573,6 +586,34 @@ def sync_wallet(bot):
                     if status in ambiguous_statuses:
                         bot.log(
                             f"⏳ Wallet sync: {symbol} tiene estado ambiguo ({status}), no purgando"
+                        )
+                        continue
+
+                    if not _exchange_position_is_flat(bot, symbol):
+                        _halt_wallet_sync(
+                            bot,
+                            "LOCAL_TRADE_MISSING_FROM_SNAPSHOT_NOT_FLAT",
+                            {"symbol": symbol, "trade_key": trade_key},
+                        )
+                        continue
+
+                    existing_sl = _find_existing_hard_sl_order(bot, symbol, trade)
+                    if existing_sl is _HARD_SL_ORDER_LOOKUP_FAILED:
+                        _halt_wallet_sync(
+                            bot,
+                            "ORPHAN_PURGE_OPEN_ORDERS_LOOKUP_FAILED",
+                            {"symbol": symbol, "trade_key": trade_key},
+                        )
+                        continue
+                    if existing_sl:
+                        _halt_wallet_sync(
+                            bot,
+                            "LOCAL_TRADE_MISSING_BUT_PROTECTION_EXISTS",
+                            {
+                                "symbol": symbol,
+                                "trade_key": trade_key,
+                                "sl_exchange_order_id": existing_sl.get("id"),
+                            },
                         )
                         continue
 

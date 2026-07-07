@@ -1,7 +1,10 @@
 import hashlib
+import logging
 import traceback
 
 from config import Config
+
+logger = logging.getLogger(__name__)
 from core.config.operational import OperationalConfig
 from core.execution_telemetry import append_execution_event
 from core.symbol_utils import normalize_position_symbol
@@ -114,6 +117,35 @@ def _build_open_order_index(open_orders):
         if coid:
             by_client_order_id[coid] = order
     return by_client_order_id, by_symbol
+
+
+def _bool_reduce_only_order(order: dict) -> bool:
+    info = order.get("info") or {}
+    raw = order.get("reduceOnly", info.get("reduceOnly", False))
+    if isinstance(raw, bool):
+        return raw
+    return str(raw).lower() in {"true", "1", "yes"}
+
+
+def _bool_close_position(order: dict) -> bool:
+    info = order.get("info") or {}
+    raw = order.get("closePosition", info.get("closePosition", False))
+    if isinstance(raw, bool):
+        return raw
+    return str(raw).lower() in {"true", "1", "yes"}
+
+
+def _find_existing_orphan_stop(open_orders_by_symbol: dict, symbol: str, side: str):
+    expected_side = "SELL" if str(side).upper() == "BUY" else "BUY"
+    for order in open_orders_by_symbol.get(symbol, []) or []:
+        order_type = str(order.get("type") or (order.get("info") or {}).get("type") or "").upper()
+        if "STOP" not in order_type:
+            continue
+        if not _bool_reduce_only_order(order):
+            continue
+        if str(order.get("side") or "").upper() == expected_side:
+            return order
+    return None
 
 
 def _normalize_order_status(raw_status: str) -> str:
@@ -408,6 +440,35 @@ def reconcile_bootstrap_state(bot):
             )
             adopted_trade["entry_client_order_id"] = entry_coid
             adopted_trade["sl_client_order_id"] = sl_coid
+            existing_stop = _find_existing_orphan_stop(open_orders_by_symbol, symbol, info["side"])
+            if existing_stop:
+                stop_amount_raw = existing_stop.get("amount") or 0
+                try:
+                    stop_amount = float(stop_amount_raw)
+                except (TypeError, ValueError):
+                    stop_amount = 0.0
+                stop_close_position = _bool_close_position(existing_stop)
+                if stop_close_position or stop_amount >= float(amount):
+                    adopted_trade["sl_exchange_order_id"] = existing_stop.get("id")
+                    adopted_trade["sl_client_order_id"] = (
+                        _extract_client_order_id(existing_stop) or sl_coid
+                    )
+                    adopted_trade["status"] = "OPEN"
+                    with bot.lock:
+                        bot.active_trades[trade_key] = adopted_trade
+                    with bot.db_lock:
+                        bot.brain.save_active_trade_state(trade_key, adopted_trade)
+                    adopted += 1
+                    continue
+                else:
+                    logger.warning(
+                        "reconciliation orphan stop %s amount %.4f < position %.4f for %s; "
+                        "not adopted as HARD SL coverage",
+                        existing_stop.get("id"),
+                        stop_amount,
+                        float(amount),
+                        symbol,
+                    )
             try:
                 sl_order = bot.execution.place_hard_sl(
                     symbol,

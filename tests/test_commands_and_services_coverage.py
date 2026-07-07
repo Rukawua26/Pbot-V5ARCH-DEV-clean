@@ -541,6 +541,17 @@ class BotIoLoopsCoverageTest(unittest.TestCase):
             self.assertTrue(_is_authorized_telegram_chat("123", 7))
             self.assertFalse(_is_authorized_telegram_chat("123", 9))
             self.assertFalse(_is_authorized_telegram_chat("999", 7))
+        with (
+            patch("core.bot_io_loops.Config.TELEGRAM_CHAT_ID", "-100123"),
+            patch("core.bot_io_loops.Config.TELEGRAM_ADMIN_IDS", ""),
+        ):
+            self.assertFalse(_is_authorized_telegram_chat("-100123", 7))
+        with (
+            patch("core.bot_io_loops.Config.TELEGRAM_CHAT_ID", "-100123"),
+            patch("core.bot_io_loops.Config.TELEGRAM_ADMIN_IDS", "7"),
+        ):
+            self.assertTrue(_is_authorized_telegram_chat("-100123", 7))
+            self.assertFalse(_is_authorized_telegram_chat("-100123", 8))
 
         bot = SimpleNamespace(
             price_lock=RLock(),

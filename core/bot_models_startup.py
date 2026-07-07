@@ -60,12 +60,23 @@ def init_models_and_startup_tasks(bot, export_dataset_fn, backup_database_fn, tf
                 bot.log("👻 Agente Ghost (PRO v2): Ensemble cargado.")
                 send_telegram_msg("🧠 *IA Nivel 6 (Ghost Pro Ensemble) operativa*")
             elif tf_module and os.path.exists(model_path) and os.path.exists(scaler_path):
-                bot.ghost_model = tf_module.keras.models.load_model(model_path)
-                bot.scaler = joblib.load(scaler_path)
-                bot.ghost_model_type = "LSTM"
-                bot.bootstrap_heuristic_mode = False
-                bot.log("👻 Agente Ghost (LSTM): Red Neuronal cargada.")
-                send_telegram_msg("🧠 *IA Nivel 5 (LSTM Neural Network) operativa*")
+                allow_legacy_lstm = str(
+                    os.getenv("ALLOW_UNVERIFIED_LSTM_MODEL_LOAD", "false") or ""
+                ).lower() in {"1", "true", "yes", "y", "on"}
+                if not allow_legacy_lstm:
+                    bot.log(
+                        "⚠️ Agente Ghost (LSTM): carga legacy omitida; "
+                        "requiere ALLOW_UNVERIFIED_LSTM_MODEL_LOAD=true."
+                    )
+                    bot.bootstrap_heuristic_mode = True
+                    bot.ai_status_msg = "BOOTSTRAP_HEURISTIC"
+                else:
+                    bot.ghost_model = tf_module.keras.models.load_model(model_path)
+                    bot.scaler = joblib.load(scaler_path)
+                    bot.ghost_model_type = "LSTM"
+                    bot.bootstrap_heuristic_mode = False
+                    bot.log("👻 Agente Ghost (LSTM): Red Neuronal cargada.")
+                    send_telegram_msg("🧠 *IA Nivel 5 (LSTM Neural Network) operativa*")
             elif os.path.exists("ghost_brain.pkl"):
                 bot.ghost_model = safe_pickle_load("ghost_brain.pkl")
                 bot.ghost_model_type = "RF"

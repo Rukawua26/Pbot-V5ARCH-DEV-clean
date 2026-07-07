@@ -46,6 +46,8 @@ class ConfigPrecedenceTest(unittest.TestCase):
             self.assertEqual(_env_int("TEST_INT_SETTING", 4), 4)
             self.assertTrue(_env_bool("TEST_BOOL_SETTING", True))
         self.assertEqual(len(_CONFIG_ENV_WARNINGS), 3)
+        self.assertFalse(any("bad" in warning for warning in _CONFIG_ENV_WARNINGS))
+        self.assertFalse(any("unknown" in warning for warning in _CONFIG_ENV_WARNINGS))
 
     def test_sanitize_symbol_delegates_to_canonical_normalizer(self):
         self.assertEqual(Config.sanitize_symbol("btcusdt"), "BTC/USDT")

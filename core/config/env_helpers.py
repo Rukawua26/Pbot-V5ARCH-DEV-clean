@@ -10,7 +10,7 @@ def env_float(name: str, default: float) -> float:
     try:
         return float(raw)
     except (TypeError, ValueError):
-        _CONFIG_ENV_WARNINGS.append(f"{name}={raw!r} inválido; usando default {default!r}")
+        _CONFIG_ENV_WARNINGS.append(f"{name} inválido; usando default {default!r}")
         return default
 
 
@@ -21,7 +21,7 @@ def env_int(name: str, default: int) -> int:
     try:
         return int(float(raw))
     except (TypeError, ValueError):
-        _CONFIG_ENV_WARNINGS.append(f"{name}={raw!r} inválido; usando default {default!r}")
+        _CONFIG_ENV_WARNINGS.append(f"{name} inválido; usando default {default!r}")
         return default
 
 
@@ -48,7 +48,7 @@ def env_bool(name: str, default: bool) -> bool:
         return True
     if normalized in {"0", "false", "no", "n", "off"}:
         return False
-    _CONFIG_ENV_WARNINGS.append(f"{name}={raw!r} inválido; usando default {default!r}")
+    _CONFIG_ENV_WARNINGS.append(f"{name} inválido; usando default {default!r}")
     return default
 
 

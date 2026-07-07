@@ -95,7 +95,37 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
         try:
             cancel_order(symbol, old_order_id)
         except Exception as error:
-            bot.log(f"⚠️ No se pudo cancelar HARD SL anterior {symbol}/{old_order_id}: {error}")
+            bot.is_paused = True
+            bot.integrity_lock_active = True
+            setattr(bot, "halt_system_active", True)
+            trade["status"] = "HARD_SL_AMEND_CANCEL_AMBIGUOUS"
+            trade["sl_exchange_order_id"] = new_order.get("id")
+            trade["sl_client_order_id"] = new_coid
+            trade["hard_sl_price"] = new_sl
+            trade["sl_amend_count"] = amend_count
+            with bot.db_lock:
+                bot.brain.save_active_trade_state(trade_key, trade)
+            append_execution_event(
+                bot,
+                "HARD_SL_AMEND_CANCEL_AMBIGUOUS_HALT",
+                {
+                    "symbol": symbol,
+                    "old_order_id": old_order_id,
+                    "new_order_id": new_order.get("id"),
+                    "error": str(error)[:180],
+                },
+            )
+            append_runtime_metric(
+                "halt",
+                {
+                    "reason": "HARD_SL_AMEND_CANCEL_AMBIGUOUS",
+                    "symbol": symbol,
+                    "old_order_id": old_order_id,
+                    "new_order_id": new_order.get("id"),
+                },
+            )
+            bot.log(f"🛑 HARD_SL_AMEND_CANCEL_AMBIGUOUS {symbol}/{old_order_id}: {error}")
+            return
 
     trade["sl_exchange_order_id"] = new_order.get("id")
     trade["sl_client_order_id"] = new_coid

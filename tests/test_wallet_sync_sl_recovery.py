@@ -181,7 +181,7 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
         bot.execution.place_hard_sl.assert_not_called()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
-    def test_replaces_stale_local_sl_id_when_exchange_order_is_missing(self):
+    def test_stale_local_sl_visibility_gap_halts_without_duplicating(self):
         bot = self._base_bot()
         bot.active_trades = {
             "ETH/USDT": {
@@ -212,8 +212,66 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
 
         sync_wallet(bot)
 
-        self.assertEqual(bot.active_trades["ETH/USDT"].get("sl_exchange_order_id"), "new-sl")
-        bot.execution.place_hard_sl.assert_called_once()
+        self.assertEqual(
+            bot.active_trades["ETH/USDT"].get("status"), "HARD_SL_VISIBILITY_AMBIGUOUS"
+        )
+        bot.execution.place_hard_sl.assert_not_called()
+        bot.brain.save_error_snapshot.assert_called()
+
+    @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
+    def test_does_not_purge_local_real_trade_when_second_position_check_not_flat(self):
+        bot = self._base_bot()
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.halt_system_active = False
+        old_open = datetime(2020, 1, 1)
+        bot.active_trades = {
+            "BTC/USDT": {
+                "symbol": "BTC/USDT",
+                "side": "BUY",
+                "entry": 100.0,
+                "amount": 1.0,
+                "sl": 99.0,
+                "is_shadow": False,
+                "open_time": old_open,
+                "sl_exchange_order_id": "sl-live",
+            }
+        }
+        fetch_positions = MagicMock(
+            side_effect=[
+                [
+                    {
+                        "symbol": "ETH/USDT:USDT",
+                        "contracts": 0.1,
+                        "side": "long",
+                        "entryPrice": 2000.0,
+                        "unrealizedPnl": 0.0,
+                        "info": {},
+                    }
+                ],
+                [
+                    {
+                        "symbol": "BTC/USDT:USDT",
+                        "contracts": 1.0,
+                        "side": "long",
+                        "entryPrice": 100.0,
+                        "unrealizedPnl": 0.0,
+                        "info": {},
+                    }
+                ],
+            ]
+        )
+        bot.execution = SimpleNamespace(
+            fetch_positions=fetch_positions,
+            fetch_open_orders=MagicMock(return_value=[]),
+            place_hard_sl=MagicMock(),
+        )
+
+        sync_wallet(bot)
+
+        self.assertIn("BTC/USDT", bot.active_trades)
+        self.assertTrue(bot.halt_system_active)
+        bot.brain.delete_active_trade_state.assert_not_called()
 
     @patch("core.bot_wallet_sync.Config.PAPER_MODE", False)
     def test_open_orders_lookup_failure_halts_without_duplicating_sl(self):

@@ -6,6 +6,9 @@ on:
   push:
     branches: [main, freeze/**]
 
+permissions:
+  contents: read
+
 env:
   SNIPER_DISABLE_FILE_TELEMETRY: 1
 
@@ -16,16 +19,16 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67ef4e541b1c7f1a06ab  # v5
         with:
           python-version: "3.12"
           cache: "pip"
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684  # v4
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('requirements.lock', 'requirements-dev.lock') }}
@@ -63,7 +66,7 @@ jobs:
           MYPYPATH=. mypy --explicit-package-bases core/config/ core/types.py core/bot_facade.py core/execution_adapters.py
 
       - name: Secrets scan
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.90.6
         with:
           extra_args: --only-verified
 

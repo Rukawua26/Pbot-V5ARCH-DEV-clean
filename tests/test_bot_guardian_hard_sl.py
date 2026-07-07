@@ -67,6 +67,31 @@ class GuardianHardSlSyncTest(unittest.TestCase):
         bot.brain.save_active_trade_state.assert_called_once_with("BTC/USDT", trade)
         append_event.assert_called_once()
 
+    @patch("core.bot_guardian.Config.PAPER_MODE", False)
+    @patch("core.bot_guardian.append_execution_event")
+    def test_ambiguous_cancel_after_hard_sl_amend_halts(self, append_event):
+        from core.bot_guardian import _sync_tightened_hard_sl
+
+        trade = {
+            "side": "BUY",
+            "sl": 101.0,
+            "amount": 0.2,
+            "sl_exchange_order_id": "old-sl",
+            "sl_client_order_id": "SL_BASE",
+        }
+        bot = self._bot(MagicMock(return_value={"id": "new-sl"}))
+        bot.execution.cancel_order.side_effect = RuntimeError("cancel ambiguous")
+
+        _sync_tightened_hard_sl(bot, "BTC/USDT", trade, previous_sl=100.0)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        self.assertEqual(trade["status"], "HARD_SL_AMEND_CANCEL_AMBIGUOUS")
+        self.assertEqual(trade["sl_exchange_order_id"], "new-sl")
+        bot.brain.save_active_trade_state.assert_called_once_with("BTC/USDT", trade)
+        append_event.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

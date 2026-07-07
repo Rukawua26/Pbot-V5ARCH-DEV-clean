@@ -21,7 +21,12 @@ def _is_authorized_telegram_chat(chat_id, from_id=None) -> bool:
     if not bool(expected) or current != expected:
         return False
     admin_ids = str(getattr(Config, "TELEGRAM_ADMIN_IDS", "") or "").strip()
-    if admin_ids and from_id is not None:
+    is_group_chat = expected.startswith("-")
+    if is_group_chat and not admin_ids:
+        return False
+    if admin_ids:
+        if from_id is None:
+            return False
         allowed = [x.strip() for x in admin_ids.split(",") if x.strip()]
         if allowed and str(from_id) not in allowed:
             return False

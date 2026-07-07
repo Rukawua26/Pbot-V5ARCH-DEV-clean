@@ -90,6 +90,53 @@ class ReconciliationTest(unittest.TestCase):
         self.assertIn("sl_client_order_id", trade)
         self.assertIn("client_order_id", bot.execution.place_hard_sl.call_args.kwargs)
 
+    def test_adopts_exchange_orphan_reusing_existing_stop(self):
+        bot = SimpleNamespace()
+        bot.lock = RLock()
+        bot.db_lock = RLock()
+        bot.active_trades = {}
+        bot.balance = 100.0
+        bot.is_paused = False
+        bot.integrity_lock_active = False
+        bot.log = MagicMock()
+        bot.execution = SimpleNamespace(
+            fetch_positions=lambda: [
+                {
+                    "symbol": "ETH/USDT:USDT",
+                    "contracts": 0.5,
+                    "side": "long",
+                    "entryPrice": 3000,
+                }
+            ],
+            fetch_open_orders=lambda: [
+                {
+                    "id": "existing-sl",
+                    "symbol": "ETH/USDT",
+                    "type": "STOP_MARKET",
+                    "side": "SELL",
+                    "reduceOnly": True,
+                    "amount": 0.5,
+                    "clientOrderId": "S_EXISTING",
+                }
+            ],
+            place_hard_sl=MagicMock(return_value={"id": "duplicate-sl"}),
+            fetch_ticker=lambda s: {"last": 2950},
+        )
+        bot.get_current_balance = lambda: 100.0
+        bot.brain = SimpleNamespace(
+            save_active_trade_state=MagicMock(),
+            save_error_snapshot=MagicMock(),
+            delete_active_trade_state=MagicMock(),
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertIn("ETH/USDT", bot.active_trades)
+        trade = bot.active_trades["ETH/USDT"]
+        self.assertEqual(trade.get("sl_exchange_order_id"), "existing-sl")
+        self.assertEqual(trade.get("sl_client_order_id"), "S_EXISTING")
+        bot.execution.place_hard_sl.assert_not_called()
+
     @patch("core.reconciliation.send_telegram_msg")
     def test_orphan_adoption_persists_open_state_only_after_hard_sl(self, mocked_tg):
         bot = SimpleNamespace()

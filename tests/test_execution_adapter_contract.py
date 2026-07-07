@@ -53,12 +53,31 @@ class ExecutionAdapterContractTest(unittest.TestCase):
             BINANCE_API_KEY="k",
             BINANCE_API_SECRET="s",
             USE_TESTNET=True,
+            PAPER_MODE=False,
             EXECUTION_BACKEND="live",
         )
 
         execution = build_execution_gateway(config, _FakeExecutionService)
 
         execution.exchange.set_sandbox_mode.assert_called_once_with(True)
+
+    def test_factory_uses_shadow_adapter_by_default_in_paper_mode(self):
+        config = SimpleNamespace(
+            BINANCE_API_KEY="k",
+            BINANCE_API_SECRET="s",
+            USE_TESTNET=False,
+            PAPER_MODE=True,
+            EXECUTION_BACKEND="live",
+            SHADOW_SIM_LATENCY_MIN_MS=0,
+            SHADOW_SIM_LATENCY_MAX_MS=0,
+            SHADOW_SIM_REJECT_RATE=0.0,
+            SHADOW_SIM_PARTIAL_FILL_RATE=0.0,
+            SHADOW_SIM_MIN_PARTIAL_RATIO=0.3,
+        )
+
+        execution = build_execution_gateway(config, _FakeExecutionService)
+
+        self.assertIsInstance(execution, ShadowExecutionAdapter)
 
     def test_factory_rejects_unknown_backend(self):
         config = SimpleNamespace(

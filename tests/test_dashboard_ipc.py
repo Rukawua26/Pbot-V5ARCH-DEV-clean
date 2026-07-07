@@ -131,6 +131,25 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertEqual(result, {"ok": True, "action": "/recover_halt"})
         self.assertEqual(data["commands"][0]["action"], "/recover_halt")
 
+    def test_dashboard_control_key_is_separate_from_read_key(self):
+        req = type("Req", (), {"headers": {"X-API-Key": api_server.API_KEY}})()
+        with patch.object(api_server, "CONTROL_API_KEY", "control-key-for-tests"):
+            with self.assertRaises(HTTPException) as raised:
+                api_server.verify_control_key(req)
+
+        self.assertEqual(raised.exception.status_code, 401)
+
+    def test_dashboard_command_writer_rejects_unsafe_cmd_dir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            unsafe_dir = os.path.join(tmpdir, "cmd")
+            os.mkdir(unsafe_dir, 0o777)
+            os.chmod(unsafe_dir, 0o777)
+            with patch.object(api_server, "CMD_DIR", unsafe_dir):
+                with self.assertRaises(HTTPException) as raised:
+                    api_server.send_command(api_server.Command(action="/pause"), _=None)
+
+        self.assertEqual(raised.exception.status_code, 500)
+
     def test_dashboard_startup_reuses_existing_localhost_server(self):
         bot = _DummyBot()
 
