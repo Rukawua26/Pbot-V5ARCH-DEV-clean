@@ -564,10 +564,10 @@
                 var t=s.telemetry||{};
                 document.getElementById('shadow-wr').textContent=(t.shadow_win_rate||0).toFixed(1)+'%';
                 document.getElementById('real-wr').textContent=(t.real_win_rate!=null?t.real_win_rate:0).toFixed(1)+'%';
-                var se=document.getElementById('sentiment-display'), stx=s.sentiment||'NEUTRAL';
-                if(Array.isArray(stx))stx=stx[0];
-                se.textContent=String(stx).includes('BAJISTA')?'🔴 '+stx:'🟢 '+stx;
-                se.className='text-sm font-bold '+(String(stx).includes('BAJISTA')?'glow-red':'glow-green');
+                var se=document.getElementById('sentiment-display'), stx=s.sentiment||'NEUTRAL', scol=s.sentiment_color||'';
+                var ico=scol==='red'?'🔴':(scol==='yellow'?'🟡':'🟢');
+                se.textContent=ico+' '+stx;
+                se.className='text-sm font-bold '+(scol==='red'?'glow-red':(scol==='yellow'?'glow-yellow':'glow-green'));
                 renderRadar(s.radar||[]);
                 renderSideTrades('real-trades-list',s.active_trades||[],false);
                 renderSideTrades('shadow-trades-list',s.shadow_trades||[],true);

@@ -4,6 +4,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from fastapi import HTTPException
@@ -58,6 +59,16 @@ class _DummyBot:
         self.is_running = False
         self.handled = []
         self.logs = []
+        self.current_sentiment = ("RANGO", "yellow")
+        self.db_lock = threading.Lock()
+        self.brain = SimpleNamespace(
+            get_stats=lambda: {
+                "shadow_win_rate": 27.1,
+                "real_win_rate": 33.3,
+                "total_trades": 3,
+                "shadow_trades": 48,
+            }
+        )
 
     def handle_command(self, action):
         self.handled.append(action)
@@ -91,6 +102,10 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn("ETH/USDT", [item["symbol"] for item in data["radar"]])
         pending = [item for item in data["radar"] if item["symbol"] == "ETH/USDT"][0]
         self.assertEqual(pending["result"], "PENDIENTE")
+        self.assertEqual(data["sentiment"], "RANGO")
+        self.assertEqual(data["sentiment_color"], "yellow")
+        self.assertEqual(data["telemetry"]["shadow_win_rate"], 27.1)
+        self.assertEqual(data["telemetry"]["real_win_rate"], 33.3)
 
     def test_command_consumer_accepts_only_dashboard_commands(self):
         bot = _DummyBot()

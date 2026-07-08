@@ -36,6 +36,42 @@ def _pending_target_entry(symbol):
     }
 
 
+def _normalize_sentiment(raw):
+    color_map = {
+        "red": "red",
+        "yellow": "yellow",
+        "green": "green",
+        "🔴": "red",
+        "🟡": "yellow",
+        "🟢": "green",
+    }
+    if isinstance(raw, (list, tuple)) and raw:
+        label = str(raw[0] or "NEUTRAL")
+        color = str(raw[1] or "").lower() if len(raw) > 1 else ""
+    else:
+        label = str(raw or "NEUTRAL")
+        color = ""
+    return {
+        "label": label,
+        "color": color_map.get(color, color_map.get(label[:1], "green")),
+    }
+
+
+def _collect_dashboard_stats(bot):
+    try:
+        with bot.db_lock:
+            stats = bot.brain.get_stats()
+        return {
+            "shadow_win_rate": stats.get("shadow_win_rate"),
+            "real_win_rate": stats.get("real_win_rate"),
+            "total_real_trades": stats.get("total_trades", 0),
+            "total_shadow_trades": stats.get("shadow_trades", 0),
+        }
+    except Exception as error:
+        logger.debug("dashboard stats snapshot unavailable: %s", error)
+        return {}
+
+
 def _write_state_snapshot(bot):
     try:
         ts = time.time()
@@ -79,6 +115,7 @@ def _write_state_snapshot(bot):
         if bal > 0 and daily_initial_balance > 0:
             daily_pnl_pct = round(((bal - daily_initial_balance) / daily_initial_balance) * 100, 2)
             daily_pnl_usd = round(bal - daily_initial_balance, 2)
+        sentiment = _normalize_sentiment(getattr(bot, "current_sentiment", "NEUTRAL"))
         snapshot = {
             "ts": ts,
             "mode": mode,
@@ -96,10 +133,12 @@ def _write_state_snapshot(bot):
             "active_trades": real_trades[:15],
             "shadow_trades": shadow_trades[:15],
             "regime": str(getattr(bot, "current_regime", "N/A")),
-            "sentiment": str(getattr(bot, "current_sentiment", "NEUTRAL")),
+            "sentiment": sentiment["label"],
+            "sentiment_color": sentiment["color"],
             "uptime_seconds": round(ts - getattr(bot, "_start_ts", ts), 1),
             "scanner_pairs": len(getattr(bot, "pairs_to_scan", [])),
             "guardian_stats": getattr(bot, "_guardian_stats", {}),
+            "telemetry": _collect_dashboard_stats(bot),
         }
         slock = getattr(bot, "scanner_lock", None)
         history = getattr(bot, "scanner_history", [])
