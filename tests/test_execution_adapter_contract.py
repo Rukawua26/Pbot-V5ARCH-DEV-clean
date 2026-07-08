@@ -16,6 +16,15 @@ class _FakeExecutionService:
     def fetch_ticker(self, _symbol):
         return {"last": 100.0}
 
+    def has_markets_loaded(self) -> bool:
+        return True
+
+    def fetch_book_tickers(self):
+        return {"BTC/USDT": {"bid": 100.0, "ask": 100.1}}
+
+    def fetch_funding_rate(self, _symbol):
+        return {"fundingRate": 0.0001}
+
 
 class ExecutionAdapterContractTest(unittest.TestCase):
     def test_factory_builds_shadow_adapter(self):
@@ -113,6 +122,22 @@ class ExecutionAdapterContractTest(unittest.TestCase):
         self.assertEqual(order.get("status"), "open")
         self.assertLess(float(order.get("filled") or 0.0), 2.0)
         self.assertEqual(order.get("clientOrderId"), "cid-1")
+
+    def test_shadow_adapter_delegates_read_only_market_data(self):
+        live = _FakeExecutionService("k", "s")
+        adapter = ShadowExecutionAdapter(
+            live,
+            min_latency_ms=0,
+            max_latency_ms=0,
+            reject_rate=0.0,
+            partial_fill_rate=0.0,
+            random_source=random.Random(2),
+            sleep_fn=lambda _s: None,
+        )
+
+        self.assertTrue(adapter.has_markets_loaded())
+        self.assertIn("BTC/USDT", adapter.fetch_book_tickers())
+        self.assertEqual(adapter.fetch_funding_rate("BTC/USDT")["fundingRate"], 0.0001)
 
     def test_shadow_adapter_latency_is_non_blocking_for_caller(self):
         live = _FakeExecutionService("k", "s")

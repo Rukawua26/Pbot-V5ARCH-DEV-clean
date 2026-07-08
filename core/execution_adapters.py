@@ -53,6 +53,9 @@ class ShadowExecutionAdapter:
     def load_markets(self):
         return self._live.load_markets()
 
+    def has_markets_loaded(self) -> bool:
+        return bool(self._live.has_markets_loaded())
+
     def fetch_ticker(self, symbol: str) -> dict:
         return self._live.fetch_ticker(symbol)
 
@@ -68,8 +71,14 @@ class ShadowExecutionAdapter:
     def fetch_book_ticker(self, symbol: str):
         return self._live.fetch_book_ticker(symbol)
 
+    def fetch_book_tickers(self):
+        return self._live.fetch_book_tickers()
+
     def fetch_order_book(self, symbol: str, limit: int = 20):
         return self._live.fetch_order_book(symbol, limit)
+
+    def fetch_funding_rate(self, symbol: str):
+        return self._live.fetch_funding_rate(symbol)
 
     def fetch_positions(self):
         raise NotImplementedError(
