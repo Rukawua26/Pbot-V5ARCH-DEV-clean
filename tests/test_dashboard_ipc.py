@@ -301,6 +301,19 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn("calc(100dvh - 205px)", html)
         self.assertIn('class="tbl-wrap radar-table-wrap"', html)
 
+    def test_dashboard_radar_has_summary_filters_and_compact_reasons(self):
+        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('id="radar-summary"', html)
+        self.assertIn('data-radar-filter="near"', html)
+        self.assertIn('data-radar-filter="adx"', html)
+        self.assertIn('data-radar-filter="volume"', html)
+        self.assertIn("function radarMeta(e)", html)
+        self.assertIn("function setRadarFilter(f)", html)
+        self.assertIn('class="reason-pill"', html)
+
 
 if __name__ == "__main__":
     unittest.main()

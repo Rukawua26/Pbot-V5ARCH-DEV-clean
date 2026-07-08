@@ -159,6 +159,15 @@
         .tbl-wrap tr { transition: transform 0.16s ease, background 0.16s ease; }
         .tbl-wrap tr:hover td { background: var(--hover); }
         .tbl-wrap tr:hover { transform: translateX(2px); }
+        .radar-summary { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:8px; padding:0 16px 10px; }
+        .radar-card { background:var(--inset-bg); border:1px solid var(--border-panel); border-radius:12px; padding:9px 10px; }
+        .radar-card strong { display:block; font-size:18px; line-height:1; font-family:'JetBrains Mono',monospace; }
+        .radar-card span { display:block; margin-top:5px; font-size:9px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); }
+        .radar-filters { display:flex; gap:6px; padding:0 16px 12px; overflow-x:auto; }
+        .reason-pill { display:inline-flex; flex-direction:column; gap:2px; min-width:112px; }
+        .reason-pill b { font-size:10px; line-height:1; }
+        .reason-pill small { color:var(--text-muted); font-size:9px; line-height:1.1; }
+        .near-pass td { background:rgba(255,179,0,0.035); }
 
         .badge { padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; white-space: nowrap; }
         .badge-green { background: rgba(57,255,20,0.12); color: var(--neon-green); }
@@ -231,6 +240,8 @@
             .chart-box { height: 240px; }
             .mobile-stack { width: 100%; }
             .radar-table-wrap { max-height: 62dvh; min-height: 360px; }
+            .radar-summary { grid-template-columns:repeat(2,minmax(0,1fr)); padding:0 12px 10px; }
+            .radar-filters { padding:0 12px 12px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -345,6 +356,17 @@
                     <div class="p-4 pb-2 flex items-center gap-3">
                         <h2 class="font-bold text-sm uppercase tracking-wider">Radar de Inteligencia <span id="radar-count" class="text-muted font-mono font-normal">(0)</span></h2>
                         <span class="text-[9px] text-muted bg-inset px-2 py-0.5 rounded-full">ML ACTIVE</span>
+                    </div>
+                    <div id="radar-summary" class="radar-summary"></div>
+                    <div class="radar-filters">
+                        <button class="btn-filter active" data-radar-filter="all" onclick="setRadarFilter('all')">Todas</button>
+                        <button class="btn-filter" data-radar-filter="pass" onclick="setRadarFilter('pass')">Ejecutables</button>
+                        <button class="btn-filter" data-radar-filter="near" onclick="setRadarFilter('near')">Cerca</button>
+                        <button class="btn-filter" data-radar-filter="adx" onclick="setRadarFilter('adx')">ADX bajo</button>
+                        <button class="btn-filter" data-radar-filter="volume" onclick="setRadarFilter('volume')">Volumen</button>
+                        <button class="btn-filter" data-radar-filter="agents" onclick="setRadarFilter('agents')">Agentes</button>
+                        <button class="btn-filter" data-radar-filter="risk" onclick="setRadarFilter('risk')">Riesgo SL</button>
+                        <button class="btn-filter" data-radar-filter="timeout" onclick="setRadarFilter('timeout')">Timeout</button>
                     </div>
                     <div class="tbl-wrap radar-table-wrap">
                         <table>
@@ -490,6 +512,7 @@
         var API = '/api/v1'; var H = {};
         var tradeChartInstance = null, equityChartInstance = null;
         var tradeFilter = 'all';
+        var radarFilter = 'all', lastRadar = [];
         var tradeAllCount = 473, tradeShadowCount = 471, tradeRealCount = 2;
 
         /* ===== TABS ===== */
@@ -587,15 +610,63 @@
             }).join('');
         }
 
+        function radarMeta(e) {
+            var res=String(e.result||''), prob=Number(e.prob||0), category='other', label='Observando', detail=res||'-', near=false;
+            var adx=res.match(/ADX\s+([0-9.]+)\s+<\s+([0-9.]+)/i);
+            var vol=res.match(/volumen\s+([0-9.]+)\s+<\s+([0-9.]+)/i);
+            var risk=res.match(/RIESGO EXCESIVO\s*\(([0-9.]+)%\s*>\s*([0-9.]+)%\)/i);
+            var agents=res.match(/solo\s+([0-9]+)\/([0-9]+)\s+agentes/i);
+            if(res.includes('TIMEOUT')) { category='timeout'; label='Timeout'; detail='Sin analisis completo'; }
+            else if(risk) { category='risk'; label='Riesgo SL'; detail=risk[1]+'% / '+risk[2]+'%'; }
+            else if(adx) { category='adx'; label='ADX bajo'; detail=Number(adx[1]).toFixed(1)+' / '+Number(adx[2]).toFixed(0); near=Number(adx[1]) >= Number(adx[2])-3; }
+            else if(vol) { category='volume'; label='Volumen bajo'; detail=Number(vol[1]).toFixed(2)+' / '+Number(vol[2]).toFixed(2); near=Number(vol[1]) >= Number(vol[2])*0.65; }
+            else if(agents) { category='agents'; label='Agentes'; detail=agents[1]+' / '+agents[2]+' activos'; }
+            else if(!res.includes('VETO') && !res.includes('WAIT') && (e.signal||'WAIT')!=='WAIT') { category='pass'; label='Ejecutable'; detail='Sin veto'; }
+            return {category:category,label:label,detail:detail,near:near,score:(category==='pass'?0:near?1:category==='timeout'?4:2),prob:prob};
+        }
+
+        function setRadarFilter(f) {
+            radarFilter=f;
+            document.querySelectorAll('[data-radar-filter]').forEach(function(b){b.classList.toggle('active',b.dataset.radarFilter===f);});
+            renderRadar(lastRadar);
+        }
+
+        function renderRadarSummary(arr, metas) {
+            var el=document.getElementById('radar-summary');
+            if(!el)return;
+            var total=arr.length, pass=0, near=0, adx=0, vol=0, agents=0, risk=0, timeout=0;
+            metas.forEach(function(m){
+                if(m.category==='pass')pass++;
+                if(m.near)near++;
+                if(m.category==='adx')adx++;
+                if(m.category==='volume')vol++;
+                if(m.category==='agents')agents++;
+                if(m.category==='risk')risk++;
+                if(m.category==='timeout')timeout++;
+            });
+            el.innerHTML=[
+                ['text-theme',total,'Escaneadas'],['glow-green',pass,'Ejecutables'],['text-amber-400',near,'Cerca de pasar'],['text-rose-400',adx+vol+agents+risk,'Vetadas'],['text-dim',timeout,'Timeout']
+            ].map(function(c){return '<div class="radar-card"><strong class="'+c[0]+'">'+c[1]+'</strong><span>'+c[2]+'</span></div>';}).join('');
+        }
+
         function renderRadar(arr) {
             var b=document.getElementById('radar-body'), c=document.getElementById('radar-count');
-            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="7" class="empty-state"><strong>Esperando radar</strong>Verifica que el bot este activo en PAPER o SHADOW y que la API responda.</td></tr>';c.textContent='(0)';return;}
-            c.textContent='('+arr.length+')';
-            b.innerHTML=arr.map(function(e,i){
-                var sig=e.signal||'WAIT', sc=sig==='BUY'?'text-emerald-400':sig==='SELL'?'text-rose-400':'text-muted';
+            lastRadar=arr||[];
+            if(!arr||!arr.length){b.innerHTML='<tr><td colspan="7" class="empty-state"><strong>Esperando radar</strong>Verifica que el bot este activo en PAPER o SHADOW y que la API responda.</td></tr>';c.textContent='(0)';renderRadarSummary([],[]);return;}
+            var enriched=arr.map(function(e){return {entry:e,meta:radarMeta(e)};});
+            renderRadarSummary(arr,enriched.map(function(x){return x.meta;}));
+            enriched=enriched.filter(function(x){
+                if(radarFilter==='all')return true;
+                if(radarFilter==='near')return x.meta.near;
+                return x.meta.category===radarFilter;
+            }).sort(function(a,b){return (a.meta.score-b.meta.score) || (b.meta.prob-a.meta.prob);});
+            c.textContent='('+arr.length+' / '+enriched.length+')';
+            if(!enriched.length){b.innerHTML='<tr><td colspan="7" class="empty-state"><strong>Sin resultados en este filtro</strong>Cambia el filtro del radar para ampliar la vista.</td></tr>';return;}
+            b.innerHTML=enriched.map(function(x,i){
+                var e=x.entry,m=x.meta,sig=e.signal||'WAIT', sc=sig==='BUY'?'text-emerald-400':sig==='SELL'?'text-rose-400':'text-muted';
                 var pv=e.prob>0?e.prob.toFixed(1)+'%':'---', pc2=e.prob>70?'text-emerald-400':e.prob>40?'text-amber-400':'text-muted';
-                var rs=e.rsi||0, tr=e.trend||'N/A', res=e.result||'', rc=res.includes('VETO')?'text-rose-400':res.includes('SHADOW')?'text-amber-400':'text-dim';
-                return '<tr class="reason-row"><td class="text-muted">'+(i+1)+'</td><td class="font-bold text-theme">'+esc(e.symbol)+'</td><td class="'+sc+' font-bold">'+esc(sig)+'</td><td class="'+pc2+'">'+pv+'</td><td style="text-align:center;">'+rs+'</td><td class="'+(tr==='UP'?'text-emerald-400':tr==='DOWN'?'text-rose-400':'text-muted')+'">'+esc(tr)+'</td><td class="'+rc+' text-[10px]">'+esc(res)+'</td></tr>';
+                var rs=e.rsi||0, tr=e.trend||'N/A', rc=m.category==='pass'?'text-emerald-400':m.near?'text-amber-400':m.category==='timeout'?'text-dim':'text-rose-400';
+                return '<tr class="reason-row '+(m.near?'near-pass':'')+'" title="'+esc(e.result||'')+'"><td class="text-muted">'+(i+1)+'</td><td class="font-bold text-theme">'+esc(e.symbol)+'</td><td class="'+sc+' font-bold">'+esc(sig)+'</td><td class="'+pc2+'">'+pv+'</td><td style="text-align:center;">'+rs+'</td><td class="'+(tr==='UP'?'text-emerald-400':tr==='DOWN'?'text-rose-400':'text-muted')+'">'+esc(tr)+'</td><td class="'+rc+' text-[10px]"><span class="reason-pill"><b>'+esc(m.label)+'</b><small>'+esc(m.detail)+'</small></span></td></tr>';
             }).join('');
         }
 
