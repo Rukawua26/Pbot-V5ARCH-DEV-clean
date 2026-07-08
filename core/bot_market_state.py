@@ -259,7 +259,9 @@ def warmup_hurst(bot) -> bool:
 
     try:
         data_service = getattr(bot, "data_service", None)
-        exchange = getattr(data_service, "exchange", None) if data_service else None
+        if data_service is None:
+            return False
+        exchange = getattr(data_service, "exchange", None)
         if exchange is None:
             return False
 

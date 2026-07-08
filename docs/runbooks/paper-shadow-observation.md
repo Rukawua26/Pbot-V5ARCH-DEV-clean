@@ -62,3 +62,47 @@ El reporte usa `logs/runtime_metrics.jsonl` y resume vetos, boosts, overrides, t
 - Global Market queda aceptado si no introduce huecos frecuentes ni latencia operativa relevante.
 - Macro filters requieren evidencia de mejora sin degradar drawdown.
 - Consenso/trailing requiere winrate SHADOW >45% y mejor relacion avg win/avg loss contra baseline.
+
+## Plan de corrida de 1 semana (cronograma)
+
+El objetivo es recolectar >=20 trades SHADOW cerrados con todos los flags activos,
+sin tocar thresholds ni logica de ejecucion.
+
+### Dia 0 - Preflight y arranque
+1. Confirmar modo seguro (PAPER o SHADOW sin ALLOW_REAL_TRADING).
+2. Ejecutar preflight:
+   ```bash
+   SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/pending_improvements_readiness.py
+   ```
+3. Arrancar el bot con los flags del bloque "Configuracion PAPER sugerida".
+4. Verificar que `logs/runtime_metrics.jsonl` recibe eventos `shadow_validation`
+   (debe aparecer `config_snapshot` al iniciar).
+
+### Dia 1-2 - Baseline limpio
+- Dejar correr sin tocar nada.
+- Al final del dia 2, ejecutar el reporte y guardar salida como `baseline_d2.md`.
+
+### Dia 3-4 - Observacion macro + FVG + consenso
+- Los flags ya estan activos desde el dia 0; estos dias solo acumulan datos.
+- Revisar `fvg_cycle` y `filter_decision` en el reporte diario (sin ajustar thresholds).
+
+### Dia 5-7 - Acumulacion y cierre
+- Objetivo: >=20 trades SHADOW cerrados en `shadow_trade_closed`.
+- Al final del dia 7, ejecutar reporte final y comparar contra baseline del roadmap
+  (17 SHADOW trades, 35.3% WR, -12.17% PnL).
+
+### Comando de arranque sugerido
+```bash
+SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python main.py
+```
+(requiere `.env` con los flags del bloque "Configuracion PAPER sugerida")
+
+### Gates de decision (post-semana)
+- Si `shadow_trades.closed >= 20` y `winrate_pct > 45` y `avg_win_pct/abs(avg_loss_pct)` mejora:
+  candidato a ajuste fino de thresholds (Fase 5).
+- Si `agent_override_rate_pct` es 0 o ~100% sistematicamente: revisar
+  `SIGNAL_AGENT_OVERRIDE_THRESHOLD`.
+- Si FVG `new_gaps` alto pero no correlaciona con trades buenos: dejar observacional.
+- Si `macro_vetoes` mata senales utiles o `macro_boosts` no mejoran PnL: ajustar
+  `GLOBAL_FEAR_VETO_THRESHOLD` / `GLOBAL_BTC_DOM_BOOST_THRESHOLD` solo con evidencia.
+
