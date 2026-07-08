@@ -508,8 +508,12 @@
         });
 
         /* ===== COMMANDS ===== */
-        function hasApiKey() { return Boolean(H['X-API-Key']); }
+        function hasApiKey() { return true; }
         function setApiKey(interactive) {
+            if (!interactive) {
+                document.getElementById('auth-btn').textContent = '🔐 LOCAL';
+                return true;
+            }
             var key = window.prompt('SNIPER_API_KEY del dashboard:');
             if (key && key.trim().length >= 16) {
                 H = {'X-API-Key': key.trim()};

@@ -1,3 +1,4 @@
+import hashlib
 import hmac
 import json
 import os
@@ -34,6 +35,10 @@ if len(API_KEY) < 16:
 CONTROL_API_KEY = os.getenv("SNIPER_CONTROL_API_KEY")
 if CONTROL_API_KEY is not None and len(CONTROL_API_KEY) < 16:
     raise RuntimeError("SNIPER_CONTROL_API_KEY debe tener al menos 16 caracteres.")
+READ_SESSION_COOKIE = "sniper_dashboard_read_session"
+READ_SESSION_TOKEN = hmac.new(
+    API_KEY.encode("utf-8"), b"sniper-dashboard-read-session-v1", hashlib.sha256
+).hexdigest()
 STATE_FILE = "/dev/shm/sniper_state.json"
 CMD_DIR = "/dev/shm/sniper_cmd"
 LOG_FILE = "sniper.log"
@@ -107,7 +112,10 @@ class Command(BaseModel):
 
 def verify_key(req: Request):
     supplied = str(req.headers.get("X-API-Key") or "")
-    if not hmac.compare_digest(supplied, API_KEY):
+    cookie = str(req.cookies.get(READ_SESSION_COOKIE) or "")
+    if not (
+        hmac.compare_digest(supplied, API_KEY) or hmac.compare_digest(cookie, READ_SESSION_TOKEN)
+    ):
         raise HTTPException(401, "Unauthorized")
 
 
@@ -135,7 +143,15 @@ def index():
     path = os.path.join(STATIC_DIR, "index.html")
     if not os.path.exists(path):
         raise HTTPException(404, "Dashboard HTML not found")
-    return FileResponse(path)
+    response = FileResponse(path)
+    response.set_cookie(
+        READ_SESSION_COOKIE,
+        READ_SESSION_TOKEN,
+        httponly=True,
+        samesite="strict",
+        max_age=12 * 60 * 60,
+    )
+    return response
 
 
 @app.get("/api/v1/health")

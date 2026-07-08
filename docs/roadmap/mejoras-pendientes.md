@@ -83,6 +83,7 @@ Criterio de exito: winrate > 65% en trades replicados vs ~50% baseline, con al m
 
 `tools/dashboard_api_server.py` requiere `SNIPER_API_KEY` con al menos 16 caracteres para iniciar.
 Si no esta configurada, el dashboard API lanza warning pero el bot sigue operando normal.
+El dashboard localhost usa cookie HttpOnly para lectura automatica sin prompt del navegador.
 
 Pendiente:
 1. Definir `SNIPER_API_KEY` segura en `.env` si se va a usar el dashboard.
@@ -90,6 +91,18 @@ Pendiente:
 3. Documentar la variable en `.env.example` si aplica.
 
 Criterio de exito: bot arranca sin warning cuando dashboard esta habilitado, o dashboard queda apagado explicitamente cuando no se use.
+
+### 5.1 Dashboard Votos / Consenso — PENDIENTE
+
+Objetivo: ver desde `http://127.0.0.1:8000` los votos MT/SR/G, consenso, score direccional, override y razon exacta de veto por simbolo.
+
+Pendiente:
+1. Ampliar `core/state_snapshot.py` o agregar endpoint read-only `/api/v1/signals/live`.
+2. Exponer por simbolo: `votos`, `agent_direction_score`, `agent_signal_override`, `audit_verdict`, `filter_reason`, `prob_final`.
+3. Agregar pestana UI "Votos / Consenso" en `dashboard/static/index.html`.
+4. Mantener solo lectura en esta fase; no permitir force entry, override o cambios de pesos hasta terminar la campana SHADOW.
+
+Criterio de exito: el usuario puede auditar por localhost por que una senal 70-80% fue vetada sin consultar logs ni consola.
 
 ### 6. Direccion por Consenso de Agentes + Trailing Adaptativo — IMPLEMENTADO
 

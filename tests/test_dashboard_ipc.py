@@ -139,6 +139,42 @@ class DashboardIpcTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 401)
 
+    def test_dashboard_read_cookie_authenticates_without_exposing_api_key(self):
+        req = type(
+            "Req",
+            (),
+            {
+                "headers": {},
+                "cookies": {api_server.READ_SESSION_COOKIE: api_server.READ_SESSION_TOKEN},
+            },
+        )()
+
+        self.assertIsNone(api_server.verify_key(req))
+
+    def test_dashboard_index_sets_httponly_read_cookie(self):
+        response = api_server.index()
+        headers = [
+            value.decode("latin-1")
+            for key, value in response.raw_headers
+            if key.decode("latin-1").lower() == "set-cookie"
+        ]
+
+        self.assertTrue(any(api_server.READ_SESSION_COOKIE in header for header in headers))
+        self.assertTrue(any("HttpOnly" in header for header in headers))
+        self.assertTrue(any("SameSite=strict" in header for header in headers))
+
+    def test_dashboard_rejects_invalid_read_cookie(self):
+        req = type(
+            "Req",
+            (),
+            {"headers": {}, "cookies": {api_server.READ_SESSION_COOKIE: "bad-token"}},
+        )()
+
+        with self.assertRaises(HTTPException) as raised:
+            api_server.verify_key(req)
+
+        self.assertEqual(raised.exception.status_code, 401)
+
     def test_dashboard_command_writer_rejects_unsafe_cmd_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             unsafe_dir = os.path.join(tmpdir, "cmd")
@@ -216,6 +252,15 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn('id="intel-postmortem"', html)
         self.assertIn("generateIntelligence()", html)
         self.assertIn("openTradePostmortem", html)
+
+    def test_dashboard_static_uses_local_cookie_auth_without_startup_prompt(self):
+        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("function hasApiKey() { return true; }", html)
+        self.assertIn("setApiKey(false);", html)
+        self.assertIn("🔐 LOCAL", html)
 
 
 if __name__ == "__main__":
