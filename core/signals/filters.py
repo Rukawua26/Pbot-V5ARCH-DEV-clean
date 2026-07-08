@@ -338,6 +338,47 @@ def _apply_side_quality_parity_filter(
     return True, None
 
 
+def _apply_ema_alignment_filter(audit_signal: str, ctx: dict) -> tuple[bool, str | None]:
+    if not bool(getattr(Config, "EMA_ALIGNMENT_FILTER_ENABLED", False)):
+        return True, None
+    if audit_signal not in {"BUY", "SELL"} or not isinstance(ctx, dict):
+        return True, None
+
+    close = float(ctx.get("close", 0.0) or 0.0)
+    ema_9 = float(ctx.get("ema_9", 0.0) or 0.0)
+    ema_21 = float(ctx.get("ema_21", 0.0) or 0.0)
+    ema_50 = float(ctx.get("ema", 0.0) or 0.0)
+    if min(close, ema_9, ema_21, ema_50) <= 0.0:
+        return True, None
+
+    mode = str(getattr(Config, "EMA_ALIGNMENT_MODE", "cross") or "cross").lower()
+    if mode == "stack":
+        buy_ok = ema_9 > ema_21 > ema_50
+        sell_ok = ema_9 < ema_21 < ema_50
+        mode_label = "stack"
+    else:
+        buy_ok = ema_9 > ema_21 and close > ema_50
+        sell_ok = ema_9 < ema_21 and close < ema_50
+        mode_label = "cross"
+
+    if bool(getattr(Config, "EMA_SLOPE_FILTER_ENABLED", False)):
+        slope = float(ctx.get("ema50_slope", 0.0) or 0.0)
+        buy_ok = buy_ok and slope >= 0.0
+        sell_ok = sell_ok and slope <= 0.0
+
+    if audit_signal == "BUY" and not buy_ok:
+        return False, (
+            f"EMA_ALIGN_{mode_label}: BUY requiere EMA9>EMA21 y close>EMA50 "
+            f"(EMA9={ema_9:.6f}, EMA21={ema_21:.6f}, EMA50={ema_50:.6f})"
+        )
+    if audit_signal == "SELL" and not sell_ok:
+        return False, (
+            f"EMA_ALIGN_{mode_label}: SELL requiere EMA9<EMA21 y close<EMA50 "
+            f"(EMA9={ema_9:.6f}, EMA21={ema_21:.6f}, EMA50={ema_50:.6f})"
+        )
+    return True, None
+
+
 def _apply_entry_filters_and_adjust_prob(
     bot, symbol, symbol_raw, df_main, audit_signal, prob_final, ctx, vol_rel, votos=None
 ):
@@ -493,6 +534,14 @@ def _apply_entry_filters_and_adjust_prob(
             filter_passed = False
             filter_reason = parity_reason
             bot.log(f"⛔ {symbol}: {parity_reason}")
+
+    # [EMA_ALIGNMENT] EMA9/21 confirma impulso; EMA50 conserva estructura.
+    if filter_passed:
+        ema_ok, ema_reason = _apply_ema_alignment_filter(audit_signal, ctx)
+        if not ema_ok:
+            filter_passed = False
+            filter_reason = ema_reason
+            bot.log(f"⛔ {symbol}: {ema_reason}")
 
     # [BEAR_TREND PREVETO] Veto directo si hay alta probabilidad de reversión alcista
     if filter_passed and audit_signal == "BUY" and btc_regime == "BEAR_TREND":

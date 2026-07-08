@@ -93,6 +93,12 @@ def emit_filter_decision(
             "agent_signal_override": bool(ctx.get("agent_signal_override", False)),
             "base_trend": str(ctx.get("base_trend") or ""),
             "trend": str(ctx.get("trend") or ""),
+            "ema_9": _float(ctx.get("ema_9")),
+            "ema_21": _float(ctx.get("ema_21")),
+            "ema_50": _float(ctx.get("ema")),
+            "ema_fast_spread": _float(ctx.get("ema_fast_spread")),
+            "ema_compression": _float(ctx.get("ema_compression")),
+            "ema50_slope": _float(ctx.get("ema50_slope")),
         },
     )
 

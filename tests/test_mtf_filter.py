@@ -306,6 +306,8 @@ class MTFFilterTests(unittest.TestCase):
 
         with (
             patch.object(filters.Config, "MTF_FILTER_ENABLED", False),
+            patch.object(filters.Config, "EMA_ALIGNMENT_FILTER_ENABLED", False),
+            patch.object(filters.Config, "SIDE_PARITY_RANGE_BUY_MAX_RSI", 60.0),
             patch.object(filters.Config, "OI_FILTER_ENABLED", False),
             patch.object(filters.Config, "BREAKOUT_WATCH_ENABLED", False),
             patch.object(

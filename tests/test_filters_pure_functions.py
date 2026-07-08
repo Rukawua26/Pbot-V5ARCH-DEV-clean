@@ -6,6 +6,7 @@ from unittest.mock import patch
 from config import Config
 from core.signals.analyze import _get_fast_coherence_veto_reason
 from core.signals.filters import (
+    _apply_ema_alignment_filter,
     _evaluate_bootstrap_heuristic,
     _get_markov_snapshot_mode,
     _is_shadow_learning_runtime,
@@ -141,6 +142,53 @@ class TestEvaluateBootstrapHeuristic(unittest.TestCase):
         }
         r = _evaluate_bootstrap_heuristic("SELL", ctx)
         self.assertIn("EMA_ALIGN", r["heuristic_hits"])
+
+
+class TestApplyEmaAlignmentFilter(unittest.TestCase):
+    def test_disabled_filter_allows_signal(self):
+        with patch.object(Config, "EMA_ALIGNMENT_FILTER_ENABLED", False):
+            ok, reason = _apply_ema_alignment_filter("BUY", {})
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_cross_buy_requires_fast_ema_and_close_above_ema50(self):
+        ctx = {"close": 105.0, "ema_9": 103.0, "ema_21": 101.0, "ema": 100.0}
+        with (
+            patch.object(Config, "EMA_ALIGNMENT_FILTER_ENABLED", True),
+            patch.object(Config, "EMA_ALIGNMENT_MODE", "cross"),
+            patch.object(Config, "EMA_SLOPE_FILTER_ENABLED", False),
+        ):
+            ok, reason = _apply_ema_alignment_filter("BUY", ctx)
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_cross_sell_rejects_when_fast_ema_not_bearish(self):
+        ctx = {"close": 95.0, "ema_9": 101.0, "ema_21": 100.0, "ema": 100.0}
+        with (
+            patch.object(Config, "EMA_ALIGNMENT_FILTER_ENABLED", True),
+            patch.object(Config, "EMA_ALIGNMENT_MODE", "cross"),
+            patch.object(Config, "EMA_SLOPE_FILTER_ENABLED", False),
+        ):
+            ok, reason = _apply_ema_alignment_filter("SELL", ctx)
+        self.assertFalse(ok)
+        self.assertIn("EMA_ALIGN_cross", reason)
+
+    def test_slope_filter_rejects_buy_when_ema50_slope_is_negative(self):
+        ctx = {
+            "close": 105.0,
+            "ema_9": 103.0,
+            "ema_21": 101.0,
+            "ema": 100.0,
+            "ema50_slope": -0.001,
+        }
+        with (
+            patch.object(Config, "EMA_ALIGNMENT_FILTER_ENABLED", True),
+            patch.object(Config, "EMA_ALIGNMENT_MODE", "cross"),
+            patch.object(Config, "EMA_SLOPE_FILTER_ENABLED", True),
+        ):
+            ok, reason = _apply_ema_alignment_filter("BUY", ctx)
+        self.assertFalse(ok)
+        self.assertIn("EMA_ALIGN_cross", reason)
 
 
 class TestIsShadowLearningRuntime(unittest.TestCase):

@@ -19,6 +19,8 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
         raise KeyError("RAW_TA_UNAVAILABLE")
 
     ema_ref = float(raw_metrics.get("ema", price) or price)
+    ema_9 = float(raw_metrics.get("ema_9", ema_ref) or ema_ref)
+    ema_21 = float(raw_metrics.get("ema_21", ema_ref) or ema_ref)
     trend_label = "RANGO"
     current_adx = float(
         raw_metrics.get("adx", ind.get("adx", _safe_series_float(df_main, "adx", 0.0)))
@@ -44,6 +46,11 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
         "adx": current_adx,
         "close": close_raw,
         "ema": float(ema_ref),
+        "ema_9": ema_9,
+        "ema_21": ema_21,
+        "ema_fast_spread": float(raw_metrics.get("ema_fast_spread", 0.0) or 0.0),
+        "ema_compression": float(raw_metrics.get("ema_compression", 0.0) or 0.0),
+        "ema50_slope": float(raw_metrics.get("ema50_slope", 0.0) or 0.0),
         "df_1h": df_main,
         "atr": current_atr,
         "atr_pct": atr_pct_raw,
@@ -109,7 +116,8 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
     if raw_log_count < 5:
         bot.log(
             f"🧪 RAW_TA {symbol}: rows={ctx['raw_rows']} "
-            f"RSI={ctx['rsi']:.2f} ADX={ctx['adx']:.2f} ATR={ctx['atr']:.6f} EMA={ctx['ema']:.6f}"
+            f"RSI={ctx['rsi']:.2f} ADX={ctx['adx']:.2f} ATR={ctx['atr']:.6f} "
+            f"EMA9={ctx['ema_9']:.6f} EMA21={ctx['ema_21']:.6f} EMA50={ctx['ema']:.6f}"
         )
         bot._raw_snapshot_log_count = raw_log_count + 1
 

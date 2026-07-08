@@ -50,6 +50,8 @@ class StrategyUtils:
             if len(work) < 100:
                 return None
 
+            work.ta.ema(length=9, append=True)
+            work.ta.ema(length=21, append=True)
             work.ta.ema(length=50, append=True)
             work.ta.rsi(length=14, append=True)
             work.ta.atr(length=14, append=True)
@@ -58,6 +60,8 @@ class StrategyUtils:
             work["volume_ma"] = work["volume"].rolling(window=20, min_periods=20).mean()
 
             needed = [
+                "EMA_9",
+                "EMA_21",
                 "EMA_50",
                 "RSI_14",
                 "ATRr_14",
@@ -71,6 +75,8 @@ class StrategyUtils:
                 return None
 
             last = work.iloc[-1]
+            ema_9 = float(last["EMA_9"])
+            ema_21 = float(last["EMA_21"])
             ema = float(last["EMA_50"])
             rsi = float(last["RSI_14"])
             atr = float(last["ATRr_14"])
@@ -80,21 +86,49 @@ class StrategyUtils:
             volume_ma = float(last["volume_ma"])
             close = float(last["close"])
 
-            if any(pd.isna(v) for v in [ema, rsi, atr, adx, bb_lower, bb_upper, volume_ma, close]):
+            if any(
+                pd.isna(v)
+                for v in [ema_9, ema_21, ema, rsi, atr, adx, bb_lower, bb_upper, volume_ma, close]
+            ):
                 return None
-            if ema <= 0 or close <= 0 or volume_ma <= 0 or atr < 0 or adx < 0:
+            if (
+                ema_9 <= 0
+                or ema_21 <= 0
+                or ema <= 0
+                or close <= 0
+                or volume_ma <= 0
+                or atr < 0
+                or adx < 0
+            ):
                 return None
             if bb_upper <= bb_lower:
                 return None
 
+            try:
+                from config import Config
+
+                slope_lookback = max(1, int(getattr(Config, "EMA_SLOPE_LOOKBACK", 2) or 2))
+            except Exception:
+                slope_lookback = 2
+            ema_prev = (
+                float(work["EMA_50"].iloc[-(slope_lookback + 1)])
+                if len(work) > slope_lookback
+                else ema
+            )
+            ema50_slope = ((ema - ema_prev) / ema_prev) if ema_prev > 0 else 0.0
             result = {
                 "rows": float(len(work)),
+                "ema_9": ema_9,
+                "ema_21": ema_21,
                 "ema": ema,
                 "rsi": rsi,
                 "atr": atr,
                 "adx": adx,
                 "volume_ma": volume_ma,
                 "dist_ema": (close - ema) / ema,
+                "ema_fast_spread": (ema_9 - ema_21) / close,
+                "ema_compression": (ema_9 - ema) / close,
+                "ema50_slope": ema50_slope,
                 "bb_lower": bb_lower,
                 "bb_upper": bb_upper,
                 "bb_pos": (close - bb_lower) / (bb_upper - bb_lower),
@@ -210,7 +244,11 @@ class StrategyUtils:
                     "bb_upper",
                     "stoch_k",
                     "stoch_d",
+                    "ema_9",
+                    "ema_21",
                     "ema_200",
+                    "EMA_9",
+                    "EMA_21",
                     "EMA_50",
                     "RSI_14",
                     "ATRr_14",
@@ -227,6 +265,8 @@ class StrategyUtils:
                     errors="ignore",
                 )
 
+                df.ta.ema(length=9, append=True)
+                df.ta.ema(length=21, append=True)
                 df.ta.ema(length=50, append=True)
                 df.ta.rsi(length=14, append=True)
                 df.ta.atr(length=14, append=True)
@@ -238,6 +278,8 @@ class StrategyUtils:
                 df.ta.ema(length=200, append=True)
 
                 rename_map = {
+                    "EMA_9": "ema_9",
+                    "EMA_21": "ema_21",
                     "EMA_50": "ema",
                     "RSI_14": "rsi",
                     "ATRr_14": "atr",
@@ -254,11 +296,27 @@ class StrategyUtils:
                 )
             else:
                 df.drop(
-                    columns=[c for c in ["ema", "ema_200", "EMA_50", "EMA_200"] if c in df.columns],
+                    columns=[
+                        c
+                        for c in [
+                            "ema",
+                            "ema_9",
+                            "ema_21",
+                            "ema_200",
+                            "EMA_9",
+                            "EMA_21",
+                            "EMA_50",
+                            "EMA_200",
+                        ]
+                        if c in df.columns
+                    ],
                     inplace=True,
                     errors="ignore",
                 )
+                df.ta.ema(length=9, append=True)
+                df.ta.ema(length=21, append=True)
                 df.ta.ema(length=50, append=True)
+                df.rename(columns={"EMA_9": "ema_9", "EMA_21": "ema_21"}, inplace=True)
                 df.rename(columns={"EMA_50": "ema"}, inplace=True)
                 if len(df) >= 200:
                     df.ta.ema(length=200, append=True)

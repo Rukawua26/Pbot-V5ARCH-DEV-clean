@@ -229,6 +229,13 @@ class Config(OperationalConfig, StrategyConfig):
     SIDE_PARITY_RANGE_SELL_MIN_RSI = _env_float("SIDE_PARITY_RANGE_SELL_MIN_RSI", 40.0)
     SIDE_PARITY_MIN_AGENT_SUPPORT = _env_int("SIDE_PARITY_MIN_AGENT_SUPPORT", 2)
 
+    # --- EMA Alignment Filter (PAPER/SHADOW-first experiment) ---
+    EMA_ALIGNMENT_FILTER_ENABLED = _env_bool("EMA_ALIGNMENT_FILTER_ENABLED", False)
+    EMA_ALIGNMENT_MODE = _env_str("EMA_ALIGNMENT_MODE", "cross")
+    EMA_SLOPE_FILTER_ENABLED = _env_bool("EMA_SLOPE_FILTER_ENABLED", False)
+    EMA_SLOPE_LOOKBACK = _env_int("EMA_SLOPE_LOOKBACK", 2)
+    EMA_COMPRESSION_TELEMETRY_ENABLED = _env_bool("EMA_COMPRESSION_TELEMETRY_ENABLED", True)
+
     # --- FVG / Gap Tracker (satélite read-only) ---
     FVG_TRACKER_ENABLED = _env_bool("FVG_TRACKER_ENABLED", False)
     FVG_MIN_GAP_PCT = _env_float("FVG_MIN_GAP_PCT", 0.1)
@@ -336,6 +343,10 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append("MAX_ENTRY_SL_PCT debe ser >= 3.0")
         if float(cls.SHOCK_MIN_DIST_PCT) > 0.2:
             errors.append("SHOCK_MIN_DIST_PCT debe ser <= 0.2")
+        if str(cls.EMA_ALIGNMENT_MODE).lower() not in {"cross", "stack"}:
+            errors.append("EMA_ALIGNMENT_MODE debe ser 'cross' o 'stack'")
+        if int(cls.EMA_SLOPE_LOOKBACK) < 1:
+            errors.append("EMA_SLOPE_LOOKBACK debe ser >= 1")
         if float(cls.BTC_RISK_MAX_PRICE_AGE_SECONDS) <= 0:
             errors.append("BTC_RISK_MAX_PRICE_AGE_SECONDS debe ser positivo")
         if int(cls.HALT_RECOVERY_MAX_ATTEMPTS) < 1:

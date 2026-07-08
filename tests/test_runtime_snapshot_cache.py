@@ -39,6 +39,11 @@ class RuntimeSnapshotCacheTest(unittest.TestCase):
         self.assertIsNotNone(btc_snapshot)
         self.assertIsNotNone(dogs_snapshot)
         self.assertGreater(btc_snapshot["ema"], 100.0)
+        self.assertGreater(btc_snapshot["ema_9"], btc_snapshot["ema_21"])
+        self.assertGreater(btc_snapshot["ema_21"], 100.0)
+        self.assertIn("ema_fast_spread", btc_snapshot)
+        self.assertIn("ema_compression", btc_snapshot)
+        self.assertIn("ema50_slope", btc_snapshot)
         self.assertLess(dogs_snapshot["ema"], 20.0)
         self.assertNotEqual(btc_snapshot["ema"], dogs_snapshot["ema"])
 
