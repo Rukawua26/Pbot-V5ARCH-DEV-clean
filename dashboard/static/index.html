@@ -148,6 +148,7 @@
 
         /* TABLES */
         .tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 460px; -webkit-overflow-scrolling: touch; }
+        .radar-table-wrap { max-height: calc(100dvh - 205px); min-height: 520px; }
         .tbl-wrap table { width: 100%; min-width: 720px; font-size: 11px; font-family: 'JetBrains Mono', monospace; border-collapse: collapse; }
         .tbl-wrap th {
             position: sticky; top: 0; background: var(--thead-bg); padding: 8px 10px;
@@ -229,6 +230,7 @@
             .tab-btn { padding: 11px 14px; font-size: 11px; }
             .chart-box { height: 240px; }
             .mobile-stack { width: 100%; }
+            .radar-table-wrap { max-height: 62dvh; min-height: 360px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -344,7 +346,7 @@
                         <h2 class="font-bold text-sm uppercase tracking-wider">Radar de Inteligencia <span id="radar-count" class="text-muted font-mono font-normal">(0)</span></h2>
                         <span class="text-[9px] text-muted bg-inset px-2 py-0.5 rounded-full">ML ACTIVE</span>
                     </div>
-                    <div class="tbl-wrap" style="max-height:520px;">
+                    <div class="tbl-wrap radar-table-wrap">
                         <table>
                             <thead><tr><th>#</th><th>Symbol</th><th>Signal</th><th>Prob</th><th style="text-align:center;">RSI</th><th>Trend</th><th>Resultado</th></tr></thead>
                             <tbody id="radar-body"><tr><td colspan="7" class="empty-state"><strong>Radar inicializando</strong>Conecta la API y confirma que el bot este emitiendo estado.</td></tr></tbody>

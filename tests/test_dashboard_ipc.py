@@ -292,6 +292,15 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn("setApiKey(false);", html)
         self.assertIn("🔐 LOCAL", html)
 
+    def test_dashboard_radar_uses_viewport_height(self):
+        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(".radar-table-wrap", html)
+        self.assertIn("calc(100dvh - 205px)", html)
+        self.assertIn('class="tbl-wrap radar-table-wrap"', html)
+
 
 if __name__ == "__main__":
     unittest.main()
