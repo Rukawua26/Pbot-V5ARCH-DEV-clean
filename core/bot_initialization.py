@@ -9,6 +9,7 @@ from core.cooldown_state import load_cooldowns
 from core.execution_runtime_state import load_execution_runtime_state
 from core.providers.global_market import GlobalMarketProvider
 from core.time_utils import monotonic_now
+from core.ws_reconciliation import handle_ws_reconnected
 
 
 def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
@@ -136,6 +137,7 @@ def init_realtime_and_monitoring(
         symbols=bootstrap_symbols,
         enable_cvd=bool(getattr(Config, "CVD_FILTER_ENABLED", False)),
         cvd_window_seconds=int(getattr(Config, "CVD_WINDOW_SECONDS", 300)),
+        on_reconnect=lambda **kwargs: handle_ws_reconnected(bot, **kwargs),
     )
     bot.ws_manager.start_background()
 

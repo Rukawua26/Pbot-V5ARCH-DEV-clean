@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, patch
 from core.risk_policy import (
     activate_runtime_protection,
     evaluate_entry_risk_decision,
+    evaluate_neutral_agent_vote_decision,
     evaluate_runtime_entry_decision,
 )
 
@@ -125,6 +126,54 @@ class RiskPolicyTests(unittest.TestCase):
 
         self.assertIsNotNone(decision)
         self.assertEqual(decision.reason, "CIRCUIT_BREAKER_PANIC")
+
+    def test_runtime_entry_decision_blocks_real_during_ws_reconciliation(self):
+        bot = self._bot()
+        bot.ws_reconciliation_in_progress = True
+
+        decision = evaluate_runtime_entry_decision(bot, "BTC/USDT", False)
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.reason, "WS_RECONCILIATION_IN_PROGRESS")
+
+    def test_runtime_entry_decision_allows_shadow_during_ws_reconciliation(self):
+        bot = self._bot()
+        bot.ws_reconciliation_in_progress = True
+
+        decision = evaluate_runtime_entry_decision(bot, "BTC/USDT", True)
+
+        self.assertIsNone(decision)
+
+    def test_neutral_agent_vote_decision_blocks_all_neutral_votes(self):
+        decision = evaluate_neutral_agent_vote_decision(
+            "BTC/USDT",
+            False,
+            prob_final=50.0,
+            votes={"MT": 50.0, "SR": 50.0, "G": 50.0},
+        )
+
+        self.assertIsNotNone(decision)
+        self.assertEqual(decision.reason, "NEUTRAL_AGENT_VOTE")
+
+    def test_neutral_agent_vote_decision_ignores_missing_votes(self):
+        decision = evaluate_neutral_agent_vote_decision(
+            "BTC/USDT",
+            False,
+            prob_final=50.0,
+            votes={},
+        )
+
+        self.assertIsNone(decision)
+
+    def test_neutral_agent_vote_decision_ignores_directional_votes(self):
+        decision = evaluate_neutral_agent_vote_decision(
+            "BTC/USDT",
+            False,
+            prob_final=55.0,
+            votes={"MT": 60.0, "SR": 50.0, "G": 55.0},
+        )
+
+        self.assertIsNone(decision)
 
     def test_runtime_entry_decision_quarantines_real_symbol(self):
         execution = SimpleNamespace(

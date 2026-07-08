@@ -1,18 +1,28 @@
 import asyncio
 from collections import deque
 import json
+import logging
 import random
 import threading
 import time
 
 import websockets
 
+logger = logging.getLogger("SniperAI")
+
 
 class BinanceWebSocket:
-    def __init__(self, symbols=["btcusdt"], enable_cvd=False, cvd_window_seconds=300):
+    def __init__(
+        self,
+        symbols=["btcusdt"],
+        enable_cvd=False,
+        cvd_window_seconds=300,
+        on_reconnect=None,
+    ):
         self.symbols = [s.lower().replace("/", "").split(":")[0] for s in symbols]
         self.enable_cvd = bool(enable_cvd)
         self.cvd_window_seconds = max(1, int(cvd_window_seconds or 300))
+        self.on_reconnect = on_reconnect
         self._lock = threading.RLock()
 
         self.url = self._build_url()
@@ -28,6 +38,8 @@ class BinanceWebSocket:
         self._loop = None
         self._ws = None
         self._thread = None
+        self._connect_count = 0
+        self._reconnect_count = 0
 
     def _build_url(self):
         streams = []
@@ -73,6 +85,19 @@ class BinanceWebSocket:
                 # Use \n to avoid mixing with the carriage return updates
                 async with websockets.connect(self.url) as ws:
                     self._ws = ws
+                    self._connect_count += 1
+                    if self._connect_count > 1:
+                        self._reconnect_count += 1
+                        callback = self.on_reconnect
+                        if callable(callback):
+                            threading.Thread(
+                                target=callback,
+                                kwargs={
+                                    "source": "l2_cvd_ws",
+                                    "reconnect_count": self._reconnect_count,
+                                },
+                                daemon=True,
+                            ).start()
                     self._reconnect_flag = False
                     reconnect_delay = 2.0
                     try:
@@ -86,7 +111,7 @@ class BinanceWebSocket:
                     finally:
                         self._ws = None
             except Exception as e:
-                print(f"⚠️ WS reconnect loop error: {e}")
+                logger.warning("WS reconnect loop error: %s", e)
 
             if self.is_running:
                 wait_s = reconnect_delay + random.uniform(0.0, 0.8)
@@ -134,7 +159,7 @@ class BinanceWebSocket:
                     self.l2_state[symbol]["spread"] = spread_pct
 
         except (ValueError, IndexError, KeyError) as e:
-            print(f"⚠️ WS payload inválido: {e}")
+            logger.warning("WS payload inválido: %s", e)
 
     def _process_agg_trade(self, symbol, payload):
         try:
@@ -160,7 +185,7 @@ class BinanceWebSocket:
                 state["cvd"] += delta
                 self._prune_cvd_locked(symbol, now_ts=ts)
         except (TypeError, ValueError) as e:
-            print(f"⚠️ WS aggTrade inválido: {e}")
+            logger.warning("WS aggTrade inválido: %s", e)
 
     def _prune_cvd_locked(self, symbol, now_ts=None):
         state = self.cvd_state.get(symbol)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from config import Config
 from core.execution_telemetry import append_execution_event
 from tools.learning import shadow_logger
 from tools.notifier import send_telegram_msg
@@ -22,9 +23,11 @@ RISK_REASON_PRIORITY = {
     "CIRCUIT_BREAKER_PANIC": 80,
     "BOT_PAUSED": 75,
     "RECOVERY_PENDING_STATE": 70,
+    "WS_RECONCILIATION_IN_PROGRESS": 68,
     "CONFIDENCE_STAGNATION_LOCK": 60,
     "SYMBOL_QUARANTINED": 50,
     "GLOBAL_COOLDOWN": 40,
+    "NEUTRAL_AGENT_VOTE": 35,
 }
 
 
@@ -50,12 +53,16 @@ def record_risk_decision(
     is_shadow: bool | None = None,
     extra: dict | None = None,
 ) -> None:
+    mode = "SHADOW" if is_shadow else ("PAPER" if Config.PAPER_MODE else "REAL")
     append_execution_event(
         bot,
         "RISK_DECISION",
         {
+            "component": "Risk",
             "symbol": symbol,
+            "mode": mode,
             "is_shadow": is_shadow,
+            "decision": decision.action,
             "action": decision.action,
             "reason": decision.reason,
             "scope": decision.scope,
@@ -63,6 +70,43 @@ def record_risk_decision(
             "priority": decision.priority,
             **(extra or {}),
         },
+    )
+
+
+def evaluate_neutral_agent_vote_decision(
+    symbol: str,
+    is_shadow: bool,
+    *,
+    prob_final: float | None,
+    votes: dict | None,
+) -> EntryRiskDecision | None:
+    """Block execution when the full agent consensus is explicitly neutral.
+
+    A lone 50.0 probability can be a fallback in older paths, so require a
+    non-empty votes dict and all available agent votes at 50.0.
+    """
+    if not votes:
+        return None
+    try:
+        prob = float(prob_final if prob_final is not None else 0.0)
+        vote_values = [float(value) for value in votes.values()]
+    except (TypeError, ValueError):
+        return None
+
+    if not vote_values:
+        return None
+    if abs(prob - 50.0) > 1e-9:
+        return None
+    if any(abs(value - 50.0) > 1e-9 for value in vote_values):
+        return None
+
+    return EntryRiskDecision(
+        action=RISK_ACTION_BLOCK,
+        reason="NEUTRAL_AGENT_VOTE",
+        scope=RISK_SCOPE_ALL,
+        log_message=f"🧭 NEUTRAL_AGENT_VOTE {symbol}: todos los agentes devolvieron 50.0; no se ejecuta.",
+        source="neutral_vote_gate",
+        priority=_priority_for("NEUTRAL_AGENT_VOTE"),
     )
 
 
@@ -178,6 +222,16 @@ def evaluate_runtime_entry_decision(bot, symbol: str, is_shadow: bool) -> EntryR
             log_message=f"🛑 CIRCUIT_BREAKER activo: bloqueando nueva entrada {symbol}.",
             source="runtime_entry_guard",
             priority=_priority_for("CIRCUIT_BREAKER_PANIC"),
+        )
+
+    if not is_shadow and bool(getattr(bot, "ws_reconciliation_in_progress", False)):
+        return EntryRiskDecision(
+            action=RISK_ACTION_BLOCK,
+            reason="WS_RECONCILIATION_IN_PROGRESS",
+            scope=RISK_SCOPE_REAL_ONLY,
+            log_message=f"🧷 WS_RECONCILIATION_IN_PROGRESS {symbol}: bloqueando nueva entrada REAL hasta reconciliar.",
+            source="runtime_entry_guard",
+            priority=_priority_for("WS_RECONCILIATION_IN_PROGRESS"),
         )
 
     if bool(getattr(bot, "is_paused", False)):

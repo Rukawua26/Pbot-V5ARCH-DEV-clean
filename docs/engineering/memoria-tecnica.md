@@ -37,6 +37,41 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-08 - Gate institucional y reconciliacion post-WebSocket
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/risk_policy.py`: se agrega decision estructurada `NEUTRAL_AGENT_VOTE` para bloquear ejecucion cuando todos los agentes devuelven `50.0` y `prob_final=50.0`.
+- `core/risk_policy.py`: se bloquean nuevas entradas REAL mientras `ws_reconciliation_in_progress` esta activo.
+- `core/ws_reconciliation.py`: nuevo coordinador de reconciliacion post-reconexion WebSocket; en PAPER solo registra/omite, en REAL ejecuta reconciliacion REST con debounce y activa proteccion/HALT si falla.
+- `tools/ws_manager.py`: el WebSocket L2/CVD acepta callback `on_reconnect` y lo dispara solo tras reconexion exitosa.
+- `core/bot_io_loops.py`: el WebSocket ticker emite eventos estructurados de conexion/desconexion y dispara reconciliacion tras reconectar.
+- `core/bot_initialization.py`: cablea el callback de reconexion al bot runtime.
+
+Reglas preventivas:
+
+- No crear un `RiskManager` paralelo; extender `core/risk_policy.py` y `core/risk_engine.py` para mantener una unica frontera de riesgo.
+- No permitir nuevas entradas REAL durante reconciliacion post-WebSocket.
+- No disparar reconciliacion por errores de conexion; solo tras reconexion confirmada.
+- En REAL, si la reconciliacion post-WebSocket falla o queda ambigua, preferir `HALT`/proteccion runtime antes de continuar.
+- Mantener debounce para evitar tormentas REST tras microcortes.
+
+Validacion registrada:
+
+- Tests enfocados `test_risk_policy`, `test_ws_reconciliation`, `test_cvd_filter` OK.
+- Tests de entrada/runtime `test_execute_order_coverage` y `test_runtime_safety_regressions` OK.
+- `compileall main.py core` OK.
+- `ruff check core/ tests/` OK.
+- `ruff format --check core/ tests/` OK.
+- `scripts/smoke_modular_imports.sh` OK.
+- `tools/check_no_silent_pass.py` OK.
+- `tools/regression_contracts.py` OK.
+- `tools/chaos_matrix.py`: 8/8 OK.
+- `tools/recovery_drill.py`: 3/3 OK.
+- Suite unitaria completa: `1098` tests OK, `2` skipped.
+
 ### 2026-07-06 - Fixes runtime criticos TP1, chase exit y daily drawdown
 
 Commit: pendiente hasta cerrar este cambio.

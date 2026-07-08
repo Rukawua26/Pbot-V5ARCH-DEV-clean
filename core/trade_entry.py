@@ -13,7 +13,11 @@ from core.reconciliation import (
 )
 from core.regime_tuning import get_sl_multiplier, get_tp_multiplier
 from core.risk.correlation_risk import compute_correlation_reduction
-from core.risk_policy import evaluate_runtime_entry_decision, record_risk_decision
+from core.risk_policy import (
+    evaluate_neutral_agent_vote_decision,
+    evaluate_runtime_entry_decision,
+    record_risk_decision,
+)
 from core.symbol_utils import normalize_position_symbol  # noqa: F401 - compatibility patch target
 from core.time_utils import utc_now, utc_now_iso
 from core.trade_helpers import (
@@ -127,6 +131,24 @@ def execute_order(
     atr_pct = context.get("atr_pct", 0) if context else 0.02
     min_notional = Config.MIN_NOTIONAL_VALUE
     confidence_score = context.get("prob_final", 0.0) if context else 0.0
+    agent_votes = (context or {}).get("votos") if isinstance(context, dict) else None
+    neutral_decision = evaluate_neutral_agent_vote_decision(
+        symbol,
+        is_shadow,
+        prob_final=confidence_score,
+        votes=agent_votes,
+    )
+    if neutral_decision:
+        safe_votes = dict(agent_votes) if isinstance(agent_votes, dict) else {}
+        record_risk_decision(
+            bot,
+            neutral_decision,
+            symbol=symbol,
+            is_shadow=is_shadow,
+            extra={"prob_final": float(confidence_score), "votes": safe_votes},
+        )
+        bot.log(neutral_decision.log_message)
+        return _discard_pending_signal(neutral_decision.reason)
     current_leverage = _clamp_leverage_1_to_10(getattr(Config, "LEVERAGE", 10))
 
     max_notional_possible = bot.balance * current_leverage

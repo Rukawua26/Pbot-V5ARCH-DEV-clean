@@ -1,12 +1,14 @@
 import hashlib
 import json
 import random
+import threading
 import time
 
 from config import Config
 from core.execution_telemetry import append_execution_event
 from core.telegram_api import sanitize_telegram_error, telegram_get_json
 from core.time_utils import monotonic_now, parse_datetime_utc, utc_now
+from core.ws_reconciliation import handle_ws_reconnected
 
 
 def _extract_telegram_message(update):
@@ -99,13 +101,30 @@ def websocket_monitor(bot):
 
     is_reconnecting = False
     reconnect_delay = 5.0
+    reconnect_count = 0
 
     def on_open(ws):
-        nonlocal is_reconnecting, reconnect_delay
+        nonlocal is_reconnecting, reconnect_delay, reconnect_count
         if is_reconnecting:
+            reconnect_count += 1
             bot.log("⚡ WEBSOCKET: Reconectado exitosamente. Precios en tiempo real restaurados.")
+            threading.Thread(
+                target=handle_ws_reconnected,
+                kwargs={"bot": bot, "source": "ticker_ws", "reconnect_count": reconnect_count},
+                daemon=True,
+            ).start()
         else:
             bot.log("⚡ WEBSOCKET: Conectado. Precios en tiempo real activos.")
+            append_execution_event(
+                bot,
+                "WS_CONNECTED",
+                {
+                    "component": "WebSocket",
+                    "event": "WS_CONNECTED",
+                    "source": "ticker_ws",
+                    "mode": "PAPER" if Config.PAPER_MODE else "REAL",
+                },
+            )
         is_reconnecting = False
         reconnect_delay = 5.0
 
@@ -122,6 +141,17 @@ def websocket_monitor(bot):
                 is_reconnecting = True
                 wait_s = reconnect_delay + random.uniform(0.0, 1.0)
                 bot.log(f"🔌 WEBSOCKET: Conexión cerrada. Reintentando en {wait_s:.1f}s...")
+                append_execution_event(
+                    bot,
+                    "WS_DISCONNECTED",
+                    {
+                        "component": "WebSocket",
+                        "event": "WS_DISCONNECTED",
+                        "source": "ticker_ws",
+                        "mode": "PAPER" if Config.PAPER_MODE else "REAL",
+                        "reconnect_delay_s": round(wait_s, 3),
+                    },
+                )
                 time.sleep(wait_s)
                 reconnect_delay = min(reconnect_delay * 1.8, 60.0)
         except Exception as error:
@@ -129,6 +159,18 @@ def websocket_monitor(bot):
                 bot.log(f"🔌 WEBSOCKET: Desconectado. Reintentando... (Error: {error})")
             is_reconnecting = True
             wait_s = reconnect_delay + random.uniform(0.0, 1.0)
+            append_execution_event(
+                bot,
+                "WS_DISCONNECTED",
+                {
+                    "component": "WebSocket",
+                    "event": "WS_DISCONNECTED",
+                    "source": "ticker_ws",
+                    "mode": "PAPER" if Config.PAPER_MODE else "REAL",
+                    "reconnect_delay_s": round(wait_s, 3),
+                    "error": str(error)[:180],
+                },
+            )
             time.sleep(wait_s)
             reconnect_delay = min(reconnect_delay * 1.8, 60.0)
 
