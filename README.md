@@ -16,7 +16,7 @@
 [![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Runtime_Clean-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean)
 [![Modos](https://img.shields.io/badge/Modos-PAPER_%7C_REAL_%7C_SHADOW-0ea5e9?style=flat-square)]()
 [![HMM](https://img.shields.io/badge/HMM-Markov_Intelligence-f97316?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/Tests-1003_ok_%7C_2_skipped-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-1089_ok_%7C_2_skipped-22c55e?style=flat-square)]()
 [![Shadow](https://img.shields.io/badge/Shadow_Capacity-20_trades-9333ea?style=flat-square)]()
 [![Deploy](https://img.shields.io/badge/Deploy-systemd_%7C_Docker-111827?style=flat-square)]()
 [![Risk](https://img.shields.io/badge/Risk_Engine-v118.7-ef4444?style=flat-square)]()
@@ -36,7 +36,7 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 
 | Check | Estado |
 |---|---|
-| `unittest discover` | ✅ `1003 tests OK` · `2 skipped` |
+| `unittest discover` | ✅ `1089 tests OK` · `2 skipped` |
 | `ruff` | ✅ Sin errores en archivos tocados |
 | `compileall main.py core tools` | ✅ OK |
 | `check_no_silent_pass.py` | ✅ OK |
@@ -45,6 +45,7 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 | `coverage report --fail-under=75` | ✅ 76% |
 | `docker build -t sniper-ai .` | ✅ OK |
 | Runtime safety | ✅ HARD SL, locks, reconciliación y deploy hardening revisados |
+| Portable packaging | ✅ Windows `.zip` y Linux `.tar.gz` vía GitHub Releases por tag `v*` |
 
 > Esta rama limpia elimina módulos huérfanos, corrige riesgos de concurrencia y deja el runtime preparado para validación CI/producción.
 
@@ -57,6 +58,18 @@ Binance Futures → Triage Dinámico → HMM BTC → Agentes MT/SR/G
 ---
 
 ## ✨ Últimas Fases
+
+### 📦 Phase 23 — Portable Windows/Linux Releases (Julio 2026)
+Distribución portable multiplataforma estilo RustDesk:
+
+| Área | Resultado |
+|---|---|
+| Rutas portables | Windows `%APPDATA%\SniperBot`, Linux `~/.config/SniperBot` |
+| Wizard inicial | Crea `.env`, detecta IP pública y arranca siempre en `PAPER` |
+| Seguridad | `ALLOW_REAL_TRADING=false` por defecto; REAL no se activa desde wizard |
+| Persistencia | DB, logs, modelos y backups fuera del directorio temporal de PyInstaller |
+| Packaging | PyInstaller `onedir`, `console=True`, dashboard estático incluido |
+| Releases | Workflow `.github/workflows/release.yml` genera Windows `.zip` y Linux `.tar.gz` al pushear tags `v*` |
 
 ### 🧱 Phase 22 — FVG Tracker + Idempotencia de Salidas + Readiness (Junio 2026)
 Endurecimiento incremental sin activar nuevas decisiones de trading por defecto:
@@ -205,10 +218,11 @@ El motor HMM clasifica el régimen de BTC y publica un snapshot en memoria con p
 git clone https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean.git
 cd Pbot-V5ARCH-DEV-clean
 
-# 2. Crear entorno virtual e instalar dependencias
-python3 -m venv .venv
+# 2. Crear entorno virtual e instalar dependencias lockeadas
+python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip
+python -m pip install -r requirements.lock
 
 # 3. Configurar variables de entorno
 cp .env.example .env
@@ -219,6 +233,61 @@ cp .env.example .env
 ```
 
 > ⚠️ Para modo `REAL`, completa primero los checks de `docs/runbooks/real-trading.md` y `docs/runbooks/recovery.md`.
+
+---
+
+## 📦 Portables Windows / Linux
+
+Los paquetes portables se publican en **GitHub Releases** cuando se pushea un tag `v*`.
+
+| Sistema | Archivo | Primer arranque |
+|---|---|---|
+| Windows | `SniperBot-Windows-Portable.zip` | Ejecutar `SniperBot.exe`; crea `%APPDATA%\SniperBot\.env` |
+| Linux Ubuntu/Debian/Arch moderno | `SniperBot-Linux-Portable.tar.gz` | Ejecutar `./SniperBot`; crea `~/.config/SniperBot/.env` |
+
+El wizard portable siempre genera configuración segura:
+
+```env
+PAPER_MODE=true
+ALLOW_REAL_TRADING=false
+EXECUTION_BACKEND=live
+```
+
+### Windows
+
+```powershell
+# Descargar desde Releases, extraer zip y ejecutar:
+.\SniperBot.exe
+```
+
+Para desarrollo con Python instalado:
+
+```bat
+packaging\windows\start_bot.bat
+```
+
+### Linux
+
+```bash
+tar -xzf SniperBot-Linux-Portable.tar.gz
+cd SniperBot
+./SniperBot
+```
+
+Para desarrollo con Python instalado:
+
+```bash
+bash packaging/linux/start_bot.sh
+```
+
+### Crear un Release
+
+```bash
+git tag v118.8-PRO
+git push origin v118.8-PRO
+```
+
+Esto dispara `.github/workflows/release.yml` y sube ambos artefactos al Release.
 
 ---
 
