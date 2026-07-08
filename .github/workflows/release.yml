@@ -1,0 +1,84 @@
+name: release-portable
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  create-release:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "${{ github.ref_name }}" >/dev/null 2>&1 || \
+            gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes "Portable SniperBot release"
+
+  build-windows:
+    needs: create-release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67ef4e541b1c7f1a06ab
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock
+          python -m pip install pyinstaller
+
+      - name: Build portable app
+        run: pyinstaller packaging/pyinstaller/sniperbot.spec --noconfirm
+
+      - name: Package Windows zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/SniperBot -DestinationPath dist/SniperBot-Windows-Portable.zip
+
+      - name: Upload release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" dist/SniperBot-Windows-Portable.zip --clobber
+
+  build-linux:
+    needs: create-release
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67ef4e541b1c7f1a06ab
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock
+          python -m pip install pyinstaller
+
+      - name: Build portable app
+        run: pyinstaller packaging/pyinstaller/sniperbot.spec --noconfirm
+
+      - name: Package Linux tarball
+        run: |
+          cd dist
+          tar -czf SniperBot-Linux-Portable.tar.gz SniperBot/
+
+      - name: Upload release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" dist/SniperBot-Linux-Portable.tar.gz --clobber

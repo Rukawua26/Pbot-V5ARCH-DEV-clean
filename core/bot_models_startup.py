@@ -8,6 +8,7 @@ import ccxt
 import joblib
 import pandas as pd
 
+from core.config.portable_paths import get_model_path
 from core.model_loader import safe_pickle_load
 from tools.notifier import send_telegram_msg
 
@@ -27,12 +28,12 @@ def init_models_and_startup_tasks(bot, export_dataset_fn, backup_database_fn, tf
     threading.Thread(target=bot._websocket_monitor, daemon=True).start()
 
     try:
-        model_path = os.path.join("models", "lstm_model.h5")
-        scaler_path = os.path.join("models", "scaler.pkl")
+        model_path = str(get_model_path("lstm_model.h5"))
+        scaler_path = str(get_model_path("scaler.pkl"))
         pro_model_path = "ghost_brain_pro.pkl"
         advanced_model_path = "ghost_brain_advanced.pkl"
         agent_models_path = "agent_models.pkl"
-        model_dir_agent_path = os.path.join("models", "agent_models.pkl")
+        model_dir_agent_path = str(get_model_path("agent_models.pkl"))
         if os.path.exists(model_dir_agent_path):
             agent_models_path = model_dir_agent_path
 

@@ -3,6 +3,8 @@ import logging
 import os
 from datetime import UTC, datetime
 
+from core.config.portable_paths import get_log_path
+
 logger = logging.getLogger("SniperAI")
 
 
@@ -36,13 +38,13 @@ def append_execution_event(bot, event: str, payload: dict) -> None:
     try:
         if _should_skip_file_telemetry():
             return
-        os.makedirs("logs", exist_ok=True)
+        events_path = get_log_path("execution_events.jsonl")
+        os.makedirs(events_path.parent, exist_ok=True)
         record = {
             "ts": datetime.now(UTC).isoformat(),
             "event": str(event),
             "payload": payload or {},
         }
-        events_path = "logs/execution_events.jsonl"
         max_bytes = int(os.getenv("EXECUTION_EVENTS_MAX_BYTES", "5242880"))
         backups = int(os.getenv("EXECUTION_EVENTS_BACKUPS", "3"))
         _rotate_jsonl(events_path, max_bytes=max_bytes, backups=backups)

@@ -3,6 +3,7 @@ import os
 import time
 
 from config import Config
+from core.config.portable_paths import get_log_path
 from core.metrics_export import export_metrics_summary
 from core.time_utils import monotonic_now, utc_now_iso
 
@@ -45,8 +46,8 @@ def get_rss_mb(bot) -> float:
 
 def append_runtime_metric(bot, payload) -> None:
     try:
-        os.makedirs("logs", exist_ok=True)
-        metrics_path = "logs/runtime_metrics.jsonl"
+        metrics_path = get_log_path("runtime_metrics.jsonl")
+        os.makedirs(metrics_path.parent, exist_ok=True)
         max_bytes = int(os.getenv("RUNTIME_METRICS_MAX_BYTES", "5242880"))
         backups = int(os.getenv("RUNTIME_METRICS_BACKUPS", "3"))
         _rotate_jsonl(metrics_path, max_bytes=max_bytes, backups=backups)

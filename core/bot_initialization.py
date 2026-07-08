@@ -4,6 +4,7 @@ import uuid
 from collections import deque
 
 from config import Config
+from core.config.portable_paths import models_dir
 from core.cooldown_state import load_cooldowns
 from core.execution_runtime_state import load_execution_runtime_state
 from core.providers.global_market import GlobalMarketProvider
@@ -143,7 +144,7 @@ def init_realtime_and_monitoring(
     bot.global_market_cache = {}
 
     if ml_monitor_available and ml_monitor_cls is not None:
-        bot.ml_monitor = ml_monitor_cls("models")
+        bot.ml_monitor = ml_monitor_cls(str(models_dir()))
         bot._init_ml_monitoring()
     else:
         bot.ml_monitor = None

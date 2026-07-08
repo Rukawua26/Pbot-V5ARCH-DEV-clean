@@ -3,6 +3,8 @@ import os
 import time
 from datetime import UTC, datetime
 
+from core.config.portable_paths import get_log_path
+
 
 def _disabled() -> bool:
     return str(os.getenv("SNIPER_DISABLE_FILE_TELEMETRY", "0")).strip() == "1"
@@ -12,13 +14,13 @@ def append_runtime_metric(metric: str, payload: dict) -> None:
     if _disabled():
         return
     try:
-        os.makedirs("logs", exist_ok=True)
+        path = get_log_path("runtime_metrics.jsonl")
+        os.makedirs(path.parent, exist_ok=True)
         record = {
             "ts": datetime.now(UTC).isoformat(),
             "metric": str(metric),
             "payload": payload or {},
         }
-        path = "logs/runtime_metrics.jsonl"
         max_bytes = int(os.getenv("RUNTIME_METRICS_MAX_BYTES", "5242880"))
         if os.path.exists(path) and os.path.getsize(path) >= max_bytes:
             os.replace(path, f"{path}.1")

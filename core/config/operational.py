@@ -12,7 +12,9 @@ from core.config.env_helpers import (
 from core.config.env_helpers import (
     env_str as _env_str,
 )
+from core.config.portable_paths import load_runtime_env
 
+load_runtime_env()
 load_dotenv()  # Safety fallback — main.py también lo llama explícitamente
 
 

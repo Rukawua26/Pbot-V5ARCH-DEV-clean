@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from config import Config
+from core.config.portable_paths import get_log_path
 from core.cooldown_state import persist_cooldowns
 from core.model_loader import ROOT, resolve_script_path
 from core.symbol_utils import normalize_position_symbol
@@ -108,7 +109,7 @@ def _handle_misc_commands(bot, text: str) -> bool:
 
     if text == "/sre_intent":
         try:
-            events_path = Path("logs/execution_events.jsonl")
+            events_path = Path(get_log_path("execution_events.jsonl"))
             if not events_path.exists():
                 send_telegram_msg("ℹ️ SRE Intent: aún no existe logs/execution_events.jsonl")
                 return True

@@ -3,6 +3,7 @@ import os
 import time
 
 from core.bot_telemetry import collect_telemetry
+from core.config.portable_paths import get_log_path
 
 
 def _compute_trade_metrics(bot) -> dict:
@@ -55,7 +56,8 @@ def _compute_system_metrics(bot) -> dict:
 def export_metrics_summary(bot) -> dict:
     """Collect and write logs/metrics_summary.json with aggregated bot metrics."""
     try:
-        os.makedirs("logs", exist_ok=True)
+        path = get_log_path("metrics_summary.json")
+        os.makedirs(path.parent, exist_ok=True)
 
         telemetry = collect_telemetry(bot, bot.log) if hasattr(bot, "log") else {}
         trade = _compute_trade_metrics(bot)
@@ -70,7 +72,6 @@ def export_metrics_summary(bot) -> dict:
             "telemetry": telemetry,
         }
 
-        path = "logs/metrics_summary.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(summary, f, indent=2, ensure_ascii=False, default=str)
         return summary
