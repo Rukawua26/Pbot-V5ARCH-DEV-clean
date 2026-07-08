@@ -32,12 +32,12 @@ def _env_value(
     return default
 
 
-def _env_bool(
-    env: dict[str, str], key: str, default: bool, *, include_os_env: bool = True
-) -> bool:
-    raw = _env_value(
-        env, key, "true" if default else "false", include_os_env=include_os_env
-    ).strip().lower()
+def _env_bool(env: dict[str, str], key: str, default: bool, *, include_os_env: bool = True) -> bool:
+    raw = (
+        _env_value(env, key, "true" if default else "false", include_os_env=include_os_env)
+        .strip()
+        .lower()
+    )
     return raw in {"1", "true", "yes", "y", "on"}
 
 
@@ -50,9 +50,7 @@ def build_report(
 
     paper_mode = _env_bool(env, "PAPER_MODE", True, include_os_env=include_os_env)
     allow_real = _env_bool(env, "ALLOW_REAL_TRADING", False, include_os_env=include_os_env)
-    execution_backend = _env_value(
-        env, "EXECUTION_BACKEND", "live", include_os_env=include_os_env
-    )
+    execution_backend = _env_value(env, "EXECUTION_BACKEND", "live", include_os_env=include_os_env)
     fvg_enabled = _env_bool(env, "FVG_TRACKER_ENABLED", False, include_os_env=include_os_env)
     global_market_enabled = _env_bool(
         env, "GLOBAL_MARKET_PROVIDER_ENABLED", False, include_os_env=include_os_env
@@ -65,6 +63,9 @@ def build_report(
     )
     override_enabled = _env_bool(
         env, "SIGNAL_AGENT_OVERRIDE_ENABLED", True, include_os_env=include_os_env
+    )
+    shadow_validation_enabled = _env_bool(
+        env, "SHADOW_VALIDATION_ENABLED", False, include_os_env=include_os_env
     )
     api_key = _env_value(env, "SNIPER_API_KEY", "", include_os_env=include_os_env)
 
@@ -85,17 +86,34 @@ def build_report(
     if global_market_enabled:
         ok.append("Global Market Provider activado para contexto macro read-only.")
     else:
-        warnings.append("GLOBAL_MARKET_PROVIDER_ENABLED=false: filtros macro usaran defaults sin datos macro reales.")
+        warnings.append(
+            "GLOBAL_MARKET_PROVIDER_ENABLED=false: filtros macro usaran defaults sin datos macro reales."
+        )
 
     if fear_filter_enabled or btc_dom_filter_enabled:
         ok.append("Filtros macro configurados; valida thresholds solo con evidencia PAPER/SHADOW.")
     else:
-        warnings.append("Filtros macro desactivados: no habra veto/boost por Fear & Greed ni BTC dominance.")
+        warnings.append(
+            "Filtros macro desactivados: no habra veto/boost por Fear & Greed ni BTC dominance."
+        )
 
     if override_enabled:
-        ok.append("Consensus direction override activado; requiere comparar trades SHADOW contra baseline.")
+        ok.append(
+            "Consensus direction override activado; requiere comparar trades SHADOW contra baseline."
+        )
     else:
-        warnings.append("SIGNAL_AGENT_OVERRIDE_ENABLED=false: no se observara direccion por consenso.")
+        warnings.append(
+            "SIGNAL_AGENT_OVERRIDE_ENABLED=false: no se observara direccion por consenso."
+        )
+
+    if shadow_validation_enabled:
+        ok.append(
+            "SHADOW_VALIDATION_ENABLED=true: reporte semanal disponible con tools/shadow_validation_report.py."
+        )
+    else:
+        warnings.append(
+            "SHADOW_VALIDATION_ENABLED=false: no se escribiran metricas de validacion SHADOW."
+        )
 
     if len(api_key) >= 16:
         ok.append("SNIPER_API_KEY valida para Dashboard API.")

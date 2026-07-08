@@ -8,6 +8,7 @@ Guia para validar mejoras pendientes sin tocar trading real.
 - `GLOBAL_MARKET_PROVIDER_ENABLED`: enriquecer contexto con datos macro read-only.
 - `GLOBAL_FEAR_GREED_FILTER_ENABLED` y `GLOBAL_BTC_DOM_FILTER_ENABLED`: validar thresholds macro.
 - `SIGNAL_AGENT_OVERRIDE_ENABLED`: observar direccion por consenso de agentes.
+- `SHADOW_VALIDATION_ENABLED`: escribir metricas observacionales para el reporte semanal.
 - Dashboard API: requiere `SNIPER_API_KEY` de al menos 16 caracteres.
 
 ## Reglas
@@ -35,7 +36,17 @@ GLOBAL_MARKET_PROVIDER_ENABLED=true
 GLOBAL_FEAR_GREED_FILTER_ENABLED=true
 GLOBAL_BTC_DOM_FILTER_ENABLED=true
 SIGNAL_AGENT_OVERRIDE_ENABLED=true
+SHADOW_VALIDATION_ENABLED=true
+SHADOW_VALIDATION_CAMPAIGN=shadow_macro_fvg_consensus_v1
 ```
+
+## Reporte semanal
+
+```bash
+./.venv/bin/python tools/shadow_validation_report.py
+```
+
+El reporte usa `logs/runtime_metrics.jsonl` y resume vetos, boosts, overrides, trades SHADOW cerrados y ciclos FVG.
 
 ## Evidencia minima
 
@@ -43,6 +54,7 @@ SIGNAL_AGENT_OVERRIDE_ENABLED=true
 - Global Market: frecuencia de huecos de datos, cache hits, errores de rate limit.
 - Macro filters: cantidad de vetos/boosts y resultado de trades evitados o potenciados.
 - Consenso/trailing: al menos 10 trades SHADOW cerrados post-cambio.
+- Reporte: conservar salida semanal de `tools/shadow_validation_report.py` antes de ajustar thresholds.
 
 ## Criterios de avance
 

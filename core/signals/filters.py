@@ -3,6 +3,7 @@ from datetime import UTC
 from config import Config
 from core.cooldown_state import is_symbol_in_cooldown
 from core.execution_telemetry import append_execution_event
+from core.shadow_validation import emit_filter_decision
 from core.signals.cvd_filter import apply_cvd_filter
 from core.signals.mtf.filter import apply_mtf_filter
 from core.signals.oi_filter import fetch_oi_delta, validate_signal_with_oi
@@ -759,6 +760,7 @@ def _apply_entry_filters_and_adjust_prob(
             "cvd_weight": ctx.get("cvd_weight"),
         },
     )
+    emit_filter_decision(symbol, audit_signal, filter_passed, filter_reason, prob_final, ctx)
 
     return prob_final, filter_passed, filter_reason, ctx
 

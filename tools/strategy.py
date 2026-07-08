@@ -38,7 +38,7 @@ def _resolve_signal_from_agents(
     votes: dict[str, float],
     weights: dict[str, float],
     base_trend: str,
-) -> str:
+) -> tuple[str, float, bool]:
     """Determina dirección de la señal por consenso de agentes.
 
     Los agentes votan 0-100 (0=SELL extremo, 50=Neutral, 100=BUY extremo).
@@ -48,8 +48,9 @@ def _resolve_signal_from_agents(
 
     Si los agentes no tienen consenso suficiente, se fallback a la EMA.
     """
+    base_signal = "BUY" if base_trend == "UP" else "SELL"
     if not bool(getattr(Config, "SIGNAL_AGENT_OVERRIDE_ENABLED", True)):
-        return "BUY" if base_trend == "UP" else "SELL"
+        return base_signal, 0.0, False
 
     override_threshold = float(
         getattr(Config, "SIGNAL_AGENT_OVERRIDE_THRESHOLD", 15.0)
@@ -67,10 +68,12 @@ def _resolve_signal_from_agents(
 
     # Decidir dirección
     if weighted_dir >= override_threshold:
-        return "BUY"
+        signal = "BUY"
+        return signal, weighted_dir, signal != base_signal
     if weighted_dir <= -override_threshold:
-        return "SELL"
-    return "BUY" if base_trend == "UP" else "SELL"
+        signal = "SELL"
+        return signal, weighted_dir, signal != base_signal
+    return base_signal, weighted_dir, False
 
 
 class Strategy:
@@ -204,7 +207,9 @@ class Strategy:
         # 6. Filtros finales (Sello Institucional 1H)
         score_final = max(0.0, min(100.0, score_final))
 
-        signal = _resolve_signal_from_agents(votos, agent_weights, base_trend)
+        signal, agent_direction_score, agent_signal_override = _resolve_signal_from_agents(
+            votos, agent_weights, base_trend
+        )
 
         # Veto direccional macro 4H (duro, no suma puntaje)
         macro_veto_reason = None
@@ -234,6 +239,10 @@ class Strategy:
             "adx": adx,
             "rsi": {"val": rsi},
             "trend": base_trend,
+            "base_trend": base_trend,
+            "agent_direction_score": agent_direction_score,
+            "agent_signal_override": agent_signal_override,
+            "agent_signal_resolved": signal,
         }
 
         if macro_veto_reason:

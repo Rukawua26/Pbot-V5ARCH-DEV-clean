@@ -23,6 +23,7 @@ Documento vivo para registrar mejoras, integraciones y decisiones tecnicas pendi
 - README actualizado con `949 tests OK`, `2 skipped` y `75% coverage`.
 - Commit confirmado y subido a GitHub: `ba5a42a harden: add runtime safety gates and raise coverage`.
 - **FVG Tracker (GapTrackerModule)** implementado como modulo satelite read-only en `core/analytics/fvg_tracker.py`.
+- **SHADOW Validation Campaign** implementada como telemetria observacional (`SHADOW_VALIDATION_ENABLED`) y reporte `tools/shadow_validation_report.py`.
 
 ## Mejoras Pendientes
 
@@ -31,7 +32,7 @@ Documento vivo para registrar mejoras, integraciones y decisiones tecnicas pendi
 FVG Tracker ya implementado. Pendiente:
 
 1. Activar `FVG_TRACKER_ENABLED=true` en PAPER o SHADOW.
-2. Recolectar metricas de calidad de alertas (falsos positivos, timing util).
+2. Activar `SHADOW_VALIDATION_ENABLED=true` para registrar ciclos FVG y correlacionarlos con trades SHADOW.
 3. Medir si mejora MAE/MFE, winrate o reduce entradas malas.
 4. Si solo genera ruido, mantener como herramienta observacional.
 
@@ -49,6 +50,7 @@ Pendiente:
 1. Activar `GLOBAL_MARKET_PROVIDER_ENABLED=true` en PAPER o SHADOW.
 2. Revisar calidad de datos: CoinGecko gratis tiene rate limit, validar que no haya huecos.
 3. Si se necesita MCP, implementar `_fetch_from_mcp()` en el provider.
+4. Usar `tools/shadow_validation_report.py` para medir vetos/boosts macro antes de tocar thresholds.
 
 ### 3. Filtros Macro-Reactivos — IMPLEMENTADO
 
@@ -59,6 +61,7 @@ Flags: `GLOBAL_FEAR_GREED_FILTER_ENABLED`, `GLOBAL_BTC_DOM_FILTER_ENABLED`,
 Pendiente:
 1. Validar en PAPER/SHADOW que los thresholds actuales (fear<20 veto, dom>65% boost) sean óptimos.
 2. Añadir más reglas: total_market_cap drop % veto, eth_dominance altseason boost.
+3. No ajustar thresholds hasta tener 20+ trades SHADOW cerrados en el reporte de validacion.
 
 ### 4. Auto-Replication de Estrategias Ganadoras — PENDIENTE (Futuro)
 
@@ -103,5 +106,6 @@ Pendiente:
 3. Medir si aparecen mas BUY utiles sin degradar proteccion macro BTC.
 4. Ajustar `SIGNAL_AGENT_OVERRIDE_THRESHOLD` si los agentes revierten demasiado o demasiado poco.
 5. Ajustar multiplicadores de trailing si las ganadoras siguen cerrando temprano.
+6. Usar `SHADOW_VALIDATION_ENABLED=true` para medir `agent_override_rate_pct`, WR y avg win/loss.
 
 Criterio de exito: winrate SHADOW >45% y mejor relacion avg win/avg loss sin aumentar drawdown ni saltarse filtros macro.

@@ -63,6 +63,15 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
         "vol_rel": float(vol_rel),
     }
 
+    for key in (
+        "base_trend",
+        "agent_direction_score",
+        "agent_signal_override",
+        "agent_signal_resolved",
+    ):
+        if key in ind:
+            ctx[key] = ind.get(key)
+
     ob_status = Strategy.detect_order_block(df_main, symbol)
     ctx["ob_status"] = ob_status
     ctx["btc_delta_tf"] = getattr(bot, "market_btc_change_tf", 0.0)

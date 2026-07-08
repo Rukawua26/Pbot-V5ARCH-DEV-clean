@@ -8,6 +8,7 @@ from core.execution_service import ExecutionService
 from core.intent_deduper import IntentDeduper
 from core.risk.exit_engine_v1 import ExitEngineV1
 from core.risk_engine import RiskEngine
+from core.shadow_validation import emit_config_snapshot
 from core.strategy.agents.breakout_agent import BreakoutAgent
 from core.strategy.utils import StrategyUtils
 
@@ -54,3 +55,5 @@ def init_core_services_and_engines(bot):
             telegram_alerts=Config.FVG_ALERT_TELEGRAM,
             max_symbols_per_cycle=Config.FVG_MAX_SYMBOLS_PER_CYCLE,
         )
+
+    emit_config_snapshot()

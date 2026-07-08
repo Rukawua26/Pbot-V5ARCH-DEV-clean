@@ -14,6 +14,9 @@ from core.config.env_helpers import (
     env_list as _env_list,
 )
 from core.config.env_helpers import (
+    env_str as _env_str,
+)
+from core.config.env_helpers import (
     get_env_warnings,
 )
 from core.config.operational import OperationalConfig
@@ -211,6 +214,12 @@ class Config(OperationalConfig, StrategyConfig):
     GLOBAL_BTC_DOM_FILTER_ENABLED = _env_bool("GLOBAL_BTC_DOM_FILTER_ENABLED", True)
     GLOBAL_FEAR_VETO_THRESHOLD = _env_int("GLOBAL_FEAR_VETO_THRESHOLD", 20)
     GLOBAL_BTC_DOM_BOOST_THRESHOLD = _env_float("GLOBAL_BTC_DOM_BOOST_THRESHOLD", 65.0)
+
+    # --- SHADOW validation campaign telemetry (observational only) ---
+    SHADOW_VALIDATION_ENABLED = _env_bool("SHADOW_VALIDATION_ENABLED", False)
+    SHADOW_VALIDATION_CAMPAIGN = _env_str(
+        "SHADOW_VALIDATION_CAMPAIGN", "shadow_macro_fvg_consensus_v1"
+    )
 
     # --- Side Quality Parity Filter ---
     SIDE_PARITY_FILTER_ENABLED = _env_bool("SIDE_PARITY_FILTER_ENABLED", True)

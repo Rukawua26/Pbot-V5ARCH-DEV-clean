@@ -10,6 +10,7 @@ from core.kanban_sync import async_mover_tarjeta
 from core.postmortem import label_exit_reason
 from core.regime_tuning import record_trade as record_regime_trade
 from core.runtime_metrics import append_runtime_metric
+from core.shadow_validation import emit_shadow_trade_closed
 from core.time_utils import parse_datetime_utc, utc_now
 from core.trade_helpers import (
     _calculate_pnl_and_metrics,
@@ -274,6 +275,16 @@ def close_trade(
             mfe_percent=mfe_percent,
             trade=trade,
             is_adopted=trade.get("adopted_orphan", False),
+        )
+        emit_shadow_trade_closed(
+            trade,
+            reason,
+            exit_price,
+            pnl_neto_usd,
+            pnl_neto_percent,
+            mae_percent,
+            mfe_percent,
+            pm_data.get("exit_reason", "UNKNOWN"),
         )
 
         bot.log(

@@ -7,6 +7,7 @@ import time
 import pandas as pd
 
 from config import Config
+from core.shadow_validation import emit_fvg_cycle
 
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -248,6 +249,7 @@ class FvgTracker:
         now_ms = int(time.time() * 1000)
         all_new = []
         dfs_by_symbol = {}
+        symbols_scanned = 0
 
         for raw_symbol in symbols:
             try:
@@ -256,6 +258,7 @@ class FvgTracker:
                     continue
                 df = df.tail(self.max_candles_scan)
                 dfs_by_symbol[raw_symbol] = df
+                symbols_scanned += 1
                 new_gaps = self.scan_candles(df, raw_symbol)
                 all_new.extend(new_gaps)
             except Exception as error:
@@ -274,6 +277,7 @@ class FvgTracker:
             self._evaluate_and_alert(bot)
 
         self._store.save(self._active_gaps)
+        emit_fvg_cycle(symbols_scanned, len(all_new), self._active_gaps)
 
     def _evaluate_and_alert(self, bot) -> None:
         from tools.notifier import Priority, send_telegram_msg
