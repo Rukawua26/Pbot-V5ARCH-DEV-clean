@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import tempfile
@@ -189,6 +190,20 @@ class DashboardIpcTest(unittest.TestCase):
             api_server.verify_key(req)
 
         self.assertEqual(raised.exception.status_code, 401)
+
+    def test_dashboard_rate_limit_returns_response_without_asgi_exception(self):
+        async def call_next(_request):
+            raise AssertionError("rate-limited request should not reach route handler")
+
+        request = SimpleNamespace(client=SimpleNamespace(host="unit-test"), headers={})
+        with (
+            patch.object(api_server, "RATE_LIMIT_REQUESTS", 0),
+            patch.object(api_server, "_rate_limit_state", {}),
+        ):
+            response = asyncio.run(api_server.security_middleware(request, call_next))
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.headers["retry-after"], str(api_server.RATE_LIMIT_WINDOW_SECONDS))
 
     def test_dashboard_command_writer_rejects_unsafe_cmd_dir(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -10,7 +10,7 @@ from collections import deque
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field
 
 from core.learning_paths import DEFAULT_DB_PATH
@@ -49,7 +49,7 @@ EXEC_EVENTS_PATH = os.path.join(
 )
 ALLOWED_ORIGINS = os.getenv("SNIPER_DASHBOARD_ORIGINS", "http://127.0.0.1:8000").split(",")
 ALLOWED_COMMANDS = frozenset({"/pause", "/resume", "/panic", "/recover_halt"})
-RATE_LIMIT_REQUESTS = int(os.getenv("SNIPER_DASHBOARD_RATE_LIMIT_REQUESTS", "30"))
+RATE_LIMIT_REQUESTS = int(os.getenv("SNIPER_DASHBOARD_RATE_LIMIT_REQUESTS", "240"))
 RATE_LIMIT_WINDOW_SECONDS = int(os.getenv("SNIPER_DASHBOARD_RATE_LIMIT_WINDOW_SECONDS", "60"))
 MAX_BODY_BYTES = 64 * 1024
 _rate_limit_state: dict[str, list[float]] = {}
@@ -91,14 +91,21 @@ def _check_rate_limit(client_ip: str) -> None:
 @app.middleware("http")
 async def security_middleware(request: Request, call_next):
     client_ip = request.client.host if request.client else "unknown"
-    _check_rate_limit(client_ip)
+    try:
+        _check_rate_limit(client_ip)
+    except HTTPException as error:
+        return JSONResponse(
+            {"detail": error.detail},
+            status_code=error.status_code,
+            headers={"Retry-After": str(RATE_LIMIT_WINDOW_SECONDS)},
+        )
     content_length = request.headers.get("content-length")
     try:
         body_size = int(content_length) if content_length else 0
     except ValueError:
         body_size = MAX_BODY_BYTES + 1
     if body_size > MAX_BODY_BYTES:
-        raise HTTPException(413, "Request body too large")
+        return JSONResponse({"detail": "Request body too large"}, status_code=413)
     response: Response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
