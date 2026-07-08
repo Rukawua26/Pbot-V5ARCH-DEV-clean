@@ -7,6 +7,7 @@ from config import Config
 from core.signals.analyze import _get_fast_coherence_veto_reason
 from core.signals.filters import (
     _apply_ema_alignment_filter,
+    _apply_side_quality_parity_filter,
     _evaluate_bootstrap_heuristic,
     _get_markov_snapshot_mode,
     _is_shadow_learning_runtime,
@@ -172,6 +173,34 @@ class TestApplyEmaAlignmentFilter(unittest.TestCase):
             ok, reason = _apply_ema_alignment_filter("SELL", ctx)
         self.assertFalse(ok)
         self.assertIn("EMA_ALIGN_cross", reason)
+
+
+class TestSideQualityParityFilter(unittest.TestCase):
+    def test_buy_rsi_range_bound_does_not_apply_when_trend_is_up(self):
+        ctx = {"rsi": 50.0, "adx": 23.0, "trend": "UP"}
+        with (
+            patch.object(Config, "SIDE_PARITY_FILTER_ENABLED", True),
+            patch.object(Config, "SIDE_PARITY_MIN_ADX", 22.0),
+            patch.object(Config, "SIDE_PARITY_MIN_VOL_REL", 0.80),
+            patch.object(Config, "SIDE_PARITY_RANGE_BUY_MAX_RSI", 45.0),
+        ):
+            ok, reason = _apply_side_quality_parity_filter("BUY", ctx, 1.0, None)
+
+        self.assertTrue(ok)
+        self.assertIsNone(reason)
+
+    def test_buy_rsi_range_bound_applies_when_trend_is_range(self):
+        ctx = {"rsi": 50.0, "adx": 23.0, "trend": "RANGO"}
+        with (
+            patch.object(Config, "SIDE_PARITY_FILTER_ENABLED", True),
+            patch.object(Config, "SIDE_PARITY_MIN_ADX", 22.0),
+            patch.object(Config, "SIDE_PARITY_MIN_VOL_REL", 0.80),
+            patch.object(Config, "SIDE_PARITY_RANGE_BUY_MAX_RSI", 45.0),
+        ):
+            ok, reason = _apply_side_quality_parity_filter("BUY", ctx, 1.0, None)
+
+        self.assertFalse(ok)
+        self.assertIn("BUY tarde en RANGE", reason)
 
     def test_slope_filter_rejects_buy_when_ema50_slope_is_negative(self):
         ctx = {

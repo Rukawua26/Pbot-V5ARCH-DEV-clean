@@ -81,6 +81,72 @@ class MarketBreadthTest(unittest.TestCase):
         self.assertEqual(ctx["market_breadth_dump_ratio"], 0.75)
         self.assertIs(ctx["hmm_data"], hmm)
 
+    @patch("core.signals.context.Strategy.detect_order_block", return_value="⚪")
+    @patch(
+        "core.signals.context.Strategy.compute_runtime_snapshot",
+        return_value={"rows": 200, "ema": 99.0, "adx": 23.0, "rsi": 50.0, "atr": 1.0},
+    )
+    def test_symbol_context_uses_side_parity_adx_threshold_for_uptrend(self, _snapshot, _ob):
+        bot = SimpleNamespace(
+            market_breadth={},
+            _snapshot_tickers={},
+            _get_cached_funding_rate=MagicMock(return_value=0.0),
+            _raw_snapshot_log_count=99,
+            log=MagicMock(),
+        )
+        df = pd.DataFrame({"close": [100.0], "volume": [10.0], "volume_ma": [5.0]})
+
+        with patch("core.signals.context.Config.SIDE_PARITY_MIN_ADX", 22.0):
+            _decision, ctx, _ob_status, _vol_rel = _build_symbol_context(
+                bot, "BTC/USDT", "BTC/USDT", df, 100.0, {"mode": "X"}, "BUY"
+            )
+
+        self.assertEqual(ctx["trend"], "UP")
+
+    @patch("core.signals.context.Strategy.detect_order_block", return_value="⚪")
+    @patch(
+        "core.signals.context.Strategy.compute_runtime_snapshot",
+        return_value={"rows": 200, "ema": 101.0, "adx": 23.0, "rsi": 50.0, "atr": 1.0},
+    )
+    def test_symbol_context_uses_side_parity_adx_threshold_for_downtrend(self, _snapshot, _ob):
+        bot = SimpleNamespace(
+            market_breadth={},
+            _snapshot_tickers={},
+            _get_cached_funding_rate=MagicMock(return_value=0.0),
+            _raw_snapshot_log_count=99,
+            log=MagicMock(),
+        )
+        df = pd.DataFrame({"close": [100.0], "volume": [10.0], "volume_ma": [5.0]})
+
+        with patch("core.signals.context.Config.SIDE_PARITY_MIN_ADX", 22.0):
+            _decision, ctx, _ob_status, _vol_rel = _build_symbol_context(
+                bot, "BTC/USDT", "BTC/USDT", df, 100.0, {"mode": "X"}, "SELL"
+            )
+
+        self.assertEqual(ctx["trend"], "DOWN")
+
+    @patch("core.signals.context.Strategy.detect_order_block", return_value="⚪")
+    @patch(
+        "core.signals.context.Strategy.compute_runtime_snapshot",
+        return_value={"rows": 200, "ema": 99.0, "adx": 21.0, "rsi": 50.0, "atr": 1.0},
+    )
+    def test_symbol_context_keeps_range_below_side_parity_adx_threshold(self, _snapshot, _ob):
+        bot = SimpleNamespace(
+            market_breadth={},
+            _snapshot_tickers={},
+            _get_cached_funding_rate=MagicMock(return_value=0.0),
+            _raw_snapshot_log_count=99,
+            log=MagicMock(),
+        )
+        df = pd.DataFrame({"close": [100.0], "volume": [10.0], "volume_ma": [5.0]})
+
+        with patch("core.signals.context.Config.SIDE_PARITY_MIN_ADX", 22.0):
+            _decision, ctx, _ob_status, _vol_rel = _build_symbol_context(
+                bot, "BTC/USDT", "BTC/USDT", df, 100.0, {"mode": "X"}, "BUY"
+            )
+
+        self.assertEqual(ctx["trend"], "RANGO")
+
     @patch("core.signals.filters.Config.BREAKOUT_WATCH_ENABLED", False)
     @patch("core.signals.filters.Strategy.check_entry_filters")
     def test_entry_filter_vetoes_buy_when_market_breadth_is_fear(self, mocked_filters):

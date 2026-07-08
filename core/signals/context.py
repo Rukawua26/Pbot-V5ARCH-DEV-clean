@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from config import Config
 from tools.strategy import Strategy
 
 
@@ -33,7 +34,8 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
     volume_ma = float(raw_metrics.get("volume_ma", _safe_series_float(df_main, "volume_ma", 0.0)))
     close_raw = _safe_series_float(df_main, "close", price)
 
-    if current_adx > 25:
+    trend_adx_threshold = float(getattr(Config, "SIDE_PARITY_MIN_ADX", 25.0) or 25.0)
+    if current_adx >= trend_adx_threshold:
         trend_label = "UP" if price > ema_ref else "DOWN"
 
     vol_rel = (volume_now / volume_ma) if volume_ma > 0 else 0.0
