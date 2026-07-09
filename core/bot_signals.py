@@ -13,25 +13,90 @@ from core.trade_keys import has_trade
 _ANALYSIS_MISSING = object()
 
 
+def _passes_cheap_pre_filters(
+    bot, symbol_raw, symbol, res_data, controls=None, mutate_latency=True
+):
+    now = time.time()
+    symbol_base = str(symbol).split("/")[0]
+    controls = controls or {}
+    if symbol_base in controls.get("blocked", set()):
+        return False, "SYMBOL_BLOCKED", "⛔ SYMBOL BLOCKED", None
+
+    if getattr(bot, "latency_quarantine", {}).get(symbol, 0.0) > now:
+        return False, "LATENCY_QUARANTINED", "🔌 LATENCY QUARANTINE", None
+
+    lock = getattr(bot, "lock", None)
+    if lock:
+        with lock:
+            active = has_trade(getattr(bot, "active_trades", {}), symbol)
+    else:
+        active = has_trade(getattr(bot, "active_trades", {}), symbol)
+    if active:
+        return False, "SYMBOL_ALREADY_ACTIVE", "🔒 OPERACIÓN ACTIVA", None
+
+    in_cd, remaining = is_symbol_in_cooldown(bot, symbol)
+    if in_cd:
+        return False, "COOLDOWN_ACTIVE", f"❄️ COOLDOWN ({remaining}m)", None
+
+    if not res_data or not res_data.get("data"):
+        elapsed = (res_data or {}).get("elapsed")
+        return False, "DATA_INTEGRITY_FAIL", "⏱️ TIMEOUT", elapsed
+
+    df_main, _df_4h = res_data["data"]
+    elapsed = res_data.get("elapsed")
+    if df_main is None or getattr(df_main, "empty", False):
+        return False, "DATA_INTEGRITY_FAIL", "❌ NO_DATA", elapsed
+
+    latency_veto_ms = int(getattr(Config, "LATENCY_VETO_MS", 4500))
+    if elapsed is None or elapsed > latency_veto_ms or elapsed == -1:
+        latency_quarantine_seconds = int(getattr(Config, "LATENCY_QUARANTINE_SECONDS", 300))
+        if mutate_latency:
+            bot.latency_quarantine[symbol] = now + latency_quarantine_seconds
+        return False, "LATENCY_QUARANTINED", "🔌 LATENCIA", elapsed
+
+    return True, "", "", elapsed
+
+
+def _record_cheap_prefilter_veto(bot, symbol, reason, display, response_ms=None):
+    bot.log(f"⏭️ CHEAP_PREFILTER_VETO {symbol}: {reason}")
+    append_execution_event(
+        bot,
+        "CHEAP_PREFILTER_VETO",
+        {"symbol": symbol, "reason": reason, "response_ms": response_ms},
+    )
+    bot.update_radar(
+        symbol,
+        {"signal": "WAIT", "mode": "NONE"},
+        0.0,
+        "⚪",
+        display,
+        {"tier": "IRON", "filter_reason": reason},
+        response_ms=response_ms,
+    )
+
+
 def _precompute_signal_analysis(bot, top_triage, results):
     workers = int(getattr(Config, "SIGNAL_ANALYSIS_WORKERS", 1) or 1)
     if workers <= 1:
         return {}
+
+    controls = {}
+    load_controls = getattr(bot, "_load_runtime_symbol_controls", None)
+    if callable(load_controls):
+        controls = load_controls() or {}
 
     candidates = []
     for triage_entry in top_triage:
         symbol_raw = triage_entry["symbol"]
         symbol = symbol_raw.split(":")[0]
         res_data = results.get(symbol_raw)
-        if not res_data or not res_data.get("data"):
+        passed, _reason, _display, _response_ms = _passes_cheap_pre_filters(
+            bot, symbol_raw, symbol, res_data, controls, mutate_latency=False
+        )
+        if not passed:
             continue
         df_main, df_4h = res_data["data"]
         elapsed = res_data["elapsed"]
-        if df_main is None or getattr(df_main, "empty", False):
-            continue
-        latency_veto_ms = int(getattr(Config, "LATENCY_VETO_MS", 4500))
-        if elapsed > latency_veto_ms or elapsed == -1:
-            continue
         candidates.append((symbol_raw, symbol, df_main, df_4h, elapsed))
 
     if len(candidates) <= 1:
@@ -80,57 +145,25 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
         )
 
     precomputed_analysis = _precompute_signal_analysis(bot, top_triage, results)
+    controls = {}
+    load_controls = getattr(bot, "_load_runtime_symbol_controls", None)
+    if callable(load_controls):
+        controls = load_controls() or {}
 
     for triage_entry in top_triage:
         symbol_raw = triage_entry["symbol"]
         symbol = symbol_raw.split(":")[0]
 
         res_data = results.get(symbol_raw)
-        if not res_data or not res_data.get("data"):
-            bot.update_radar(
-                symbol,
-                {"signal": "WAIT", "mode": "NONE"},
-                0.0,
-                "⚪",
-                "⏱️ TIMEOUT",
-                {"tier": "IRON"},
-            )
+        passed, reason, display, response_ms = _passes_cheap_pre_filters(
+            bot, symbol_raw, symbol, res_data, controls
+        )
+        if not passed:
+            _record_cheap_prefilter_veto(bot, symbol, reason, display, response_ms)
             continue
 
         df_main, df_4h = res_data["data"]
         elapsed = res_data["elapsed"]
-
-        if df_main is None or getattr(df_main, "empty", False):
-            bot.update_radar(
-                symbol,
-                {"signal": "WAIT", "mode": "NONE"},
-                0.0,
-                "⚪",
-                "❌ NO_DATA",
-                {"tier": "IRON"},
-                response_ms=elapsed,
-            )
-            continue
-
-        # [V118-PRO] CIRCUIT BREAKER DE LATENCIA (Veto Activo)
-        latency_veto_ms = int(getattr(Config, "LATENCY_VETO_MS", 4500))
-        latency_quarantine_seconds = int(getattr(Config, "LATENCY_QUARANTINE_SECONDS", 300))
-        if elapsed > latency_veto_ms or elapsed == -1:
-            bot.log(
-                f"🔌 VETO LATENCIA: {symbol} tardó {elapsed}ms. "
-                f"Cuarentena de {int(latency_quarantine_seconds / 60)} min."
-            )
-            bot.latency_quarantine[symbol] = time.time() + latency_quarantine_seconds
-            bot.update_radar(
-                symbol,
-                {"signal": "WAIT", "mode": "NONE"},
-                0.0,
-                "⚪",
-                "🔌 LATENCIA",
-                {"tier": "IRON"},
-                response_ms=elapsed,
-            )
-            continue
 
         analysis = precomputed_analysis.get(symbol_raw, _ANALYSIS_MISSING)
         if analysis is _ANALYSIS_MISSING:
@@ -259,36 +292,6 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
 
             is_shadow_exec = True
             should_execute = False
-
-            # --- BLOQUEO DE CONCURRENCIA POR SÍMBOLO (INSTRUCCIÓN 1) ---
-            # Verificar que no haya operaciones activas en este símbolo ANTES de evaluar señales
-            with bot.lock:
-                if has_trade(bot.active_trades, symbol):
-                    bot.log(f"🔒 BLOQUEADO {symbol}: Ya existe operación activa en este símbolo")
-                    bot.update_radar(
-                        symbol_raw,
-                        {"signal": "WAIT", "mode": "NONE"},
-                        0.0,
-                        "⚪",
-                        "🔒 OPERACIÓN ACTIVA",
-                        ind,
-                    )
-                    continue
-
-            # --- COOLDOWN UNIVERSAL (INSTRUCCIÓN 2) ---
-            # Verificar cooldown sin importar si es Shadow o Real
-            in_cd, remaining = is_symbol_in_cooldown(bot, symbol)
-            if in_cd:
-                bot.log(f"❄️ COOLDOWN {symbol}: {remaining}m restantes")
-                bot.update_radar(
-                    symbol_raw,
-                    {"signal": "WAIT", "mode": "NONE"},
-                    0.0,
-                    "⚪",
-                    f"❄️ COOLDOWN ({remaining}m)",
-                    ind,
-                )
-                continue
 
             (
                 should_execute,

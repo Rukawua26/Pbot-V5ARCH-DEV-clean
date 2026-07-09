@@ -172,35 +172,40 @@ Pendiente operacional:
 1. Medir durante campana PAPER/SHADOW si los trades aceptados mantienen RRR medio superior al minimo teorico.
 2. Ajustar `MIN_RISK_REWARD_RATIO` o `RISK_REWARD_HIGH_VOL_MIN_RATIO` solo con evidencia de muestra cerrada.
 
-#### Sprint 2 — Eficiencia del pipeline: pre-filtros baratos
+#### Sprint 2 — Eficiencia del pipeline: pre-filtros baratos — IMPLEMENTADO
 
-Problema: parte del analisis pesado puede ejecutarse antes de descartar simbolos por reglas simples.
+Problema corregido: parte del analisis pesado podia ejecutarse antes de descartar simbolos por reglas simples.
 
-Pendiente:
+Implementado:
 
-1. Agregar `passes_cheap_pre_filters(...)` antes de `_analyze_symbol_candidate(...)` en `core/bot_signals.py` o helper dedicado.
-2. Solo usar datos O(1) en RAM:
-   - cooldown.
-   - simbolo ya activo.
-   - latency quarantine.
-   - runtime symbol controls cacheados.
-   - `res_data` vacio, `NO_DATA`, timeout o latencia extrema ya conocida.
-3. No mover a pre-filtro barato:
-   - RSI contextual.
-   - ADX contextual.
-   - shock distance.
-   - coherencia final.
-   - MTF/OI.
-   - filtros que dependan de `ctx` profundo.
-4. Registrar evento `CHEAP_PREFILTER_VETO` con razon (`COOLDOWN_ACTIVE`, `SYMBOL_ALREADY_ACTIVE`, `LATENCY_QUARANTINED`, `DATA_INTEGRITY_FAIL`, `SYMBOL_BLOCKED`).
-5. Medir `cycle_latency_ms` o tiempo por simbolo para comparar antes/despues.
+1. Helper `_passes_cheap_pre_filters(...)` antes de `_analyze_symbol_candidate(...)` en `core/bot_signals.py`.
+2. Se usa tanto en `_precompute_signal_analysis(...)` como en `run_signal_scan_cycle(...)` para evitar analisis paralelo o secuencial innecesario.
+3. Solo usa datos O(1) en RAM:
+    - cooldown.
+    - simbolo ya activo.
+    - latency quarantine.
+    - runtime symbol controls cacheados.
+    - `res_data` vacio, `NO_DATA`, timeout o latencia extrema ya conocida.
+4. No se movio a pre-filtro barato:
+    - RSI contextual.
+    - ADX contextual.
+    - shock distance.
+    - coherencia final.
+    - MTF/OI.
+    - filtros que dependan de `ctx` profundo.
+5. Evento `CHEAP_PREFILTER_VETO` con razon (`COOLDOWN_ACTIVE`, `SYMBOL_ALREADY_ACTIVE`, `LATENCY_QUARANTINED`, `DATA_INTEGRITY_FAIL`, `SYMBOL_BLOCKED`).
+6. Tests enfocados validan que simbolos bloqueados/activos/latencia extrema no llaman a `_analyze_symbol_candidate(...)`.
 
 Criterio de salida:
 
-- Menor latencia media por ciclo.
 - Menos invocaciones al analisis pesado.
-- Sin cambios raros en senales validas.
 - Vetos baratos visibles antes del consenso pesado.
+- Tests nuevos en verde.
+
+Pendiente operacional:
+
+1. Medir `cycle_latency_ms` o tiempo por simbolo para comparar antes/despues durante PAPER/SHADOW.
+2. Confirmar menor latencia media por ciclo y ausencia de cambios raros en senales validas.
 
 #### Sprint 3 — Aprendizaje estable: genetica en batch
 

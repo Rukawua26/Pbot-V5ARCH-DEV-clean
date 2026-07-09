@@ -37,6 +37,27 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-09 - Sprint 2 cuantitativo: pre-filtros baratos de señales
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/bot_signals.py`: agrega `_passes_cheap_pre_filters(...)` y `_record_cheap_prefilter_veto(...)` para descartar simbolos antes de `_analyze_symbol_candidate(...)`.
+- `core/bot_signals.py`: el pre-filtro corre tambien antes de `_precompute_signal_analysis(...)`, evitando analisis paralelo innecesario.
+- `core/bot_signals.py`: registra `CHEAP_PREFILTER_VETO` con razon normalizada y actualiza radar antes del consenso pesado.
+- `tests/test_bot_signal_scan_cycle.py`: cubre simbolo bloqueado, simbolo activo y latencia extrema sin invocar `_analyze_symbol_candidate(...)`.
+
+Reglas preventivas:
+
+- No mover RSI, ADX, shock distance, coherencia final, MTF/OI ni filtros dependientes de `ctx` profundo al pre-filtro barato.
+- El precompute no debe mutar cuarentena de latencia; solo el loop principal debe registrar/mutar estado visible.
+- Mantener razones normalizadas para `CHEAP_PREFILTER_VETO`: `COOLDOWN_ACTIVE`, `SYMBOL_ALREADY_ACTIVE`, `LATENCY_QUARANTINED`, `DATA_INTEGRITY_FAIL`, `SYMBOL_BLOCKED`.
+
+Validacion registrada:
+
+- `tests/test_bot_signal_scan_cycle.py` OK.
+
 ### 2026-07-09 - Sprint 1 cuantitativo: filtro RRR estructural
 
 Commit: `6c9659d feat: add structural risk reward entry filter`
