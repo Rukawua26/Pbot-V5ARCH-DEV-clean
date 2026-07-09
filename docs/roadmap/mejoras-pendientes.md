@@ -135,38 +135,42 @@ Restricciones:
 4. Cada veto nuevo debe quedar visible en logs estructurados, dashboard/radar y tests.
 5. Mantener cambios pequenos, medibles y reversibles.
 
-#### Sprint 1 — Seguridad matematica: filtro RRR estructural
+#### Sprint 1 — Seguridad matematica: filtro RRR estructural — IMPLEMENTADO
 
-Problema: hoy una senal con consenso alto puede llegar a entrada aunque el `TP/SL` tenga mala esperanza matematica.
+Problema corregido: una senal con consenso alto podia llegar a entrada aunque el `TP/SL` tuviera mala esperanza matematica.
 
-Pendiente:
+Implementado:
 
-1. Implementar filtro de ratio riesgo/beneficio minimo despues de calcular `sl_val` y `tp_val`, antes del sizing/ejecucion en `core/trade_entry.py`.
-2. Calcular RRR con precio estimado defensivo ante spread/slippage:
-   - BUY: penalizar entrada hacia arriba.
-   - SELL: penalizar entrada hacia abajo.
-3. Usar `spread` y/o `atr_pct` para evitar aceptar trades al filo del umbral.
-4. Agregar configuracion:
-   - `RISK_REWARD_FILTER_ENABLED=true`
-   - `MIN_RISK_REWARD_RATIO=1.5`
-   - `RISK_REWARD_VOLATILITY_BOOST_ENABLED=true`
-   - `RISK_REWARD_HIGH_VOL_MIN_RATIO=1.7` o similar.
-5. Registrar evento estructurado `RISK_REWARD_VETO` con `symbol`, `side`, `entry_price`, `estimated_entry`, `sl_val`, `tp_val`, `risk`, `reward`, `actual_rrr`, `required_rrr`, `spread` y `atr_pct`.
-6. Mostrar el veto en dashboard/radar como `RISK_REWARD_VETO` o `RRR X < Y`.
-7. Tests requeridos:
-   - BUY con RRR valido pasa.
-   - BUY con RRR invalido bloquea.
-   - SELL con RRR valido pasa.
-   - SELL con RRR invalido bloquea.
+1. Filtro de ratio riesgo/beneficio minimo despues de calcular `sl_val` y `tp_val`, antes del sizing/ejecucion en `core/trade_entry.py`.
+2. RRR con precio estimado defensivo ante spread/slippage:
+    - BUY: penalizar entrada hacia arriba.
+    - SELL: penalizar entrada hacia abajo.
+3. Uso de `spread`, `MAX_SLIPPAGE` y `atr_pct` para evitar aceptar trades al filo del umbral.
+4. Configuracion:
+    - `RISK_REWARD_FILTER_ENABLED=true`
+    - `MIN_RISK_REWARD_RATIO=1.5`
+    - `RISK_REWARD_VOLATILITY_BOOST_ENABLED=true`
+    - `RISK_REWARD_HIGH_VOL_MIN_RATIO=1.7`
+5. Evento estructurado `RISK_REWARD_VETO` con `symbol`, `side`, `entry_price`, `estimated_entry`, `sl_val`, `tp_val`, `risk`, `reward`, `actual_rrr`, `required_rrr`, `spread` y `atr_pct`.
+6. Veto visible en dashboard/radar como `RRR ESTRUCTURAL INSUFICIENTE`.
+7. Tests agregados:
+    - BUY con RRR valido pasa.
+    - BUY con RRR invalido bloquea.
+    - SELL con RRR valido pasa.
+    - SELL con RRR invalido bloquea.
    - Bounds invalidos bloquean.
    - Penalizacion por spread/slippage reduce RRR.
 
 Criterio de salida:
 
-- Logs `RISK_REWARD_VETO` visibles y correctos.
-- Trades aceptados con RRR medio superior al minimo teorico.
+- Logs/eventos `RISK_REWARD_VETO` visibles y correctos.
 - Tests nuevos en verde.
 - No romper PAPER/SHADOW.
+
+Pendiente operacional:
+
+1. Medir durante campana PAPER/SHADOW si los trades aceptados mantienen RRR medio superior al minimo teorico.
+2. Ajustar `MIN_RISK_REWARD_RATIO` o `RISK_REWARD_HIGH_VOL_MIN_RATIO` solo con evidencia de muestra cerrada.
 
 #### Sprint 2 — Eficiencia del pipeline: pre-filtros baratos
 

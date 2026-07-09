@@ -53,6 +53,67 @@ def _exchange_position_is_flat(bot, symbol: str) -> bool:
     return _helper_exchange_position_is_flat(bot, symbol)
 
 
+def _evaluate_risk_reward_filter(
+    *,
+    side: str,
+    entry_price: float,
+    sl_val: float,
+    tp_val: float,
+    spread: float,
+    atr_pct: float,
+) -> tuple[bool, dict[str, float | str]]:
+    if not bool(getattr(Config, "RISK_REWARD_FILTER_ENABLED", True)):
+        return True, {}
+
+    try:
+        entry = float(entry_price)
+        stop = float(sl_val)
+        target = float(tp_val)
+        spread_fraction = max(0.0, float(spread or 0.0))
+        atr_fraction = max(0.0, float(atr_pct or 0.0))
+    except (TypeError, ValueError):
+        return False, {"reason": "INVALID_BOUNDS"}
+
+    side_upper = str(side or "").upper()
+    if entry <= 0 or stop <= 0 or target <= 0 or side_upper not in {"BUY", "SELL"}:
+        return False, {"reason": "INVALID_BOUNDS"}
+
+    slippage_fraction = max(0.0, float(getattr(Config, "MAX_SLIPPAGE", 0.0) or 0.0))
+    entry_penalty = spread_fraction + slippage_fraction
+    if side_upper == "BUY":
+        estimated_entry = entry * (1.0 + entry_penalty)
+        risk = estimated_entry - stop
+        reward = target - estimated_entry
+    else:
+        estimated_entry = entry * (1.0 - entry_penalty)
+        risk = stop - estimated_entry
+        reward = estimated_entry - target
+
+    required_rrr = float(getattr(Config, "MIN_RISK_REWARD_RATIO", 1.5) or 1.5)
+    if bool(
+        getattr(Config, "RISK_REWARD_VOLATILITY_BOOST_ENABLED", True)
+    ) and atr_fraction * 100.0 > float(getattr(Config, "NATR_THRESHOLD", 2.0) or 2.0):
+        required_rrr = float(
+            getattr(Config, "RISK_REWARD_HIGH_VOL_MIN_RATIO", required_rrr) or required_rrr
+        )
+
+    actual_rrr = reward / risk if risk > 0 else 0.0
+    details: dict[str, float | str] = {
+        "reason": "RISK_REWARD_VETO",
+        "estimated_entry": estimated_entry,
+        "risk": risk,
+        "reward": reward,
+        "actual_rrr": actual_rrr,
+        "required_rrr": required_rrr,
+        "spread": spread_fraction,
+        "atr_pct": atr_fraction,
+    }
+    if risk <= 0 or reward <= 0:
+        details["reason"] = "INVALID_BOUNDS"
+        return False, details
+    return actual_rrr >= required_rrr, details
+
+
 def execute_order(
     bot,
     symbol: str,
@@ -250,6 +311,39 @@ def execute_order(
         symbol=symbol,
     )
     bot.log(f"\U0001f9e9 Exit mode {symbol}: {exit_mode}")
+
+    rrr_ok, rrr_details = _evaluate_risk_reward_filter(
+        side=side,
+        entry_price=price,
+        sl_val=sl_val,
+        tp_val=tp_val,
+        spread=spread,
+        atr_pct=atr_pct,
+    )
+    if not rrr_ok:
+        actual_rrr = float(rrr_details.get("actual_rrr", 0.0) or 0.0)
+        required_rrr = float(rrr_details.get("required_rrr", 0.0) or 0.0)
+        bot.log(f"🚫 RISK_REWARD_VETO {symbol}: RRR {actual_rrr:.2f} < {required_rrr:.2f}")
+        append_execution_event(
+            bot,
+            "RISK_REWARD_VETO",
+            {
+                "symbol": symbol,
+                "side": side,
+                "entry_price": float(price),
+                "estimated_entry": float(rrr_details.get("estimated_entry", price) or price),
+                "sl_val": float(sl_val),
+                "tp_val": float(tp_val),
+                "risk": float(rrr_details.get("risk", 0.0) or 0.0),
+                "reward": float(rrr_details.get("reward", 0.0) or 0.0),
+                "actual_rrr": actual_rrr,
+                "required_rrr": required_rrr,
+                "spread": float(rrr_details.get("spread", spread) or 0.0),
+                "atr_pct": float(rrr_details.get("atr_pct", atr_pct) or 0.0),
+                "reason": str(rrr_details.get("reason", "RISK_REWARD_VETO")),
+            },
+        )
+        return _discard_pending_signal("RISK_REWARD_VETO")
 
     clean_snapshot = (context or {}).copy()
     clean_snapshot.setdefault("side", side)

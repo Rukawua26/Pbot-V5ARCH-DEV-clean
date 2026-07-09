@@ -3,11 +3,102 @@ from threading import RLock
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from core.trade_entry import _evaluate_risk_reward_filter
 from core.trade_manager import execute_order
 
 
 class ExecuteOrderCoverageTest(unittest.TestCase):
     """Covers execute_order code paths not yet tested by test_advanced_runtime_flows."""
+
+    @patch("core.trade_entry.Config.MAX_SLIPPAGE", 0.0)
+    def test_risk_reward_filter_allows_valid_buy(self):
+        ok, details = _evaluate_risk_reward_filter(
+            side="BUY",
+            entry_price=100.0,
+            sl_val=98.0,
+            tp_val=104.0,
+            spread=0.0,
+            atr_pct=0.01,
+        )
+
+        self.assertTrue(ok)
+        self.assertAlmostEqual(details["actual_rrr"], 2.0)
+
+    @patch("core.trade_entry.Config.MAX_SLIPPAGE", 0.0)
+    def test_risk_reward_filter_blocks_invalid_buy(self):
+        ok, details = _evaluate_risk_reward_filter(
+            side="BUY",
+            entry_price=100.0,
+            sl_val=98.0,
+            tp_val=102.0,
+            spread=0.0,
+            atr_pct=0.01,
+        )
+
+        self.assertFalse(ok)
+        self.assertEqual(details["reason"], "RISK_REWARD_VETO")
+
+    @patch("core.trade_entry.Config.MAX_SLIPPAGE", 0.0)
+    def test_risk_reward_filter_allows_valid_sell(self):
+        ok, details = _evaluate_risk_reward_filter(
+            side="SELL",
+            entry_price=100.0,
+            sl_val=102.0,
+            tp_val=96.0,
+            spread=0.0,
+            atr_pct=0.01,
+        )
+
+        self.assertTrue(ok)
+        self.assertAlmostEqual(details["actual_rrr"], 2.0)
+
+    @patch("core.trade_entry.Config.MAX_SLIPPAGE", 0.0)
+    def test_risk_reward_filter_blocks_invalid_sell(self):
+        ok, details = _evaluate_risk_reward_filter(
+            side="SELL",
+            entry_price=100.0,
+            sl_val=102.0,
+            tp_val=98.0,
+            spread=0.0,
+            atr_pct=0.01,
+        )
+
+        self.assertFalse(ok)
+        self.assertEqual(details["reason"], "RISK_REWARD_VETO")
+
+    def test_risk_reward_filter_blocks_invalid_bounds(self):
+        ok, details = _evaluate_risk_reward_filter(
+            side="BUY",
+            entry_price=0.0,
+            sl_val=98.0,
+            tp_val=104.0,
+            spread=0.0,
+            atr_pct=0.01,
+        )
+
+        self.assertFalse(ok)
+        self.assertEqual(details["reason"], "INVALID_BOUNDS")
+
+    @patch("core.trade_entry.Config.MAX_SLIPPAGE", 0.001)
+    def test_risk_reward_filter_spread_penalty_reduces_rrr(self):
+        _ok_clean, clean = _evaluate_risk_reward_filter(
+            side="BUY",
+            entry_price=100.0,
+            sl_val=98.0,
+            tp_val=104.0,
+            spread=0.0,
+            atr_pct=0.01,
+        )
+        _ok_penalized, penalized = _evaluate_risk_reward_filter(
+            side="BUY",
+            entry_price=100.0,
+            sl_val=98.0,
+            tp_val=104.0,
+            spread=0.004,
+            atr_pct=0.01,
+        )
+
+        self.assertLess(penalized["actual_rrr"], clean["actual_rrr"])
 
     def _min_bot(self, **overrides):
         attrs = dict(
@@ -266,6 +357,20 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
 
         self.assertEqual(result, "FINAL_SL_TOO_WIDE")
 
+    @patch("core.trade_entry.Config.MAX_SLIPPAGE", 0.0)
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_risk_reward_veto_aborts_before_pending_intent(self, _, _tg):
+        bot = self._min_bot()
+        bot.risk_engine.get_exit_levels = lambda **kw: (98.0, 102.0, "STD")
+
+        result = execute_order(
+            bot, "BTC/USDT", "BUY", 100.0, 1.0, is_shadow=True, context=self._ctx()
+        )
+
+        self.assertEqual(result, "RISK_REWARD_VETO")
+        bot.brain.save_active_trade_state.assert_not_called()
+
     @patch("core.trade_entry.Config.MIN_NOTIONAL_VALUE", 50.0)
     @patch("core.trade_entry.Config.CORRELATION_RISK_ENABLED", True)
     @patch("core.trade_entry.send_telegram_msg")
@@ -324,6 +429,7 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
         finally:
             th._fail_safe_close_when_sl_missing = orig
 
+    @patch("core.trade_entry.Config.RISK_REWARD_FILTER_ENABLED", False)
     @patch("core.trade_entry.send_telegram_msg")
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
     def test_tp_insufficient_for_real_aborts(self, _, _tg):

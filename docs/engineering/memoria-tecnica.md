@@ -37,6 +37,30 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-09 - Sprint 1 cuantitativo: filtro RRR estructural
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/trade_entry.py`: agrega `_evaluate_risk_reward_filter()` y bloquea entradas con RRR estructural insuficiente despues de calcular `sl_val`/`tp_val` y antes de similarity/sizing/ejecucion.
+- `core/trade_entry.py`: el RRR usa entrada estimada defensiva con `spread` + `MAX_SLIPPAGE`; BUY penaliza entrada hacia arriba y SELL hacia abajo.
+- `core/trade_entry.py`: emite evento estructurado `RISK_REWARD_VETO` con entrada estimada, SL, TP, risk, reward, RRR real/requerido, spread y `atr_pct`.
+- `core/config/manager.py`: agrega flags `RISK_REWARD_FILTER_ENABLED`, `MIN_RISK_REWARD_RATIO`, `RISK_REWARD_VOLATILITY_BOOST_ENABLED`, `RISK_REWARD_HIGH_VOL_MIN_RATIO` y validacion de umbrales.
+- `core/signals/execution.py`: muestra `RISK_REWARD_VETO` como veto visible en dashboard/radar.
+- `tests/test_execute_order_coverage.py`: cubre BUY/SELL valido/invalido, bounds invalidos, penalizacion por spread/slippage y aborto antes de persistir intencion.
+
+Reglas preventivas:
+
+- No mover este filtro despues del sizing ni despues de `similarity_boost`; debe cortar trades estructuralmente malos antes de calcular tamano.
+- No bajar `MIN_RISK_REWARD_RATIO` por debajo de `1.5` sin medicion PAPER/SHADOW cerrada.
+- Si se cambia la formula de entrada estimada, mantener penalizacion conservadora para spread/slippage y tests BUY/SELL.
+- `RISK_REWARD_VETO` debe seguir visible como evento estructurado y como veto de UI/radar.
+
+Validacion registrada:
+
+- `tests/test_execute_order_coverage.py` OK.
+
 ### 2026-07-08 - Fase 4 institucional: healthcheck avanzado, alertas proactivas y VPS checklist
 
 Commit: pendiente hasta cerrar este cambio.
