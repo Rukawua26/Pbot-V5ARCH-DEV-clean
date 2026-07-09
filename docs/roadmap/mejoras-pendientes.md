@@ -122,3 +122,193 @@ Pendiente:
 6. Usar `SHADOW_VALIDATION_ENABLED=true` para medir `agent_override_rate_pct`, WR y avg win/loss.
 
 Criterio de exito: winrate SHADOW >45% y mejor relacion avg win/avg loss sin aumentar drawdown ni saltarse filtros macro.
+
+### 7. Plan de Optimizacion Cuantitativa del Bot — PENDIENTE
+
+Objetivo: mejorar calidad matematica, eficiencia del pipeline y estabilidad del aprendizaje antes de escalar la campana SHADOW o pensar en REAL.
+
+Restricciones:
+
+1. No tocar `cmd_consumer.py`, IPC del dashboard, `ws_reconciliation.py`, `scanner_history` ni `consensus_history` salvo bug real.
+2. No cambiar `EMA_SLOPE_LOOKBACK` por intuicion; medir primero.
+3. No introducir Redis/CQRS en esta fase.
+4. Cada veto nuevo debe quedar visible en logs estructurados, dashboard/radar y tests.
+5. Mantener cambios pequenos, medibles y reversibles.
+
+#### Sprint 1 — Seguridad matematica: filtro RRR estructural
+
+Problema: hoy una senal con consenso alto puede llegar a entrada aunque el `TP/SL` tenga mala esperanza matematica.
+
+Pendiente:
+
+1. Implementar filtro de ratio riesgo/beneficio minimo despues de calcular `sl_val` y `tp_val`, antes del sizing/ejecucion en `core/trade_entry.py`.
+2. Calcular RRR con precio estimado defensivo ante spread/slippage:
+   - BUY: penalizar entrada hacia arriba.
+   - SELL: penalizar entrada hacia abajo.
+3. Usar `spread` y/o `atr_pct` para evitar aceptar trades al filo del umbral.
+4. Agregar configuracion:
+   - `RISK_REWARD_FILTER_ENABLED=true`
+   - `MIN_RISK_REWARD_RATIO=1.5`
+   - `RISK_REWARD_VOLATILITY_BOOST_ENABLED=true`
+   - `RISK_REWARD_HIGH_VOL_MIN_RATIO=1.7` o similar.
+5. Registrar evento estructurado `RISK_REWARD_VETO` con `symbol`, `side`, `entry_price`, `estimated_entry`, `sl_val`, `tp_val`, `risk`, `reward`, `actual_rrr`, `required_rrr`, `spread` y `atr_pct`.
+6. Mostrar el veto en dashboard/radar como `RISK_REWARD_VETO` o `RRR X < Y`.
+7. Tests requeridos:
+   - BUY con RRR valido pasa.
+   - BUY con RRR invalido bloquea.
+   - SELL con RRR valido pasa.
+   - SELL con RRR invalido bloquea.
+   - Bounds invalidos bloquean.
+   - Penalizacion por spread/slippage reduce RRR.
+
+Criterio de salida:
+
+- Logs `RISK_REWARD_VETO` visibles y correctos.
+- Trades aceptados con RRR medio superior al minimo teorico.
+- Tests nuevos en verde.
+- No romper PAPER/SHADOW.
+
+#### Sprint 2 — Eficiencia del pipeline: pre-filtros baratos
+
+Problema: parte del analisis pesado puede ejecutarse antes de descartar simbolos por reglas simples.
+
+Pendiente:
+
+1. Agregar `passes_cheap_pre_filters(...)` antes de `_analyze_symbol_candidate(...)` en `core/bot_signals.py` o helper dedicado.
+2. Solo usar datos O(1) en RAM:
+   - cooldown.
+   - simbolo ya activo.
+   - latency quarantine.
+   - runtime symbol controls cacheados.
+   - `res_data` vacio, `NO_DATA`, timeout o latencia extrema ya conocida.
+3. No mover a pre-filtro barato:
+   - RSI contextual.
+   - ADX contextual.
+   - shock distance.
+   - coherencia final.
+   - MTF/OI.
+   - filtros que dependan de `ctx` profundo.
+4. Registrar evento `CHEAP_PREFILTER_VETO` con razon (`COOLDOWN_ACTIVE`, `SYMBOL_ALREADY_ACTIVE`, `LATENCY_QUARANTINED`, `DATA_INTEGRITY_FAIL`, `SYMBOL_BLOCKED`).
+5. Medir `cycle_latency_ms` o tiempo por simbolo para comparar antes/despues.
+
+Criterio de salida:
+
+- Menor latencia media por ciclo.
+- Menos invocaciones al analisis pesado.
+- Sin cambios raros en senales validas.
+- Vetos baratos visibles antes del consenso pesado.
+
+#### Sprint 3 — Aprendizaje estable: genetica en batch
+
+Problema: `evolve_genetics(symbol)` corre en el cierre individual y puede sobreajustar por ruido reciente.
+
+Pendiente:
+
+1. Sacar `bot.brain.evolve_genetics(symbol)` del hot-path de `core/trade_exit.py`.
+2. Mantener por trade:
+   - `update_trade_context_result(...)`
+   - `finalize_confidence_exit_audit(...)`
+   - `update_agent_reputation(...)`
+3. Implementar batch genetico con flags:
+   - `GENETIC_BATCH_ENABLED=true`
+   - `GENETIC_BATCH_MIN_TRADES=50`
+4. Calcular nuevos parametros en copia aislada.
+5. Aplicar parametros con swap atomico corto; no mutar dicts compartidos gradualmente mientras el main loop lee.
+6. Registrar eventos:
+   - `GENETIC_BATCH_STARTED`
+   - `GENETIC_BATCH_COMPLETED`
+   - `GENETIC_BATCH_SKIPPED`
+   - `GENETIC_BATCH_SWAP_APPLIED`
+
+Criterio de salida:
+
+- Genetica fuera del cierre inmediato.
+- Sin mutacion concurrente visible.
+- Suite completa verde.
+- Batch no congela main loop ni WebSocket.
+
+#### Sprint 4 — Escala y sensibilidad
+
+Objetivo: ampliar universo operable y medir sensibilidad sin adivinar.
+
+Pendiente:
+
+1. Subir triage de forma gradual solo despues de Sprints 1-3:
+   - `TRIAGE_CANDIDATE_POOL_MULTIPLIER=2`
+   - `TRIAGE_MAX_CANDIDATE_POOL=60`
+2. Medir durante 48h en SHADOW:
+   - timeouts.
+   - latencia del ciclo.
+   - candidatos utiles.
+   - ratio de vetos posteriores.
+   - senales SHADOW seleccionadas.
+3. Agregar telemetria comparativa para `EMA_SLOPE_LOOKBACK`:
+   - mantener `2` en ejecucion.
+   - comparar pasivamente contra `4`.
+   - no alterar ejecucion hasta tener evidencia.
+
+Criterio de salida:
+
+- Triage ampliado sin degradar latencia.
+- Datos suficientes para decidir si conviene ajustar slope.
+- No cambiar sensibilidad por intuicion.
+
+Orden de ejecucion obligatorio:
+
+1. Sprint 1: RRR minimo spread/slippage-aware.
+2. Sprint 2: pre-filtros baratos solo en RAM.
+3. Sprint 3: genetica batch con swap atomico.
+4. Sprint 4: triage 2x + telemetria slope comparativa.
+
+### 8. Dashboard Votos / Consenso — Mejora visual y explicabilidad
+
+Estado: implementado localmente, pendiente de commit/cierre.
+
+Objetivo: que la pestana `Votos / Consenso` explique de forma inmediata que quiso hacer el bot, por que entro/no entro, que regimen favorecia y que modelo estaba activo.
+
+Cambios implementados localmente:
+
+1. Panel principal de respuesta humana:
+   - `Señal seleccionada`
+   - `Señal bloqueada`
+   - `Bloqueado por coherencia`
+   - `Sistema neutral`
+2. Explicacion directa del motivo, por ejemplo:
+   - `Señal BUY contra régimen BAJISTA. Dirección favorecida: SELL.`
+3. KPIs visuales:
+   - `Señal`
+   - `Régimen`
+   - `Favorece`
+   - `Resultado`
+4. Chips de auditoria del modelo:
+   - `Model`
+   - `Features`
+   - `ML active` / `Heuristic`
+5. Filtros del grafico de consenso:
+   - `Todas`
+   - `Bloqueadas`
+   - `Seleccionadas`
+   - `Neutras`
+6. Colores semanticos en el grafico historico:
+   - verde para seleccionadas
+   - rojo para bloqueadas
+   - azul para neutrales
+   - ambar para observadas
+
+Archivos tocados:
+
+- `dashboard/static/index.html`
+- `tests/test_dashboard_ipc.py`
+
+Validacion local ya ejecutada:
+
+- `tests/test_dashboard_ipc.py` OK.
+- `ruff check tests/test_dashboard_ipc.py` OK.
+- `ruff format --check tests/test_dashboard_ipc.py` OK.
+- `git diff --check` OK.
+
+Pendiente opcional:
+
+1. Commit de la mejora visual junto con este roadmap.
+2. Captura visual post-cambio para comparar antes/despues.
+3. Si el usuario lo desea, agregar tooltip detallado por punto del grafico con `symbol`, `side`, `status`, `reason` y `prob_final`.

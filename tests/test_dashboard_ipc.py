@@ -340,7 +340,13 @@ class DashboardIpcTest(unittest.TestCase):
 
         self.assertIn('data-tab="consensus"', html)
         self.assertIn('id="consensusChart"', html)
+        self.assertIn('id="consensus-answer"', html)
+        self.assertIn('id="consensus-kpis"', html)
+        self.assertIn('id="consensus-model-strip"', html)
+        self.assertIn('data-consensus-filter="blocked"', html)
         self.assertIn("function fetchConsensus()", html)
+        self.assertIn("function consensusHumanAnswer", html)
+        self.assertIn("function setConsensusFilter", html)
         self.assertIn("consensusChartInstance.update('none')", html)
 
     def test_dashboard_static_uses_local_cookie_auth_without_startup_prompt(self):

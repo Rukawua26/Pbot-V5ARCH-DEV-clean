@@ -237,6 +237,16 @@
         .consensus-gauge:after { content:""; position:absolute; inset:18px 24px 0; border-radius:130px 130px 0 0; background:var(--panel-bg); }
         .consensus-needle { position:absolute; left:50%; bottom:0; width:2px; height:118px; transform-origin:bottom center; background:var(--neon-blue); z-index:2; box-shadow:0 0 14px rgba(0,242,255,0.65); }
         .consensus-hub { position:absolute; left:50%; bottom:-8px; width:28px; height:28px; transform:translateX(-50%); border-radius:50%; background:var(--neon-blue); z-index:3; box-shadow:0 0 20px rgba(0,242,255,0.35); }
+        .consensus-answer { border-radius:14px; border:1px solid var(--border-panel); background:linear-gradient(135deg, rgba(0,242,255,0.08), rgba(0,0,0,0)); padding:12px; }
+        .consensus-answer.blocked { border-color:rgba(255,0,85,0.28); background:linear-gradient(135deg, rgba(255,0,85,0.10), rgba(0,0,0,0)); }
+        .consensus-answer.selected { border-color:rgba(57,255,20,0.24); background:linear-gradient(135deg, rgba(57,255,20,0.09), rgba(0,0,0,0)); }
+        .consensus-answer.neutral { border-color:rgba(0,242,255,0.24); background:linear-gradient(135deg, rgba(0,242,255,0.09), rgba(0,0,0,0)); }
+        .consensus-answer .headline { font-size:18px; font-weight:900; letter-spacing:0.02em; text-transform:uppercase; }
+        .consensus-kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+        .consensus-kpi { border:1px solid var(--border-panel); border-radius:12px; background:var(--inset-bg); padding:9px 10px; min-width:0; }
+        .consensus-kpi span { display:block; color:var(--text-muted); font-size:8px; text-transform:uppercase; letter-spacing:0.10em; }
+        .consensus-kpi strong { display:block; margin-top:4px; font-family:'JetBrains Mono',monospace; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .consensus-model-strip { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
         .risk-dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:7px; background:var(--neon-green); box-shadow:0 0 10px rgba(57,255,20,0.35); }
         .risk-dot.warn { background:var(--neon-amber); box-shadow:0 0 10px rgba(255,179,0,0.35); }
         .risk-dot.danger { background:var(--neon-red); box-shadow:0 0 10px rgba(255,0,85,0.35); }
@@ -400,6 +410,10 @@
                     <div class="px-4 pb-4 grid grid-cols-1 xl:grid-cols-12 gap-4">
                         <div class="insight-card xl:col-span-4">
                             <p class="section-title">Consensus Gauge</p>
+                            <div id="consensus-answer" class="consensus-answer neutral mb-3">
+                                <div id="consensus-headline" class="headline glow-blue">Esperando señal</div>
+                                <div id="consensus-explain" class="text-[11px] text-dim mt-1">Aún no hay rondas de consenso disponibles.</div>
+                            </div>
                             <div class="consensus-gauge mb-3">
                                 <div id="consensus-needle" class="consensus-needle" style="transform:rotate(0deg);"></div>
                                 <div class="consensus-hub"></div>
@@ -409,9 +423,11 @@
                                 <div id="consensus-status" class="text-xs text-muted mt-1">Esperando rondas</div>
                                 <div id="consensus-symbol" class="text-[11px] text-dim mt-1 mono">--</div>
                             </div>
+                            <div id="consensus-model-strip" class="consensus-model-strip"></div>
                         </div>
                         <div class="insight-card xl:col-span-5">
                             <p class="section-title">Agent Voting Breakdown</p>
+                            <div id="consensus-kpis" class="consensus-kpis mb-3"></div>
                             <div class="tbl-wrap" style="max-height:260px;">
                                 <table>
                                     <thead><tr><th>Agente</th><th>Voto</th><th>Peso</th><th>Estado</th></tr></thead>
@@ -426,7 +442,15 @@
                         <div class="insight-card xl:col-span-12">
                             <div class="flex items-center justify-between gap-2 mb-2">
                                 <p class="section-title mb-0">Últimas 50 rondas</p>
-                                <span id="consensus-round-count" class="text-[10px] text-muted mono">0 rondas</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="flex gap-1">
+                                        <button class="btn-filter active" data-consensus-filter="all" onclick="setConsensusFilter('all')">Todas</button>
+                                        <button class="btn-filter" data-consensus-filter="blocked" onclick="setConsensusFilter('blocked')">Bloqueadas</button>
+                                        <button class="btn-filter" data-consensus-filter="selected" onclick="setConsensusFilter('selected')">Seleccionadas</button>
+                                        <button class="btn-filter" data-consensus-filter="neutral" onclick="setConsensusFilter('neutral')">Neutras</button>
+                                    </div>
+                                    <span id="consensus-round-count" class="text-[10px] text-muted mono">0 rondas</span>
+                                </div>
                             </div>
                             <div class="chart-box" style="height:220px;"><canvas id="consensusChart"></canvas></div>
                         </div>
@@ -570,6 +594,7 @@
         var tradeChartInstance = null, equityChartInstance = null, consensusChartInstance = null;
         var tradeFilter = 'all';
         var radarFilter = 'all', lastRadar = [];
+        var consensusFilter = 'all', lastConsensusRounds = [];
         var tradeAllCount = 473, tradeShadowCount = 471, tradeRealCount = 2;
 
         /* ===== TABS ===== */
@@ -743,26 +768,79 @@
             return Number(prob||0)>=65?'glow-green':Number(prob||0)<=35?'glow-red':'glow-blue';
         }
 
+        function consensusStatusGroup(status) {
+            var s=String(status||'').toUpperCase();
+            if(s==='SELECTED')return 'selected';
+            if(s.indexOf('NEUTRAL')>=0)return 'neutral';
+            if(s.indexOf('BLOCKED')===0)return 'blocked';
+            return 'observed';
+        }
+
+        function setConsensusFilter(f) {
+            consensusFilter=f;
+            document.querySelectorAll('[data-consensus-filter]').forEach(function(b){b.classList.toggle('active',b.dataset.consensusFilter===f);});
+            renderConsensusChart(lastConsensusRounds);
+        }
+
+        function consensusRegimeInfo(reason) {
+            var r=String(reason||'').toUpperCase();
+            if(r.indexOf('BAJISTA')>=0 || r.indexOf('BEAR')>=0)return {regime:'BAJISTA',favored:'SELL'};
+            if(r.indexOf('ALCISTA')>=0 || r.indexOf('BULL')>=0)return {regime:'ALCISTA',favored:'BUY'};
+            return {regime:'N/A',favored:'WAIT'};
+        }
+
+        function consensusHumanAnswer(latest) {
+            var status=String(latest.status||'OBSERVED'), reason=String(latest.reason||''), side=String(latest.side||'WAIT');
+            var group=consensusStatusGroup(status), info=consensusRegimeInfo(reason);
+            if(group==='selected')return {cls:'selected',title:'Señal seleccionada',detail:'El bot validó '+side+' y la compuerta no encontró bloqueo.'};
+            if(group==='neutral')return {cls:'neutral',title:'Sistema neutral',detail:'Los agentes no dieron suficiente dirección. El bot espera.'};
+            if(reason.indexOf('COHERENCIA')>=0)return {cls:'blocked',title:'Bloqueado por coherencia',detail:'Señal '+side+' contra régimen '+info.regime+'. Dirección favorecida: '+info.favored+'.'};
+            if(group==='blocked')return {cls:'blocked',title:'Señal bloqueada',detail:reason||'Un filtro de riesgo impidió ejecutar.'};
+            return {cls:'neutral',title:'Ronda observada',detail:'Se analizó la señal, pero no hubo ejecución.'};
+        }
+
         function renderConsensus(data) {
             var latest=data.latest||null, rounds=data.rounds||[], risk=data.risk_summary||{};
+            lastConsensusRounds=rounds;
             document.getElementById('consensus-state-age').textContent='snapshot '+Number(data.state_age_s||0).toFixed(1)+'s';
             document.getElementById('consensus-round-count').textContent=rounds.length+' rondas';
             renderConsensusRiskGate(risk);
             if(!latest){
+                document.getElementById('consensus-answer').className='consensus-answer neutral mb-3';
+                document.getElementById('consensus-headline').textContent='Esperando señal';
+                document.getElementById('consensus-headline').className='headline glow-blue';
+                document.getElementById('consensus-explain').textContent='Aún no hay rondas de consenso disponibles.';
                 document.getElementById('consensus-prob').textContent='--.-%';
                 document.getElementById('consensus-status').textContent='Esperando rondas de votacion';
                 document.getElementById('consensus-symbol').textContent='--';
+                document.getElementById('consensus-kpis').innerHTML='';
+                document.getElementById('consensus-model-strip').innerHTML='';
                 document.getElementById('consensus-votes-body').innerHTML='<tr><td colspan="4" class="empty-state"><strong>Sin votos</strong>Espera una ronda de análisis.</td></tr>';
                 renderConsensusChart([]);
                 return;
             }
             var prob=Number(latest.prob_final||0), needle=(prob/100*180)-90;
+            var answer=consensusHumanAnswer(latest), regime=consensusRegimeInfo(latest.reason), model=latest.model_version||{};
+            document.getElementById('consensus-answer').className='consensus-answer '+answer.cls+' mb-3';
+            document.getElementById('consensus-headline').textContent=answer.title;
+            document.getElementById('consensus-headline').className='headline '+consensusStatusClass(latest.status,prob);
+            document.getElementById('consensus-explain').textContent=answer.detail;
             document.getElementById('consensus-needle').style.transform='rotate('+needle.toFixed(1)+'deg)';
             var probEl=document.getElementById('consensus-prob');
             probEl.textContent=prob.toFixed(1)+'%';
             probEl.className='mono text-4xl font-black '+consensusStatusClass(latest.status,prob);
             document.getElementById('consensus-status').textContent=String(latest.status||'OBSERVED')+' · '+String(latest.reason||'');
             document.getElementById('consensus-symbol').textContent=String(latest.symbol||'--')+' · '+String(latest.side||'WAIT')+' · '+String(latest.mode||'NONE');
+            document.getElementById('consensus-kpis').innerHTML=[
+                ['Señal', latest.side||'WAIT', latest.side==='BUY'?'glow-green':latest.side==='SELL'?'glow-red':'text-dim'],
+                ['Régimen', regime.regime, regime.regime==='BAJISTA'?'glow-red':regime.regime==='ALCISTA'?'glow-green':'text-dim'],
+                ['Favorece', regime.favored, regime.favored==='BUY'?'glow-green':regime.favored==='SELL'?'glow-red':'text-dim'],
+                ['Resultado', latest.status||'OBSERVED', consensusStatusClass(latest.status,prob)]
+            ].map(function(k){return '<div class="consensus-kpi"><span>'+esc(k[0])+'</span><strong class="'+k[2]+'">'+esc(k[1])+'</strong></div>';}).join('');
+            document.getElementById('consensus-model-strip').innerHTML=
+                '<span class="code-chip">Model '+esc(model.model_type||'OFF')+'</span>'+
+                '<span class="code-chip">Features '+esc(model.features_version||'N/A')+'</span>'+
+                '<span class="code-chip">'+(model.bootstrap_heuristic_mode?'Heuristic':'ML active')+'</span>';
             renderConsensusVotes(latest.votes||{}, latest.weights||{}, latest.status||'');
             renderConsensusChart(rounds);
         }
@@ -798,15 +876,29 @@
         function renderConsensusChart(rounds) {
             var can=document.getElementById('consensusChart');
             if(!can)return;
-            var ordered=(rounds||[]).slice().reverse();
+            var filtered=(rounds||[]).filter(function(r){
+                if(consensusFilter==='all')return true;
+                return consensusStatusGroup(r.status)===consensusFilter;
+            });
+            document.getElementById('consensus-round-count').textContent=filtered.length+' / '+(rounds||[]).length+' rondas';
+            var ordered=filtered.slice().reverse();
             var labels=ordered.map(function(r){return fmtTs(Number(r.ts||0)*1000);});
             var values=ordered.map(function(r){return Number(r.prob_final||0);});
+            var pointColors=ordered.map(function(r){
+                var g=consensusStatusGroup(r.status);
+                if(g==='selected')return 'rgba(57,255,20,0.95)';
+                if(g==='blocked')return 'rgba(255,0,85,0.95)';
+                if(g==='neutral')return 'rgba(0,242,255,0.95)';
+                return 'rgba(255,179,0,0.85)';
+            });
             if(!consensusChartInstance){
-                consensusChartInstance=new Chart(can,{type:'line',data:{labels:labels,datasets:[{label:'Prob Final',data:values,borderColor:'var(--neon-blue)',backgroundColor:'rgba(0,242,255,0.10)',borderWidth:2,fill:true,tension:0.25,pointRadius:1.5}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'var(--text-muted)',font:{size:9,family:'JetBrains Mono'},maxTicksLimit:12}},y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'var(--text-muted)',font:{size:10,family:'JetBrains Mono'},callback:function(v){return v+'%';}}}}}});
+                consensusChartInstance=new Chart(can,{type:'line',data:{labels:labels,datasets:[{label:'Prob Final',data:values,borderColor:'var(--neon-blue)',backgroundColor:'rgba(0,242,255,0.10)',borderWidth:2,fill:true,tension:0.25,pointRadius:2.5,pointBackgroundColor:pointColors,pointBorderColor:pointColors}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(ctx){return 'Prob: '+Number(ctx.parsed.y||0).toFixed(1)+'%';}}}},scales:{x:{grid:{display:false},ticks:{color:'var(--text-muted)',font:{size:9,family:'JetBrains Mono'},maxTicksLimit:12}},y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'var(--text-muted)',font:{size:10,family:'JetBrains Mono'},callback:function(v){return v+'%';}}}}}});
                 return;
             }
             consensusChartInstance.data.labels=labels;
             consensusChartInstance.data.datasets[0].data=values;
+            consensusChartInstance.data.datasets[0].pointBackgroundColor=pointColors;
+            consensusChartInstance.data.datasets[0].pointBorderColor=pointColors;
             consensusChartInstance.update('none');
         }
 
