@@ -39,7 +39,7 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ### 2026-07-09 - Sprint 1 cuantitativo: filtro RRR estructural
 
-Commit: pendiente hasta cerrar este cambio.
+Commit: `6c9659d feat: add structural risk reward entry filter`
 
 Que cambia:
 
