@@ -79,6 +79,7 @@ class RiskPolicyTests(unittest.TestCase):
     @patch("core.risk_policy.append_execution_event")
     def test_activate_runtime_protection_sets_flags_and_sends_once(self, _mock_evt, mock_tg):
         bot = self._bot()
+        bot._circuit_breaker_alert_sent = True
 
         activate_runtime_protection(
             bot,
@@ -110,6 +111,48 @@ class RiskPolicyTests(unittest.TestCase):
             reason="TEST_RUNTIME_PROTECTION",
         )
         mock_tg.assert_called_once_with("alert")
+
+    @patch("core.risk_policy.send_telegram_msg")
+    @patch("core.risk_policy.append_execution_event")
+    def test_circuit_breaker_hook_alerts_on_first_trigger(self, mock_evt, mock_tg):
+        bot = self._bot()
+        bot._circuit_breaker_alert_sent = False
+
+        activate_runtime_protection(
+            bot,
+            circuit_breaker=True,
+            log_message="breaker tripped",
+            reason="CIRCUIT_BREAKER_PANIC",
+            source="test",
+        )
+
+        self.assertTrue(bot._circuit_breaker_alert_sent)
+        events = [call.args[1] for call in mock_evt.call_args_list]
+        self.assertIn("CIRCUIT_BREAKER_TRIGGER_ALERT", events)
+        mock_tg.assert_any_call(
+            "CIRCUIT BREAKER TRIGGER: reason=CIRCUIT_BREAKER_PANIC source=test. "
+            "Nuevas entradas bloqueadas. Revisar dashboard y runbook."
+        )
+
+    @patch("core.risk_policy.send_telegram_msg")
+    @patch("core.risk_policy.append_execution_event")
+    def test_circuit_breaker_hook_does_not_alert_on_second_trigger(self, mock_evt, mock_tg):
+        bot = self._bot()
+        bot._circuit_breaker_alert_sent = True
+
+        activate_runtime_protection(
+            bot,
+            circuit_breaker=True,
+            log_message="breaker tripped again",
+            reason="CIRCUIT_BREAKER_PANIC",
+        )
+
+        cb_alerts = [
+            call
+            for call in mock_evt.call_args_list
+            if call.args[1] == "CIRCUIT_BREAKER_TRIGGER_ALERT"
+        ]
+        self.assertEqual(len(cb_alerts), 0)
 
     def test_runtime_entry_decision_blocks_paused_bot(self):
         bot = self._bot(is_paused=True)

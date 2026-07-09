@@ -163,13 +163,76 @@ def index():
 
 @app.get("/api/v1/health")
 def health():
-    if os.path.exists(STATE_FILE):
-        age = time.time() - os.path.getmtime(STATE_FILE)
-        return {
-            "status": "ok",
-            "alive": age < 30,
-        }
-    return {"status": "degraded", "alive": False}
+    """Healthcheck avanzado: verifica freshness del snapshot, flags criticos y estado runtime.
+
+    No requiere API key para que Docker/healthcheck pueda sondearlo sin credenciales.
+    """
+    if not os.path.exists(STATE_FILE):
+        return JSONResponse(
+            {
+                "status": "unhealthy",
+                "reason": "NO_SNAPSHOT",
+                "state_age_s": None,
+                "ws_reconciliation_in_progress": False,
+                "halt_system_active": False,
+            },
+            status_code=503,
+        )
+
+    try:
+        snapshot_ts = os.path.getmtime(STATE_FILE)
+        state_age_s = round(time.time() - snapshot_ts, 1)
+    except OSError:
+        return JSONResponse(
+            {
+                "status": "unhealthy",
+                "reason": "STAT_ERROR",
+                "state_age_s": None,
+            },
+            status_code=503,
+        )
+
+    ws_flag = False
+    halt_flag = False
+    circuit_flag = False
+    paused_flag = False
+    try:
+        with open(STATE_FILE) as f:
+            state = json.load(f)
+            ws_flag = bool(state.get("ws_reconciliation_in_progress", False))
+            halt_flag = bool(state.get("halt_system_active", False))
+            circuit_flag = bool(state.get("circuit_breaker_active", False))
+            paused_flag = bool(state.get("is_paused", False))
+    except (json.JSONDecodeError, OSError):
+        return JSONResponse(
+            {
+                "status": "unhealthy",
+                "reason": "SNAPSHOT_CORRUPT",
+                "state_age_s": state_age_s,
+            },
+            status_code=503,
+        )
+
+    if state_age_s > 10.0:
+        status = "unhealthy"
+        reason = "STALE_SNAPSHOT"
+    elif state_age_s > 3.0 or halt_flag or circuit_flag:
+        status = "degraded"
+        reason = "STALE_OR_PROTECTION_ACTIVE"
+    else:
+        status = "healthy"
+        reason = "OK"
+
+    return {
+        "status": status,
+        "reason": reason,
+        "state_age_s": state_age_s,
+        "ws_reconciliation_in_progress": ws_flag,
+        "halt_system_active": halt_flag,
+        "circuit_breaker_active": circuit_flag,
+        "is_paused": paused_flag,
+        "timestamp": time.time(),
+    }
 
 
 @app.get("/api/v1/state")
@@ -180,6 +243,31 @@ def get_state(_=Depends(verify_key)):
         data = json.load(f)
     data["state_age_s"] = round(time.time() - os.path.getmtime(STATE_FILE), 1)
     return data
+
+
+@app.get("/api/v1/consensus")
+def get_consensus(limit: int = 50, _=Depends(verify_key)):
+    limit = _clamp_limit(limit, default=50, maximum=100)
+    if not os.path.exists(STATE_FILE):
+        raise HTTPException(503, "State not available")
+    with open(STATE_FILE) as f:
+        data = json.load(f)
+    consensus = data.get("consensus") or {}
+    rounds = list(consensus.get("rounds") or [])[:limit]
+    risk_summary = consensus.get("risk_summary") or {
+        "halt_active": bool(data.get("halt_system_active", False)),
+        "integrity_lock": bool(data.get("integrity_lock_active", False)),
+        "circuit_breaker": bool(data.get("circuit_breaker_active", False)),
+        "paused": bool(data.get("is_paused", False)),
+        "ws_reconciliation_in_progress": bool(data.get("ws_reconciliation_in_progress", False)),
+    }
+    return {
+        "latest": rounds[0] if rounds else None,
+        "rounds": rounds,
+        "total": len(rounds),
+        "risk_summary": risk_summary,
+        "state_age_s": round(time.time() - os.path.getmtime(STATE_FILE), 1),
+    }
 
 
 @app.get("/api/v1/logs")

@@ -1,11 +1,57 @@
 from __future__ import annotations
 
+import logging
+import os
+import threading
 import time
 
 from config import Config
 from core.execution_telemetry import append_execution_event
 from core.reconciliation import reconcile_bootstrap_state
 from core.risk_policy import activate_runtime_protection
+
+try:
+    from tools.notifier import send_telegram_msg
+except Exception:
+    send_telegram_msg = None  # type: ignore[assignment]
+
+logger = logging.getLogger("SniperAI")
+
+WS_RECONCILE_TIMEOUT_SECONDS = float(os.getenv("WS_RECONCILE_TIMEOUT_SECONDS", "30.0") or "30.0")
+
+
+def _check_ws_reconcile_timeout(bot) -> None:
+    """Daemon: alert if ws_reconciliation_in_progress stays active too long."""
+    start = time.monotonic()
+    while True:
+        time.sleep(max(2.0, WS_RECONCILE_TIMEOUT_SECONDS / 4.0))
+        if not bool(getattr(bot, "ws_reconciliation_in_progress", False)):
+            break
+        elapsed = time.monotonic() - start
+        if elapsed >= WS_RECONCILE_TIMEOUT_SECONDS:
+            msg = (
+                f"⏰ WS_RECONCILE_TIMEOUT: ws_reconciliation_in_progress activo > "
+                f"{WS_RECONCILE_TIMEOUT_SECONDS:.0f}s (elapsed {elapsed:.0f}s). "
+                f"Revisar conectividad del exchange."
+            )
+            bot.log(msg)
+            append_execution_event(
+                bot,
+                "WS_RECONCILE_TIMEOUT_ALERT",
+                {
+                    "component": "WebSocket",
+                    "event": "WS_RECONCILE_TIMEOUT_ALERT",
+                    "elapsed_s": round(elapsed, 3),
+                    "timeout_s": WS_RECONCILE_TIMEOUT_SECONDS,
+                    "mode": "PAPER" if Config.PAPER_MODE else "REAL",
+                },
+            )
+            try:
+                if callable(send_telegram_msg):
+                    send_telegram_msg(msg)
+            except Exception:
+                logger.warning("WS_RECONCILE_TIMEOUT alert dispatch failed")
+            break
 
 
 def handle_ws_reconnected(bot, *, source: str, reconnect_count: int | None = None) -> None:
@@ -14,6 +60,9 @@ def handle_ws_reconnected(bot, *, source: str, reconnect_count: int | None = Non
     The market stream reconnect itself is not authoritative for live exposure.
     In REAL mode, close the blind spot by reconciling positions/orders via REST
     before allowing new entries to proceed. PAPER/SHADOW keep this observational.
+
+    A timeout daemon thread monitors ws_reconciliation_in_progress
+    to alert if the flag stays active beyond WS_RECONCILE_TIMEOUT_SECONDS.
     """
     payload = {
         "component": "WebSocket",
@@ -62,6 +111,8 @@ def handle_ws_reconnected(bot, *, source: str, reconnect_count: int | None = Non
     append_execution_event(
         bot, "WS_RECONCILE_STARTED", {**payload, "event": "WS_RECONCILE_STARTED"}
     )
+    threading.Thread(target=_check_ws_reconcile_timeout, args=(bot,), daemon=True).start()
+
     try:
         reconcile_bootstrap_state(bot)
     except Exception as error:

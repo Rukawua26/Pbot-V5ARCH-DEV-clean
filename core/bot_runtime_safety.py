@@ -1,5 +1,41 @@
+import logging
+
 from config import Config
+from core.execution_telemetry import append_execution_event
 from core.risk_policy import activate_runtime_protection
+
+try:
+    from tools.notifier import send_telegram_msg
+except Exception:
+    send_telegram_msg = None  # type: ignore[assignment]
+
+
+def _notify_drawdown_warning(bot, current_pnl: float, threshold_pct: float) -> None:
+    """Envia alerta proactiva cuando el drawdown supera el 80% del limite diario."""
+    if bool(getattr(bot, "_drawdown_warning_sent", False)):
+        return
+    bot._drawdown_warning_sent = True
+    msg = (
+        f"DRAWDOWN WARNING: {current_pnl:.2f}% consumido del limite diario "
+        f"({threshold_pct:.2f}%). Zona de amortiguacion activada."
+    )
+    bot.log(msg)
+    append_execution_event(
+        bot,
+        "DAILY_DRAWDOWN_WARNING",
+        {
+            "component": "RiskEngine",
+            "event": "DAILY_DRAWDOWN_WARNING",
+            "current_pnl_pct": float(current_pnl),
+            "threshold_pct": float(threshold_pct),
+            "severity": "WARNING",
+        },
+    )
+    try:
+        if callable(send_telegram_msg):
+            send_telegram_msg(msg)
+    except Exception as error:
+        logging.getLogger("SniperAI").debug("drawdown warning telegram failed: %s", error)
 
 
 def check_safety_and_goals(bot, current_pnl=None):
@@ -19,13 +55,13 @@ def check_safety_and_goals(bot, current_pnl=None):
     if current_pnl > bot.peak_pnl:
         bot.peak_pnl = current_pnl
 
-    # 1. Trailing Stop de Cuenta: Si perdemos 3% desde el punto más alto del día
+    # 1. Trailing Stop de Cuenta: Si perdemos 3% desde el punto mas alto del dia
     if bot.peak_pnl > 0 and (bot.peak_pnl - current_pnl) >= Config.DAILY_TRAILING_STOP:
         activate_runtime_protection(
             bot,
             circuit_breaker=True,
             log_message=(
-                f"⚠️ Trailing Stop: Protegiendo {current_pnl:.2f}% (Caída del 3% desde el pico)"
+                f"⚠️ Trailing Stop: Protegiendo {current_pnl:.2f}% (Caida del 3% desde el pico)"
             ),
             reason="DAILY_TRAILING_STOP_HIT",
             source="runtime_safety",
@@ -33,7 +69,12 @@ def check_safety_and_goals(bot, current_pnl=None):
         )
         return False
 
-    # 2. Límite de Pérdida Diaria: -3% desde el inicio
+    # 2. Zona de amortiguacion: alerta proactiva al 80% del limite diario
+    drawdown_warning_threshold = -float(Config.DAILY_LOSS_LIMIT) * 0.80
+    if current_pnl <= drawdown_warning_threshold and current_pnl > -float(Config.DAILY_LOSS_LIMIT):
+        _notify_drawdown_warning(bot, current_pnl, drawdown_warning_threshold)
+
+    # 3. Limite de Perdida Diaria: -3% desde el inicio
     if current_pnl <= -Config.DAILY_LOSS_LIMIT:
         activate_runtime_protection(
             bot,

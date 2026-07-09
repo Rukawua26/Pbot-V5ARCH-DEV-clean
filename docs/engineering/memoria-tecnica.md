@@ -37,6 +37,100 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-08 - Fase 4 institucional: healthcheck avanzado, alertas proactivas y VPS checklist
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `tools/dashboard_api_server.py`: endpoint `/api/v1/health` ahora verifica freshness del snapshot (healthy/degraded/unhealthy), flags de proteccion (HALT, circuit breaker, WS reconcile) y devuelve JSON estructurado sin requerir API key.
+- `core/bot_runtime_safety.py`: alerta proactiva `DAILY_DRAWDOWN_WARNING` al 80% del limite diario, envia evento + Telegram, con flag `_drawdown_warning_sent` que se resetea diariamente.
+- `core/risk_policy.py`: alerta proactiva `CIRCUIT_BREAKER_TRIGGER_ALERT` la primera vez que se dispara el circuit breaker, con flag `_circuit_breaker_alert_sent` que se resetea diariamente.
+- `core/bot_initialization.py`, `core/bot_balance_ops.py`, `core/command_router.py`: reset diario de `_drawdown_warning_sent` y `_circuit_breaker_alert_sent`.
+- `ops/vps-checklist.md`: nuevo checklist de despliegue VPS con Docker, variables .env, healthcheck, logs, backup y troubleshooting.
+- `tests/test_drawdown_warning.py`: nuevos tests para drawdown warning (80%, <80%, solo una vez).
+- `tests/test_risk_policy.py`: nuevos tests para circuit breaker hook (primer trigger, segundo trigger silenciado).
+- `tests/test_daily_circuit_breaker.py`: actualizado para silenciar hook en tests existentes.
+
+Reglas preventivas:
+
+- No remover el endpoint `/api/v1/health` sin reemplazarlo; es el healthcheck de Docker/VPS.
+- No cambiar el umbral de 80% del drawdown sin validar que no genere falsos positivos.
+- No remover las alertas proactivas; son la zona de amortiguacion antes del HALT.
+- El flag `_drawdown_warning_sent` y `_circuit_breaker_alert_sent` deben resetearse en `bot_balance_ops.py` y `command_router.py` al igual que `daily_drawdown_alert_sent`.
+- El endpoint `/api/v1/health` no requiere API key para que Docker pueda sondearlo.
+
+Validacion registrada:
+
+- Tests enfocados `test_drawdown_warning`, `test_risk_policy`, `test_dashboard_ipc`, `test_ws_reconciliation`, `test_runtime_safety_regressions`, `test_daily_circuit_breaker` OK.
+- `compileall main.py core tools/dashboard_api_server.py` OK.
+- `ruff check core/ tests/ tools/dashboard_api_server.py` OK.
+- `ruff format --check core/ tests/ tools/dashboard_api_server.py` OK.
+- `scripts/smoke_modular_imports.sh` OK.
+- `tools/regression_contracts.py` OK.
+- `tools/check_no_silent_pass.py` OK.
+- Suite unitaria completa: `1106` tests OK, `2` skipped.
+
+### 2026-07-08 - Fase 3 institucional: model_version, watchdog timeout y runbook
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/bot_radar.py`: cada ronda de consenso ahora incluye `model_version` con `model_type`, `bootstrap_heuristic_mode` y `features_version`.
+- `core/state_snapshot.py`: el snapshot expone `model_version` en cada entrada de consenso.
+- `core/ws_reconciliation.py`: nuevo watchdog daemon `_check_ws_reconcile_timeout` que alerta si `ws_reconciliation_in_progress` stays active > `WS_RECONCILE_TIMEOUT_SECONDS` (default 30s). Envia evento `WS_RECONCILE_TIMEOUT_ALERT` y Telegram si esta configurado.
+- `ops/runbook.md`: nuevo runbook operativo para PAPER/SHADOW con procedimientos ante HALT, integrity lock, WS reconcile prolongada, NEUTRAL_AGENT_VOTE frecuente y dashboard no responde.
+
+Reglas preventivas:
+
+- No cambiar `WS_RECONCILE_TIMEOUT_SECONDS` por debajo de 10s sin validar que el watchdog no dispare falsos positivos.
+- No remover `model_version` del payload de consenso; es parte de la trazabilidad de auditoria.
+- No crear un RiskManager paralelo; los gaps institucionales se cubren extendiendo `risk_policy` y `ws_reconciliation`.
+- El runbook aplica solo a PAPER/SHADOW. Antes de operar REAL, debe completarse con procedimientos de recuperacion de capital.
+
+Validacion registrada:
+
+- Tests enfocados `test_ws_reconciliation`, `test_dashboard_ipc`, `test_risk_policy` OK.
+- `compileall main.py core` OK.
+- `ruff check core/ tests/` OK.
+- `ruff format --check core/ tests/` OK.
+- `scripts/smoke_modular_imports.sh` OK.
+- `tools/regression_contracts.py` OK.
+- `tools/check_no_silent_pass.py` OK.
+- Suite unitaria completa: `1101` tests OK, `2` skipped.
+
+### 2026-07-08 - Dashboard Votos / Consenso con endpoint canonico
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/bot_initialization.py`: agrega `consensus_history` como `deque(maxlen=200)` y `consensus_lock` separado de `scanner_history`.
+- `core/bot_radar.py`: registra rondas compactas de consenso sin inflar el radar visual.
+- `core/state_snapshot.py`: expone `consensus.latest`, `consensus.rounds`, `consensus.risk_summary` y `ws_reconciliation_in_progress` en el snapshot materializado.
+- `tools/dashboard_api_server.py`: agrega `/api/v1/consensus?limit=50` leyendo solo el snapshot, no logs crudos.
+- `dashboard/static/index.html`: agrega tab `Votos / Consenso` con gauge CSS, tabla de agentes, panel de risk gate y grafico historico Chart.js reutilizable.
+
+Reglas preventivas:
+
+- No usar `execution_events.jsonl` como fuente primaria de la UI de consenso; el endpoint canonico es `/api/v1/consensus`.
+- No meter logica de riesgo en JavaScript; el frontend solo dibuja el payload ya procesado.
+- No inflar `scanner_history`; mantener `consensus_history` separado, corto y en memoria.
+- No recrear `Chart.js` en cada polling; actualizar datasets y usar `update('none')`.
+- No anadir WebSocket UI salvo necesidad real; el dashboard sigue por HTTP polling.
+
+Validacion registrada:
+
+- `test_dashboard_ipc` y `test_risk_policy` OK.
+- `compileall main.py core tools/dashboard_api_server.py` OK.
+- `ruff check core/ tools/dashboard_api_server.py tests/test_dashboard_ipc.py` OK.
+- `ruff format --check core/ tools/dashboard_api_server.py tests/test_dashboard_ipc.py` OK.
+- `scripts/smoke_modular_imports.sh` OK.
+- `tools/regression_contracts.py` OK.
+- Suite unitaria completa: `1100` tests OK, `2` skipped.
+- `git diff --check` OK.
+
 ### 2026-07-08 - Gate institucional y reconciliacion post-WebSocket
 
 Commit: pendiente hasta cerrar este cambio.

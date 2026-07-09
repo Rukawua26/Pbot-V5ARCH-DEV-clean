@@ -1,4 +1,5 @@
 import math
+import time
 
 from config import Config
 from core.trade_keys import has_trade
@@ -12,6 +13,83 @@ def _safe_metric_to_int(value, default=0):
         return int(round(num))
     except Exception:
         return int(default)
+
+
+def _safe_metric_to_float(value, default=0.0):
+    try:
+        num = float(value)
+        if math.isnan(num) or math.isinf(num):
+            return float(default)
+        return float(num)
+    except Exception:
+        return float(default)
+
+
+def _consensus_status(prob_pct: float, result: str) -> tuple[str, str]:
+    text = str(result or "")
+    upper = text.upper()
+    if "NEUTRAL_AGENT_VOTE" in upper or abs(prob_pct - 50.0) <= 1e-9:
+        return "BLOCKED_NEUTRAL", "NEUTRAL_AGENT_VOTE"
+    if "WS_RECONCILIATION_IN_PROGRESS" in upper:
+        return "BLOCKED_RISK", "WS_RECONCILIATION_IN_PROGRESS"
+    if "VETO" in upper or "BLOQUE" in upper or "RECHAZ" in upper or "NO EJECUTA" in upper:
+        return "BLOCKED", text[:120] or "FILTER_VETO"
+    if "OK" in upper or "OPEN" in upper or "SHADOW" in upper:
+        return "SELECTED", "PASSED"
+    return "OBSERVED", text[:120] or "OBSERVED"
+
+
+def _record_consensus_round(
+    bot, symbol, decision, prob_pct, display_verdict, ctx, votos, response_ms
+):
+    votes = dict(votos or {}) if isinstance(votos, dict) else {}
+    weights = {}
+    if isinstance(ctx, dict):
+        raw_weights = ctx.get("weights") or ctx.get("final_weights") or ctx.get("agent_weights")
+        if isinstance(raw_weights, dict):
+            weights = {str(k): _safe_metric_to_float(v, 0.0) for k, v in raw_weights.items()}
+    status, reason = _consensus_status(prob_pct, display_verdict)
+    mode = str(decision.get("mode") or "NONE") if isinstance(decision, dict) else "NONE"
+    model_type = str(getattr(bot, "ghost_model_type", "OFF") or "OFF")
+    heuristic = bool(getattr(bot, "bootstrap_heuristic_mode", False))
+    features_ver = "v3_clean"
+    if isinstance(ctx, dict):
+        features_ver = str(ctx.get("features_version") or "v3_clean")
+    round_entry = {
+        "ts": time.time(),
+        "symbol": symbol,
+        "side": str(decision.get("signal") or "WAIT") if isinstance(decision, dict) else "WAIT",
+        "mode": mode,
+        "prob_final": round(float(prob_pct), 4),
+        "status": status,
+        "reason": reason,
+        "votes": {str(k): _safe_metric_to_float(v, 50.0) for k, v in votes.items()},
+        "weights": weights,
+        "risk_gate": {
+            "halt_active": bool(getattr(bot, "halt_system_active", False)),
+            "integrity_lock": bool(getattr(bot, "integrity_lock_active", False)),
+            "circuit_breaker": bool(getattr(bot, "circuit_breaker_active", False)),
+            "paused": bool(getattr(bot, "is_paused", False)),
+            "ws_reconciliation_in_progress": bool(
+                getattr(bot, "ws_reconciliation_in_progress", False)
+            ),
+        },
+        "model_version": {
+            "model_type": model_type,
+            "bootstrap_heuristic_mode": heuristic,
+            "features_version": features_ver,
+        },
+        "response_ms": _safe_metric_to_float(response_ms, -1.0),
+    }
+    history = getattr(bot, "consensus_history", None)
+    if history is None:
+        return
+    clock = getattr(bot, "consensus_lock", None)
+    if clock:
+        with clock:
+            history.appendleft(round_entry)
+    else:
+        history.appendleft(round_entry)
 
 
 def update_radar(
@@ -134,6 +212,17 @@ def update_radar(
         "ml_score": prob_ia * 100 if prob_ia > 0 else -1,
         "response_ms": response_ms,
     }
+
+    _record_consensus_round(
+        bot,
+        symbol,
+        decision,
+        prob_ia * 100 if prob_ia > 0 else 0.0,
+        display_verdict,
+        ctx,
+        votos,
+        response_ms,
+    )
 
     slock = getattr(bot, "scanner_lock", None)
     if slock:

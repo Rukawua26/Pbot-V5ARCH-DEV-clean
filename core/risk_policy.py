@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from config import Config
@@ -43,6 +44,32 @@ class EntryRiskDecision:
 
 def _priority_for(reason: str) -> int:
     return int(RISK_REASON_PRIORITY.get(str(reason or "").upper(), 0))
+
+
+def _notify_circuit_breaker_trigger(bot, *, reason: str, source: str) -> None:
+    """Alerta proactiva la primera vez que el circuit breaker se dispara en la sesion."""
+    if bool(getattr(bot, "_circuit_breaker_alert_sent", False)):
+        return
+    bot._circuit_breaker_alert_sent = True
+    msg = (
+        f"CIRCUIT BREAKER TRIGGER: reason={reason} source={source}. "
+        f"Nuevas entradas bloqueadas. Revisar dashboard y runbook."
+    )
+    append_execution_event(
+        bot,
+        "CIRCUIT_BREAKER_TRIGGER_ALERT",
+        {
+            "component": "RiskPolicy",
+            "event": "CIRCUIT_BREAKER_TRIGGER_ALERT",
+            "reason": str(reason),
+            "source": str(source),
+            "severity": "WARNING",
+        },
+    )
+    try:
+        send_telegram_msg(msg)
+    except Exception as error:
+        logging.getLogger("SniperAI").debug("circuit breaker alert telegram failed: %s", error)
 
 
 def record_risk_decision(
@@ -283,6 +310,7 @@ def activate_runtime_protection(
 ) -> None:
     if circuit_breaker:
         bot.circuit_breaker_active = True
+        _notify_circuit_breaker_trigger(bot, reason=reason, source=source)
     if pause:
         bot.is_paused = True
     if integrity_lock:

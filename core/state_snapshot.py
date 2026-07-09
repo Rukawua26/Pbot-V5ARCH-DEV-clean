@@ -36,6 +36,23 @@ def _pending_target_entry(symbol):
     }
 
 
+def _consensus_entry(entry):
+    return {
+        "ts": entry.get("ts", 0.0),
+        "symbol": entry.get("symbol", "?"),
+        "side": entry.get("side", "WAIT"),
+        "mode": entry.get("mode", "NONE"),
+        "prob_final": entry.get("prob_final", 0.0),
+        "status": entry.get("status", "OBSERVED"),
+        "reason": entry.get("reason", ""),
+        "votes": entry.get("votes", {}),
+        "weights": entry.get("weights", {}),
+        "risk_gate": entry.get("risk_gate", {}),
+        "model_version": entry.get("model_version", {}),
+        "response_ms": entry.get("response_ms", -1.0),
+    }
+
+
 def _normalize_sentiment(raw):
     color_map = {
         "red": "red",
@@ -127,6 +144,9 @@ def _write_state_snapshot(bot):
             "integrity_lock_active": bool(getattr(bot, "integrity_lock_active", False)),
             "circuit_breaker_active": bool(getattr(bot, "circuit_breaker_active", False)),
             "is_paused": bool(getattr(bot, "is_paused", False)),
+            "ws_reconciliation_in_progress": bool(
+                getattr(bot, "ws_reconciliation_in_progress", False)
+            ),
             "stop_requested": bool(getattr(bot, "stop_requested", False)),
             "active_trades_count": len(real_trades),
             "shadow_trades_count": len(shadow_trades),
@@ -157,6 +177,26 @@ def _write_state_snapshot(bot):
             if len(radar) >= 100:
                 break
         snapshot["radar"] = radar
+        clock = getattr(bot, "consensus_lock", None)
+        consensus_history = getattr(bot, "consensus_history", [])
+        if clock and consensus_history:
+            with clock:
+                consensus = [_consensus_entry(e) for e in list(consensus_history)[:100]]
+        else:
+            consensus = [_consensus_entry(e) for e in list(consensus_history)[:100]]
+        latest = consensus[0] if consensus else None
+        snapshot["consensus"] = {
+            "latest": latest,
+            "rounds": consensus,
+            "total": len(consensus),
+            "risk_summary": {
+                "halt_active": snapshot["halt_system_active"],
+                "integrity_lock": snapshot["integrity_lock_active"],
+                "circuit_breaker": snapshot["circuit_breaker_active"],
+                "paused": snapshot["is_paused"],
+                "ws_reconciliation_in_progress": snapshot["ws_reconciliation_in_progress"],
+            },
+        }
         tmp = STATE_FILE + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(snapshot, f)

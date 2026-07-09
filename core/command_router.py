@@ -117,6 +117,8 @@ def handle_basic_command(bot, text: str) -> bool:
                 bot.integrity_lock_active = False
                 bot.circuit_breaker_active = False
                 bot.daily_drawdown_alert_sent = False
+                bot._drawdown_warning_sent = False
+                bot._circuit_breaker_alert_sent = False
                 bot.is_paused = False
             send_telegram_msg(
                 f"✅ *REBASE CAPITAL OK*\nNuevo ancla: ${current:.2f}\nIntegrity lock liberado."

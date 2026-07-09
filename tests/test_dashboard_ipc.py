@@ -23,6 +23,7 @@ class _DummyBot:
         self.balance_lock = threading.Lock()
         self.lock = threading.Lock()
         self.scanner_lock = threading.Lock()
+        self.consensus_lock = threading.Lock()
         self.balance = 110.0
         self.available_balance = 95.0
         self.daily_initial_balance = 100.0
@@ -57,6 +58,22 @@ class _DummyBot:
             }
         ]
         self.pairs_to_scan = ["BTC/USDT", "ETH/USDT"]
+        self.ws_reconciliation_in_progress = True
+        self.consensus_history = [
+            {
+                "ts": 123.0,
+                "symbol": "BTC/USDT",
+                "side": "BUY",
+                "mode": "SHADOW",
+                "prob_final": 50.0,
+                "status": "BLOCKED_NEUTRAL",
+                "reason": "NEUTRAL_AGENT_VOTE",
+                "votes": {"G": 50.0, "MT": 50.0, "SR": 50.0},
+                "weights": {},
+                "risk_gate": {"ws_reconciliation_in_progress": True},
+                "response_ms": 42.0,
+            }
+        ]
         self.is_running = False
         self.handled = []
         self.logs = []
@@ -107,6 +124,39 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertEqual(data["sentiment_color"], "yellow")
         self.assertEqual(data["telemetry"]["shadow_win_rate"], 27.1)
         self.assertEqual(data["telemetry"]["real_win_rate"], 33.3)
+        self.assertTrue(data["ws_reconciliation_in_progress"])
+        self.assertEqual(data["consensus"]["latest"]["reason"], "NEUTRAL_AGENT_VOTE")
+        self.assertTrue(data["consensus"]["risk_summary"]["ws_reconciliation_in_progress"])
+
+    def test_consensus_api_reads_canonical_snapshot(self):
+        payload = {
+            "halt_system_active": False,
+            "integrity_lock_active": False,
+            "circuit_breaker_active": False,
+            "is_paused": False,
+            "ws_reconciliation_in_progress": True,
+            "consensus": {
+                "rounds": [
+                    {
+                        "symbol": "BTC/USDT",
+                        "prob_final": 50.0,
+                        "status": "BLOCKED_NEUTRAL",
+                        "reason": "NEUTRAL_AGENT_VOTE",
+                    }
+                ],
+                "risk_summary": {"ws_reconciliation_in_progress": True},
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "state.json")
+            with open(path, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle)
+            with patch.object(api_server, "STATE_FILE", path):
+                result = api_server.get_consensus(limit=50, _=None)
+
+        self.assertEqual(result["latest"]["reason"], "NEUTRAL_AGENT_VOTE")
+        self.assertTrue(result["risk_summary"]["ws_reconciliation_in_progress"])
+        self.assertEqual(result["total"], 1)
 
     def test_command_consumer_accepts_only_dashboard_commands(self):
         bot = _DummyBot()
@@ -282,6 +332,16 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn('id="intel-postmortem"', html)
         self.assertIn("generateIntelligence()", html)
         self.assertIn("openTradePostmortem", html)
+
+    def test_dashboard_static_includes_consensus_tab(self):
+        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('data-tab="consensus"', html)
+        self.assertIn('id="consensusChart"', html)
+        self.assertIn("function fetchConsensus()", html)
+        self.assertIn("consensusChartInstance.update('none')", html)
 
     def test_dashboard_static_uses_local_cookie_auth_without_startup_prompt(self):
         html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(

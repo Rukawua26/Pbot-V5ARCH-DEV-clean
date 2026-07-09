@@ -80,6 +80,7 @@ class DailyCircuitBreakerTest(unittest.TestCase):
             circuit_breaker_active=False,
             is_paused=False,
             daily_drawdown_alert_sent=False,
+            _circuit_breaker_alert_sent=True,
         )
 
         self.assertTrue(check_daily_drawdown_breaker(bot))
@@ -101,6 +102,7 @@ class DailyCircuitBreakerTest(unittest.TestCase):
                 circuit_breaker_active=False,
                 is_paused=False,
                 daily_drawdown_alert_sent=False,
+                _circuit_breaker_alert_sent=True,
             )
             self.assertTrue(check_daily_drawdown_breaker(bot))
             self.assertTrue(bot.circuit_breaker_active)

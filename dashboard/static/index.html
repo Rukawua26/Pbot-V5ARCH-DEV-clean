@@ -229,6 +229,17 @@
             box-shadow: 0 0 0 12px rgba(0,242,255,0.05);
         }
         @keyframes radar-sweep { to { transform: rotate(360deg); } }
+        .consensus-gauge {
+            position: relative; height: 150px; border-radius: 150px 150px 18px 18px;
+            overflow: hidden; border: 1px solid var(--border-panel);
+            background: conic-gradient(from 270deg at 50% 100%, rgba(255,0,85,0.24), rgba(255,179,0,0.22), rgba(0,242,255,0.22), rgba(57,255,20,0.24));
+        }
+        .consensus-gauge:after { content:""; position:absolute; inset:18px 24px 0; border-radius:130px 130px 0 0; background:var(--panel-bg); }
+        .consensus-needle { position:absolute; left:50%; bottom:0; width:2px; height:118px; transform-origin:bottom center; background:var(--neon-blue); z-index:2; box-shadow:0 0 14px rgba(0,242,255,0.65); }
+        .consensus-hub { position:absolute; left:50%; bottom:-8px; width:28px; height:28px; transform:translateX(-50%); border-radius:50%; background:var(--neon-blue); z-index:3; box-shadow:0 0 20px rgba(0,242,255,0.35); }
+        .risk-dot { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:7px; background:var(--neon-green); box-shadow:0 0 10px rgba(57,255,20,0.35); }
+        .risk-dot.warn { background:var(--neon-amber); box-shadow:0 0 10px rgba(255,179,0,0.35); }
+        .risk-dot.danger { background:var(--neon-red); box-shadow:0 0 10px rgba(255,0,85,0.35); }
         .mobile-stack { min-width: 0; }
 
         @media (max-width: 768px) {
@@ -344,6 +355,7 @@
                 <!-- TAB NAV -->
                 <div class="tab-nav bg-thead rounded-t-xl" style="padding-left:4px;">
                     <button class="tab-btn" active data-tab="radar">📡 Radar</button>
+                    <button class="tab-btn" data-tab="consensus">🧭 Votos / Consenso</button>
                     <button class="tab-btn" data-tab="trades">📊 Historial</button>
                     <button class="tab-btn" data-tab="blocked">⛔ Bloqueados</button>
                     <button class="tab-btn" data-tab="executed">✅ Ejecutados</button>
@@ -373,6 +385,51 @@
                             <thead><tr><th>#</th><th>Symbol</th><th>Signal</th><th>Prob</th><th style="text-align:center;">RSI</th><th>Trend</th><th>Resultado</th></tr></thead>
                             <tbody id="radar-body"><tr><td colspan="7" class="empty-state"><strong>Radar inicializando</strong>Conecta la API y confirma que el bot este emitiendo estado.</td></tr></tbody>
                         </table>
+                    </div>
+                </div>
+
+                <!-- CONSENSUS -->
+                <div class="tab-pane" data-pane="consensus">
+                    <div class="p-4 pb-2 flex flex-wrap items-center gap-3 justify-between">
+                        <div>
+                            <h2 class="font-bold text-sm uppercase tracking-wider">🧭 Votos / Consenso</h2>
+                            <p class="text-[10px] text-muted mt-1">Lectura institucional del consenso, votos por agente y compuerta de riesgo.</p>
+                        </div>
+                        <span id="consensus-state-age" class="code-chip">sin snapshot</span>
+                    </div>
+                    <div class="px-4 pb-4 grid grid-cols-1 xl:grid-cols-12 gap-4">
+                        <div class="insight-card xl:col-span-4">
+                            <p class="section-title">Consensus Gauge</p>
+                            <div class="consensus-gauge mb-3">
+                                <div id="consensus-needle" class="consensus-needle" style="transform:rotate(0deg);"></div>
+                                <div class="consensus-hub"></div>
+                            </div>
+                            <div class="text-center">
+                                <div id="consensus-prob" class="mono text-4xl font-black glow-blue">--.-%</div>
+                                <div id="consensus-status" class="text-xs text-muted mt-1">Esperando rondas</div>
+                                <div id="consensus-symbol" class="text-[11px] text-dim mt-1 mono">--</div>
+                            </div>
+                        </div>
+                        <div class="insight-card xl:col-span-5">
+                            <p class="section-title">Agent Voting Breakdown</p>
+                            <div class="tbl-wrap" style="max-height:260px;">
+                                <table>
+                                    <thead><tr><th>Agente</th><th>Voto</th><th>Peso</th><th>Estado</th></tr></thead>
+                                    <tbody id="consensus-votes-body"><tr><td colspan="4" class="empty-state"><strong>Sin votos</strong>Espera una ronda de análisis.</td></tr></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="insight-card xl:col-span-3">
+                            <p class="section-title">Pre-Execution Gate</p>
+                            <div id="consensus-risk-gate" class="space-y-2 text-sm"></div>
+                        </div>
+                        <div class="insight-card xl:col-span-12">
+                            <div class="flex items-center justify-between gap-2 mb-2">
+                                <p class="section-title mb-0">Últimas 50 rondas</p>
+                                <span id="consensus-round-count" class="text-[10px] text-muted mono">0 rondas</span>
+                            </div>
+                            <div class="chart-box" style="height:220px;"><canvas id="consensusChart"></canvas></div>
+                        </div>
                     </div>
                 </div>
 
@@ -510,7 +567,7 @@
 
     <script>
         var API = '/api/v1'; var H = {};
-        var tradeChartInstance = null, equityChartInstance = null;
+        var tradeChartInstance = null, equityChartInstance = null, consensusChartInstance = null;
         var tradeFilter = 'all';
         var radarFilter = 'all', lastRadar = [];
         var tradeAllCount = 473, tradeShadowCount = 471, tradeRealCount = 2;
@@ -525,6 +582,7 @@
                 if (pane) pane.setAttribute('active', '');
                 // re-render charts when tab becomes visible
                 if (b.dataset.tab === 'trades') { if (!tradeChartInstance) fetchTrades(); }
+                if (b.dataset.tab === 'consensus') fetchConsensus();
                 if (b.dataset.tab === 'blocked') fetchBlocked();
                 if (b.dataset.tab === 'executed') fetchExecStats();
                 if (b.dataset.tab === 'equity') { if (!equityChartInstance) fetchEquity(); }
@@ -556,7 +614,7 @@
             var h=document.documentElement, c=h.getAttribute('data-theme')||'dark', n=c==='dark'?'light':'dark';
             h.setAttribute('data-theme',n); localStorage.setItem('sniper-theme',n);
             document.getElementById('theme-btn').textContent=n==='dark'?'🌙':'☀️';
-            tradeChartInstance=null; equityChartInstance=null;
+            tradeChartInstance=null; equityChartInstance=null; consensusChartInstance=null;
         }
         (function(){ var t=localStorage.getItem('sniper-theme')||'dark'; document.getElementById('theme-btn').textContent=t==='dark'?'🌙':'☀️'; })();
 
@@ -668,6 +726,88 @@
                 var rs=e.rsi||0, tr=e.trend||'N/A', rc=m.category==='pass'?'text-emerald-400':m.near?'text-amber-400':m.category==='timeout'?'text-dim':'text-rose-400';
                 return '<tr class="reason-row '+(m.near?'near-pass':'')+'" title="'+esc(e.result||'')+'"><td class="text-muted">'+(i+1)+'</td><td class="font-bold text-theme">'+esc(e.symbol)+'</td><td class="'+sc+' font-bold">'+esc(sig)+'</td><td class="'+pc2+'">'+pv+'</td><td style="text-align:center;">'+rs+'</td><td class="'+(tr==='UP'?'text-emerald-400':tr==='DOWN'?'text-rose-400':'text-muted')+'">'+esc(tr)+'</td><td class="'+rc+' text-[10px]"><span class="reason-pill"><b>'+esc(m.label)+'</b><small>'+esc(m.detail)+'</small></span></td></tr>';
             }).join('');
+        }
+
+        /* ===== CONSENSUS ===== */
+        function fetchConsensus() {
+            if(!hasApiKey())return;
+            fetch(API+'/consensus?limit=50',{headers:H}).then(function(r){if(!r.ok)return;r.json().then(function(d){
+                renderConsensus(d||{});
+            })}).catch(function(){});
+        }
+
+        function consensusStatusClass(status, prob) {
+            if(status==='BLOCKED_NEUTRAL')return 'glow-blue';
+            if(String(status||'').indexOf('BLOCKED')===0)return 'glow-red';
+            if(status==='SELECTED')return 'glow-green';
+            return Number(prob||0)>=65?'glow-green':Number(prob||0)<=35?'glow-red':'glow-blue';
+        }
+
+        function renderConsensus(data) {
+            var latest=data.latest||null, rounds=data.rounds||[], risk=data.risk_summary||{};
+            document.getElementById('consensus-state-age').textContent='snapshot '+Number(data.state_age_s||0).toFixed(1)+'s';
+            document.getElementById('consensus-round-count').textContent=rounds.length+' rondas';
+            renderConsensusRiskGate(risk);
+            if(!latest){
+                document.getElementById('consensus-prob').textContent='--.-%';
+                document.getElementById('consensus-status').textContent='Esperando rondas de votacion';
+                document.getElementById('consensus-symbol').textContent='--';
+                document.getElementById('consensus-votes-body').innerHTML='<tr><td colspan="4" class="empty-state"><strong>Sin votos</strong>Espera una ronda de análisis.</td></tr>';
+                renderConsensusChart([]);
+                return;
+            }
+            var prob=Number(latest.prob_final||0), needle=(prob/100*180)-90;
+            document.getElementById('consensus-needle').style.transform='rotate('+needle.toFixed(1)+'deg)';
+            var probEl=document.getElementById('consensus-prob');
+            probEl.textContent=prob.toFixed(1)+'%';
+            probEl.className='mono text-4xl font-black '+consensusStatusClass(latest.status,prob);
+            document.getElementById('consensus-status').textContent=String(latest.status||'OBSERVED')+' · '+String(latest.reason||'');
+            document.getElementById('consensus-symbol').textContent=String(latest.symbol||'--')+' · '+String(latest.side||'WAIT')+' · '+String(latest.mode||'NONE');
+            renderConsensusVotes(latest.votes||{}, latest.weights||{}, latest.status||'');
+            renderConsensusChart(rounds);
+        }
+
+        function renderConsensusVotes(votes, weights, status) {
+            var b=document.getElementById('consensus-votes-body');
+            var keys=Object.keys(votes||{}).sort();
+            if(!keys.length){b.innerHTML='<tr><td colspan="4" class="empty-state"><strong>Sin votos</strong>La ronda no incluyo desglose por agente.</td></tr>';return;}
+            b.innerHTML=keys.map(function(k){
+                var v=Number(votes[k]||50), w=weights&&weights[k]!=null?Number(weights[k]):null;
+                var cls=Math.abs(v-50)<=0.001?'text-dim':(v>50?'text-emerald-400':'text-rose-400');
+                var st=Math.abs(v-50)<=0.001?'NEUTRAL':(v>50?'BULLISH':'BEARISH');
+                if(status==='BLOCKED_NEUTRAL')st='NEUTRAL_BLOCK';
+                return '<tr class="reason-row"><td class="font-bold text-theme">'+esc(k)+'</td><td class="'+cls+' font-bold">'+v.toFixed(1)+'</td><td class="text-dim">'+(w==null?'--':(w*100).toFixed(1)+'%')+'</td><td><span class="badge '+(st.indexOf('NEUTRAL')>=0?'badge-blue':v>50?'badge-green':'badge-red')+'">'+esc(st)+'</span></td></tr>';
+            }).join('');
+        }
+
+        function renderConsensusRiskGate(risk) {
+            var el=document.getElementById('consensus-risk-gate');
+            var rows=[
+                ['Daily/HALT', !!risk.halt_active, 'danger'],
+                ['Integrity Lock', !!risk.integrity_lock, 'danger'],
+                ['Circuit Breaker', !!risk.circuit_breaker, 'danger'],
+                ['Bot Paused', !!risk.paused, 'warn'],
+                ['WS Reconciliation', !!risk.ws_reconciliation_in_progress, 'warn']
+            ];
+            el.innerHTML=rows.map(function(r){
+                var active=r[1], cls=active?r[2]:'';
+                return '<div class="flex items-center justify-between gap-2 p-2 rounded-xl bg-inset border border-theme"><span><i class="risk-dot '+cls+'"></i>'+esc(r[0])+'</span><span class="mono '+(active?(cls==='danger'?'glow-red':'text-amber-400'):'glow-green')+'">'+(active?'ON':'OK')+'</span></div>';
+            }).join('');
+        }
+
+        function renderConsensusChart(rounds) {
+            var can=document.getElementById('consensusChart');
+            if(!can)return;
+            var ordered=(rounds||[]).slice().reverse();
+            var labels=ordered.map(function(r){return fmtTs(Number(r.ts||0)*1000);});
+            var values=ordered.map(function(r){return Number(r.prob_final||0);});
+            if(!consensusChartInstance){
+                consensusChartInstance=new Chart(can,{type:'line',data:{labels:labels,datasets:[{label:'Prob Final',data:values,borderColor:'var(--neon-blue)',backgroundColor:'rgba(0,242,255,0.10)',borderWidth:2,fill:true,tension:0.25,pointRadius:1.5}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'var(--text-muted)',font:{size:9,family:'JetBrains Mono'},maxTicksLimit:12}},y:{min:0,max:100,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'var(--text-muted)',font:{size:10,family:'JetBrains Mono'},callback:function(v){return v+'%';}}}}}});
+                return;
+            }
+            consensusChartInstance.data.labels=labels;
+            consensusChartInstance.data.datasets[0].data=values;
+            consensusChartInstance.update('none');
         }
 
         /* ===== LOGS ===== */
@@ -985,6 +1125,7 @@
             if (!activeTab) return;
             var t = activeTab.dataset.tab;
             if (t === 'trades') fetchTrades();
+            if (t === 'consensus') fetchConsensus();
             if (t === 'blocked') fetchBlocked();
             if (t === 'executed') fetchExecStats();
             if (t === 'equity') fetchEquity();

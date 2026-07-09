@@ -16,6 +16,7 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
     bot.active_trades = {}
     bot.recent_closed_trades = []
     bot.scanner_history = []
+    bot.consensus_history = deque(maxlen=200)
     bot.logs = deque(maxlen=Config.LOG_LIMIT)
     bot.balance = 0.0
     bot.available_balance = 0.0
@@ -74,6 +75,7 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
     bot.db_lock = threading.RLock()
     bot.balance_lock = threading.Lock()
     bot.scanner_lock = threading.Lock()
+    bot.consensus_lock = threading.Lock()
 
     bot.is_hedge_mode = False
     bot.ghost_model = None
@@ -89,6 +91,8 @@ def init_runtime_state(bot, has_weight_tracker, weight_tracker_cls):
     bot.restricted_symbols = []
     bot.circuit_breaker_active = False
     bot.daily_drawdown_alert_sent = False
+    bot._drawdown_warning_sent = False
+    bot._circuit_breaker_alert_sent = False
     bot.pause_time = None
     bot.is_paused = False
     bot.btc_panic = False
