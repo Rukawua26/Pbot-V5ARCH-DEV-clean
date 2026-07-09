@@ -39,7 +39,7 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ### 2026-07-09 - Sprint 4 cuantitativo: escala y sensibilidad pasiva
 
-Commit: pendiente hasta cerrar este cambio.
+Commit: `a501874 feat: add passive slope telemetry and triage scale preset`
 
 Que cambia:
 
