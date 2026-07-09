@@ -176,5 +176,24 @@ class TestPreprocessData(unittest.TestCase):
         self.assertIn("ema", result.columns)
 
 
+class TestRuntimeSnapshotSlopeTelemetry(unittest.TestCase):
+    def test_ema_slope_comparison_is_passive_alt_metric(self):
+        df = pd.DataFrame(
+            {
+                "open": [100 + i for i in range(260)],
+                "high": [101 + i for i in range(260)],
+                "low": [99 + i for i in range(260)],
+                "close": [100 + i for i in range(260)],
+                "volume": [1000 + i for i in range(260)],
+            }
+        )
+
+        result = StrategyUtils.compute_runtime_snapshot(df)
+
+        self.assertIn("ema50_slope", result)
+        self.assertIn("ema50_slope_alt", result)
+        self.assertEqual(result["ema50_slope_alt_lookback"], 4.0)
+
+
 if __name__ == "__main__":
     unittest.main()

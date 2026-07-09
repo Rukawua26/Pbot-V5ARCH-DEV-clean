@@ -226,6 +226,14 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
 
         self.assertEqual(len(ranked), 4)
 
+    @patch.object(market_intelligence.Config, "TOP_TRIAGE_COUNT", 30)
+    @patch.object(market_intelligence.Config, "TRIAGE_CANDIDATE_POOL_MULTIPLIER", 2)
+    @patch.object(market_intelligence.Config, "TRIAGE_MAX_CANDIDATE_POOL", 60)
+    def test_candidate_pool_default_sprint4_profile_is_2x_capped_at_60(self):
+        bot = SimpleNamespace(weight_tracker=None, market_regime="UNKNOWN", log=MagicMock())
+
+        self.assertEqual(market_intelligence.get_candidate_pool_limit(bot), 60)
+
     @patch.object(market_intelligence.Config, "TOP_TRIAGE_COUNT", 5)
     @patch.object(market_intelligence.Config, "BEAR_TREND_MAX_PAIRS", 5)
     @patch.object(market_intelligence.Config, "TRIAGE_SPREAD_MAX", 0.002)

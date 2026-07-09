@@ -37,6 +37,28 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-09 - Sprint 4 cuantitativo: escala y sensibilidad pasiva
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/config/operational.py` y `core/market_intelligence.py`: preset triage gradual `TRIAGE_CANDIDATE_POOL_MULTIPLIER=2` y `TRIAGE_MAX_CANDIDATE_POOL=60`.
+- `core/config/manager.py`: agrega `EMA_SLOPE_COMPARISON_ENABLED` y `EMA_SLOPE_COMPARISON_LOOKBACK=4`.
+- `core/strategy/utils.py`: mantiene `ema50_slope` con `EMA_SLOPE_LOOKBACK=2` para ejecucion y calcula pasivamente `ema50_slope_alt` con lookback comparativo.
+- `core/signals/context.py`: propaga `ema50_slope_alt` y `ema50_slope_alt_lookback` al contexto para analisis SHADOW.
+- Tests cubren perfil triage `2/60` y telemetria pasiva de slope.
+
+Reglas preventivas:
+
+- No cambiar `EMA_SLOPE_LOOKBACK` de ejecucion por intuicion; usar `ema50_slope_alt` para comparar pasivamente.
+- No subir `TRIAGE_MAX_CANDIDATE_POOL` por encima de 60 sin medir timeouts, latencia de ciclo y ratio de vetos posteriores.
+- `ema50_slope_alt` no debe alimentar filtros ni sizing sin evidencia SHADOW.
+
+Validacion registrada:
+
+- `tests/test_strategy_utils.py`, `tests/test_market_intelligence_and_balance.py`, `tests/test_runtime_snapshot_cache.py` OK.
+
 ### 2026-07-09 - Sprint 3 cuantitativo: genetica en batch
 
 Commit: `3af0f93 feat: batch genetic evolution outside trade close`

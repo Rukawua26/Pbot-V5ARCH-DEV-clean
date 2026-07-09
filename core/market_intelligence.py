@@ -27,8 +27,8 @@ def get_effective_triage_count(bot):
 
 def get_candidate_pool_limit(bot):
     target_count = get_effective_triage_count(bot)
-    multiplier = max(1, int(getattr(Config, "TRIAGE_CANDIDATE_POOL_MULTIPLIER", 3) or 3))
-    max_pool = max(target_count, int(getattr(Config, "TRIAGE_MAX_CANDIDATE_POOL", 100) or 100))
+    multiplier = max(1, int(getattr(Config, "TRIAGE_CANDIDATE_POOL_MULTIPLIER", 2) or 2))
+    max_pool = max(target_count, int(getattr(Config, "TRIAGE_MAX_CANDIDATE_POOL", 60) or 60))
 
     if hasattr(bot, "weight_tracker") and bot.weight_tracker:
         try:

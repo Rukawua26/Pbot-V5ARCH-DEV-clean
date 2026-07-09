@@ -108,14 +108,32 @@ class StrategyUtils:
                 from config import Config
 
                 slope_lookback = max(1, int(getattr(Config, "EMA_SLOPE_LOOKBACK", 2) or 2))
+                slope_comparison_enabled = bool(
+                    getattr(Config, "EMA_SLOPE_COMPARISON_ENABLED", True)
+                )
+                slope_comparison_lookback = max(
+                    1, int(getattr(Config, "EMA_SLOPE_COMPARISON_LOOKBACK", 4) or 4)
+                )
             except Exception:
                 slope_lookback = 2
+                slope_comparison_enabled = True
+                slope_comparison_lookback = 4
             ema_prev = (
                 float(work["EMA_50"].iloc[-(slope_lookback + 1)])
                 if len(work) > slope_lookback
                 else ema
             )
             ema50_slope = ((ema - ema_prev) / ema_prev) if ema_prev > 0 else 0.0
+            ema50_slope_alt = ema50_slope
+            slope_alt_lookback = slope_lookback
+            if slope_comparison_enabled:
+                slope_alt_lookback = slope_comparison_lookback
+                ema_prev_alt = (
+                    float(work["EMA_50"].iloc[-(slope_alt_lookback + 1)])
+                    if len(work) > slope_alt_lookback
+                    else ema
+                )
+                ema50_slope_alt = ((ema - ema_prev_alt) / ema_prev_alt) if ema_prev_alt > 0 else 0.0
             result = {
                 "rows": float(len(work)),
                 "ema_9": ema_9,
@@ -129,6 +147,8 @@ class StrategyUtils:
                 "ema_fast_spread": (ema_9 - ema_21) / close,
                 "ema_compression": (ema_9 - ema) / close,
                 "ema50_slope": ema50_slope,
+                "ema50_slope_alt": ema50_slope_alt,
+                "ema50_slope_alt_lookback": float(slope_alt_lookback),
                 "bb_lower": bb_lower,
                 "bb_upper": bb_upper,
                 "bb_pos": (close - bb_lower) / (bb_upper - bb_lower),

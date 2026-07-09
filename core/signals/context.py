@@ -53,6 +53,8 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
         "ema_fast_spread": float(raw_metrics.get("ema_fast_spread", 0.0) or 0.0),
         "ema_compression": float(raw_metrics.get("ema_compression", 0.0) or 0.0),
         "ema50_slope": float(raw_metrics.get("ema50_slope", 0.0) or 0.0),
+        "ema50_slope_alt": float(raw_metrics.get("ema50_slope_alt", 0.0) or 0.0),
+        "ema50_slope_alt_lookback": float(raw_metrics.get("ema50_slope_alt_lookback", 0.0) or 0.0),
         "df_1h": df_main,
         "atr": current_atr,
         "atr_pct": atr_pct_raw,

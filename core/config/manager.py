@@ -240,6 +240,8 @@ class Config(OperationalConfig, StrategyConfig):
     EMA_ALIGNMENT_MODE = _env_str("EMA_ALIGNMENT_MODE", "cross")
     EMA_SLOPE_FILTER_ENABLED = _env_bool("EMA_SLOPE_FILTER_ENABLED", False)
     EMA_SLOPE_LOOKBACK = _env_int("EMA_SLOPE_LOOKBACK", 2)
+    EMA_SLOPE_COMPARISON_ENABLED = _env_bool("EMA_SLOPE_COMPARISON_ENABLED", True)
+    EMA_SLOPE_COMPARISON_LOOKBACK = _env_int("EMA_SLOPE_COMPARISON_LOOKBACK", 4)
     EMA_COMPRESSION_TELEMETRY_ENABLED = _env_bool("EMA_COMPRESSION_TELEMETRY_ENABLED", True)
 
     # --- FVG / Gap Tracker (satélite read-only) ---
@@ -359,6 +361,8 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append("EMA_ALIGNMENT_MODE debe ser 'cross' o 'stack'")
         if int(cls.EMA_SLOPE_LOOKBACK) < 1:
             errors.append("EMA_SLOPE_LOOKBACK debe ser >= 1")
+        if int(cls.EMA_SLOPE_COMPARISON_LOOKBACK) < 1:
+            errors.append("EMA_SLOPE_COMPARISON_LOOKBACK debe ser >= 1")
         if float(cls.BTC_RISK_MAX_PRICE_AGE_SECONDS) <= 0:
             errors.append("BTC_RISK_MAX_PRICE_AGE_SECONDS debe ser positivo")
         if int(cls.HALT_RECOVERY_MAX_ATTEMPTS) < 1:
