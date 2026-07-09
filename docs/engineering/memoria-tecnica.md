@@ -37,6 +37,27 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-09 - Sprint 3 cuantitativo: genetica en batch
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/trade_exit.py`: elimina `bot.brain.evolve_genetics(symbol)` del cierre inmediato; ahora encola el simbolo en `_genetic_batch_pending_symbols` y emite `GENETIC_BATCH_QUEUED`.
+- `core/bot_maintenance.py`: agrega `run_genetic_batch(...)`, invocado desde `check_for_evolution(...)`, con minimo de muestras por simbolo y eventos `GENETIC_BATCH_STARTED`, `GENETIC_BATCH_COMPLETED`, `GENETIC_BATCH_SKIPPED`, `GENETIC_BATCH_SWAP_APPLIED`.
+- `core/config/manager.py`: agrega `GENETIC_BATCH_ENABLED` y `GENETIC_BATCH_MIN_TRADES` con validacion.
+- `tests/test_trade_exit.py`: cubre cierre sin evolucion inmediata y batch genetico suficiente/insuficiente/deshabilitado.
+
+Reglas preventivas:
+
+- No volver a llamar `evolve_genetics(symbol)` desde el hot-path de cierre.
+- Mantener `update_trade_context_result`, `finalize_confidence_exit_audit` y `update_agent_reputation` por trade.
+- Si se refactoriza `Brain.evolve_genetics`, calcular parametros en copia aislada y aplicar el swap de forma corta y trazable.
+
+Validacion registrada:
+
+- `tests/test_trade_exit.py` OK.
+
 ### 2026-07-09 - Sprint 2 cuantitativo: pre-filtros baratos de señales
 
 Commit: `032a8d9 feat: add cheap signal prefilters`

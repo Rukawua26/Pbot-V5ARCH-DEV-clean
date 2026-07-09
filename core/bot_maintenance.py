@@ -2,6 +2,9 @@ import os
 import shutil
 from datetime import datetime
 
+from config import Config
+from core.execution_telemetry import append_execution_event
+
 
 def backup_database_placeholder():
     """Realiza backup de los archivos críticos del bot."""
@@ -40,6 +43,8 @@ def backup_database_placeholder():
 
 def check_for_evolution(bot):
     """[v118] Entrenamiento automático basado en tiempo y trades."""
+    run_genetic_batch(bot)
+
     last_train = bot.brain.get_last_train_timestamp()
     days_since_train = (datetime.now() - last_train).days
 
@@ -54,3 +59,66 @@ def check_for_evolution(bot):
             "ℹ️ Entrenamiento pendiente: usa /force_train para lanzar ghost_trainer "
             "en background. No se actualiza timestamp hasta que el entrenamiento real termine."
         )
+
+
+def _count_symbol_trades(bot, symbol: str) -> int:
+    counter = getattr(bot.brain, "count_trades_for_symbol", None)
+    if callable(counter):
+        return int(counter(symbol))
+
+    conn = bot.brain._get_conn()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT COUNT(*) FROM trades WHERE symbol = ? AND pnl_percent != -99.0",
+            (symbol,),
+        )
+        row = cursor.fetchone()
+        return int(row[0] if row else 0)
+    finally:
+        conn.close()
+
+
+def run_genetic_batch(bot) -> dict:
+    pending = set(getattr(bot, "_genetic_batch_pending_symbols", set()) or set())
+    if not bool(getattr(Config, "GENETIC_BATCH_ENABLED", True)):
+        append_execution_event(bot, "GENETIC_BATCH_SKIPPED", {"reason": "DISABLED"})
+        return {"status": "SKIPPED", "reason": "DISABLED", "processed": 0, "mutated": 0}
+    if not pending:
+        append_execution_event(bot, "GENETIC_BATCH_SKIPPED", {"reason": "NO_PENDING_SYMBOLS"})
+        return {"status": "SKIPPED", "reason": "NO_PENDING_SYMBOLS", "processed": 0, "mutated": 0}
+
+    min_trades = int(getattr(Config, "GENETIC_BATCH_MIN_TRADES", 50) or 50)
+    append_execution_event(
+        bot,
+        "GENETIC_BATCH_STARTED",
+        {"pending_symbols": len(pending), "min_trades": min_trades},
+    )
+
+    processed = 0
+    mutated = 0
+    still_pending = set(pending)
+    for symbol in sorted(pending):
+        samples = _count_symbol_trades(bot, symbol)
+        if samples < min_trades:
+            append_execution_event(
+                bot,
+                "GENETIC_BATCH_SKIPPED",
+                {"symbol": symbol, "reason": "INSUFFICIENT_TRADES", "samples": samples},
+            )
+            continue
+
+        processed += 1
+        if bot.brain.evolve_genetics(symbol):
+            mutated += 1
+            bot.log(f"🧬 ADN MUTADO: {symbol} ha evolucionado sus parámetros SL/TP.")
+            append_execution_event(bot, "GENETIC_BATCH_SWAP_APPLIED", {"symbol": symbol})
+        still_pending.discard(symbol)
+
+    bot._genetic_batch_pending_symbols = still_pending
+    append_execution_event(
+        bot,
+        "GENETIC_BATCH_COMPLETED",
+        {"processed": processed, "mutated": mutated, "remaining": len(still_pending)},
+    )
+    return {"status": "COMPLETED", "processed": processed, "mutated": mutated}

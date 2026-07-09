@@ -344,6 +344,8 @@ class TestCloseTradePaperPath(unittest.TestCase):
         bot.risk_engine.record_trade_result.assert_called_once_with("BTCUSDT", 1.798)
         bot._update_dynamic_risk.assert_called_once()
         bot._check_recent_mfe_health.assert_called_once()
+        bot.brain.evolve_genetics.assert_not_called()
+        self.assertEqual(bot._genetic_batch_pending_symbols, {"BTCUSDT"})
 
         # -- Cooldown was applied --
         import core.trade_exit as te
@@ -561,3 +563,70 @@ class TestCloseTradeRealSuccessPath(unittest.TestCase):
         self.assertTrue(bot.is_paused)
         self.assertIsNotNone(bot.pause_time)
         bot.risk_engine.record_trade_result.assert_called_once_with("BTC/USDT", -16.5)
+
+
+class TestGeneticBatch(unittest.TestCase):
+    @patch("core.bot_maintenance.Config.GENETIC_BATCH_ENABLED", True)
+    @patch("core.bot_maintenance.Config.GENETIC_BATCH_MIN_TRADES", 2)
+    @patch("core.bot_maintenance.append_execution_event")
+    def test_genetic_batch_processes_symbol_with_enough_samples(self, append_event):
+        from core.bot_maintenance import run_genetic_batch
+
+        bot = SimpleNamespace(
+            _genetic_batch_pending_symbols={"BTC/USDT"},
+            log=MagicMock(),
+            brain=SimpleNamespace(
+                count_trades_for_symbol=MagicMock(return_value=2),
+                evolve_genetics=MagicMock(return_value=True),
+            ),
+        )
+
+        result = run_genetic_batch(bot)
+
+        self.assertEqual(result["processed"], 1)
+        self.assertEqual(result["mutated"], 1)
+        self.assertEqual(bot._genetic_batch_pending_symbols, set())
+        bot.brain.evolve_genetics.assert_called_once_with("BTC/USDT")
+        self.assertTrue(
+            any(
+                call.args[1] == "GENETIC_BATCH_SWAP_APPLIED" for call in append_event.call_args_list
+            )
+        )
+
+    @patch("core.bot_maintenance.Config.GENETIC_BATCH_ENABLED", True)
+    @patch("core.bot_maintenance.Config.GENETIC_BATCH_MIN_TRADES", 50)
+    @patch("core.bot_maintenance.append_execution_event")
+    def test_genetic_batch_keeps_pending_when_samples_are_insufficient(self, _append_event):
+        from core.bot_maintenance import run_genetic_batch
+
+        bot = SimpleNamespace(
+            _genetic_batch_pending_symbols={"ETH/USDT"},
+            log=MagicMock(),
+            brain=SimpleNamespace(
+                count_trades_for_symbol=MagicMock(return_value=10),
+                evolve_genetics=MagicMock(return_value=True),
+            ),
+        )
+
+        result = run_genetic_batch(bot)
+
+        self.assertEqual(result["processed"], 0)
+        self.assertEqual(result["mutated"], 0)
+        self.assertEqual(bot._genetic_batch_pending_symbols, {"ETH/USDT"})
+        bot.brain.evolve_genetics.assert_not_called()
+
+    @patch("core.bot_maintenance.Config.GENETIC_BATCH_ENABLED", False)
+    @patch("core.bot_maintenance.append_execution_event")
+    def test_genetic_batch_skips_when_disabled(self, _append_event):
+        from core.bot_maintenance import run_genetic_batch
+
+        bot = SimpleNamespace(
+            _genetic_batch_pending_symbols={"SOL/USDT"},
+            log=MagicMock(),
+            brain=SimpleNamespace(evolve_genetics=MagicMock(return_value=True)),
+        )
+
+        result = run_genetic_batch(bot)
+
+        self.assertEqual(result["status"], "SKIPPED")
+        bot.brain.evolve_genetics.assert_not_called()

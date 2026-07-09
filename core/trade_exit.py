@@ -406,8 +406,21 @@ def close_trade(
         if kanban_id and not trade.get("is_shadow", True):
             async_mover_tarjeta(kanban_id, "Historial de Cierre")
 
-        if bot.brain.evolve_genetics(symbol):
-            bot.log(f"\U0001f9ec ADN MUTADO: {symbol} ha evolucionado sus parámetros SL/TP.")
+        if bool(getattr(Config, "GENETIC_BATCH_ENABLED", True)):
+            pending_genetics = set(getattr(bot, "_genetic_batch_pending_symbols", set()) or set())
+            pending_genetics.add(symbol)
+            bot._genetic_batch_pending_symbols = pending_genetics
+            append_execution_event(
+                bot,
+                "GENETIC_BATCH_QUEUED",
+                {"symbol": symbol, "pending_symbols": len(pending_genetics)},
+            )
+        else:
+            append_execution_event(
+                bot,
+                "GENETIC_BATCH_SKIPPED",
+                {"symbol": symbol, "reason": "DISABLED"},
+            )
 
         if trade.get("is_shadow", False):
             status, info = bot.brain.check_eureka_status(symbol)

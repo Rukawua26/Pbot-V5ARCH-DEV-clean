@@ -51,6 +51,8 @@ class Config(OperationalConfig, StrategyConfig):
     MIN_RISK_REWARD_RATIO = _env_float("MIN_RISK_REWARD_RATIO", 1.5)
     RISK_REWARD_VOLATILITY_BOOST_ENABLED = _env_bool("RISK_REWARD_VOLATILITY_BOOST_ENABLED", True)
     RISK_REWARD_HIGH_VOL_MIN_RATIO = _env_float("RISK_REWARD_HIGH_VOL_MIN_RATIO", 1.7)
+    GENETIC_BATCH_ENABLED = _env_bool("GENETIC_BATCH_ENABLED", True)
+    GENETIC_BATCH_MIN_TRADES = _env_int("GENETIC_BATCH_MIN_TRADES", 50)
 
     # --- ML weight overrides ---
     XGB_WEIGHT = _env_float("XGB_WEIGHT", 0.30)
@@ -351,6 +353,8 @@ class Config(OperationalConfig, StrategyConfig):
             errors.append("MIN_RISK_REWARD_RATIO debe ser positivo")
         if float(cls.RISK_REWARD_HIGH_VOL_MIN_RATIO) < float(cls.MIN_RISK_REWARD_RATIO):
             errors.append("RISK_REWARD_HIGH_VOL_MIN_RATIO debe ser >= MIN_RISK_REWARD_RATIO")
+        if int(cls.GENETIC_BATCH_MIN_TRADES) < 1:
+            errors.append("GENETIC_BATCH_MIN_TRADES debe ser >= 1")
         if str(cls.EMA_ALIGNMENT_MODE).lower() not in {"cross", "stack"}:
             errors.append("EMA_ALIGNMENT_MODE debe ser 'cross' o 'stack'")
         if int(cls.EMA_SLOPE_LOOKBACK) < 1:

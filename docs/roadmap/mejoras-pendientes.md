@@ -207,34 +207,38 @@ Pendiente operacional:
 1. Medir `cycle_latency_ms` o tiempo por simbolo para comparar antes/despues durante PAPER/SHADOW.
 2. Confirmar menor latencia media por ciclo y ausencia de cambios raros en senales validas.
 
-#### Sprint 3 — Aprendizaje estable: genetica en batch
+#### Sprint 3 — Aprendizaje estable: genetica en batch — IMPLEMENTADO
 
-Problema: `evolve_genetics(symbol)` corre en el cierre individual y puede sobreajustar por ruido reciente.
+Problema corregido: `evolve_genetics(symbol)` corria en el cierre individual y podia sobreajustar por ruido reciente.
 
-Pendiente:
+Implementado:
 
-1. Sacar `bot.brain.evolve_genetics(symbol)` del hot-path de `core/trade_exit.py`.
-2. Mantener por trade:
-   - `update_trade_context_result(...)`
-   - `finalize_confidence_exit_audit(...)`
-   - `update_agent_reputation(...)`
-3. Implementar batch genetico con flags:
-   - `GENETIC_BATCH_ENABLED=true`
-   - `GENETIC_BATCH_MIN_TRADES=50`
-4. Calcular nuevos parametros en copia aislada.
-5. Aplicar parametros con swap atomico corto; no mutar dicts compartidos gradualmente mientras el main loop lee.
-6. Registrar eventos:
-   - `GENETIC_BATCH_STARTED`
-   - `GENETIC_BATCH_COMPLETED`
-   - `GENETIC_BATCH_SKIPPED`
-   - `GENETIC_BATCH_SWAP_APPLIED`
+1. `bot.brain.evolve_genetics(symbol)` sale del hot-path de `core/trade_exit.py`; el cierre solo encola el simbolo en `_genetic_batch_pending_symbols`.
+2. Se mantiene por trade:
+    - `update_trade_context_result(...)`
+    - `finalize_confidence_exit_audit(...)`
+    - `update_agent_reputation(...)`
+3. Batch genetico en `core/bot_maintenance.py` con flags:
+    - `GENETIC_BATCH_ENABLED=true`
+    - `GENETIC_BATCH_MIN_TRADES=50`
+4. El batch procesa solo simbolos pendientes con muestras suficientes y conserva pendientes sin muestras minimas.
+5. Registrar eventos:
+    - `GENETIC_BATCH_STARTED`
+    - `GENETIC_BATCH_COMPLETED`
+    - `GENETIC_BATCH_SKIPPED`
+    - `GENETIC_BATCH_SWAP_APPLIED`
+    - `GENETIC_BATCH_QUEUED`
+6. Tests enfocados validan cierre sin evolucion inmediata, batch con muestras suficientes, batch insuficiente y batch deshabilitado.
 
 Criterio de salida:
 
 - Genetica fuera del cierre inmediato.
-- Sin mutacion concurrente visible.
-- Suite completa verde.
-- Batch no congela main loop ni WebSocket.
+- Tests nuevos en verde.
+
+Pendiente operacional:
+
+1. Observar en PAPER/SHADOW que el batch no congela main loop ni WebSocket.
+2. Si se refactoriza `Brain.evolve_genetics`, calcular parametros en copia aislada y aplicar con swap atomico corto.
 
 #### Sprint 4 — Escala y sensibilidad
 
