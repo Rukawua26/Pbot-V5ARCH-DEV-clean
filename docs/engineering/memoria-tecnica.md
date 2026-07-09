@@ -39,7 +39,7 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ### 2026-07-09 - Sprint 2 cuantitativo: pre-filtros baratos de señales
 
-Commit: pendiente hasta cerrar este cambio.
+Commit: `032a8d9 feat: add cheap signal prefilters`
 
 Que cambia:
 
