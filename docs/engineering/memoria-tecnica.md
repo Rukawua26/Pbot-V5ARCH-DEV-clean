@@ -39,7 +39,7 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ### 2026-07-09 - Sprint 3 cuantitativo: genetica en batch
 
-Commit: pendiente hasta cerrar este cambio.
+Commit: `3af0f93 feat: batch genetic evolution outside trade close`
 
 Que cambia:
 
