@@ -56,7 +56,17 @@ class ExitEngineV1:
         pnl_pct = float(trade.get("pnl", 0.0))
         bars = self._bars_elapsed(trade.get("open_time"), timeframe_minutes=60)
 
-        # Corrección cuantitativa: velocidad de escape, no "zona muerta"
+        # Defense-in-depth: no cerrar por time decay si el PnL ya super\u00f3 el Hard SL.
+        # El Hard SL absoluto debe disparar primero desde el guardian.
+        hard_sl_percent = float(
+            Config.SHADOW_HARD_SL_PERCENT
+            if trade.get("is_shadow", False)
+            else Config.REAL_HARD_SL_PERCENT
+        )
+        if pnl_pct <= hard_sl_percent:
+            return None
+
+        # Correcci\u00f3n cuantitativa: velocidad de escape, no "zona muerta"
         if bars >= self.time_decay_bars and pnl_pct < self.escape_velocity_pct:
             return {
                 "should_exit": True,
@@ -209,6 +219,16 @@ class ExitEngineV1:
     ) -> dict[str, Any] | None:
         entry = float(trade.get("entry", 0.0) or 0.0)
         if entry <= 0 or current_atr <= 0:
+            return None
+
+        # Defense-in-depth: no cerrar por flat volatility si el PnL ya super\u00f3 el Hard SL.
+        pnl_pct = float(trade.get("pnl", 0.0))
+        hard_sl_percent = float(
+            Config.SHADOW_HARD_SL_PERCENT
+            if trade.get("is_shadow", False)
+            else Config.REAL_HARD_SL_PERCENT
+        )
+        if pnl_pct <= hard_sl_percent:
             return None
 
         bars = self._bars_elapsed(trade.get("open_time"), timeframe_minutes=60)

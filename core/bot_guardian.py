@@ -480,6 +480,19 @@ def run_guardian_loop(bot):
                     if t["pnl"] > t.get("peak_pnl", -999):
                         t["peak_pnl"] = t["pnl"]
 
+                    # --- HARD STOP LOSS: Límite absoluto de pérdida (PRIORIDAD MÁXIMA) ---
+                    # Debe ejecutarse ANTES que cualquier otra lógica de salida (exit engine,
+                    # time decay, trailing, price SL) para evitar que trades con PnL peor que
+                    # el Hard SL se cierren con otra etiqueta (e.g. TIME_DECAY_ESCAPE_VELOCITY).
+                    max_loss = (
+                        Config.SHADOW_HARD_SL_PERCENT
+                        if t.get("is_shadow", False)
+                        else Config.REAL_HARD_SL_PERCENT
+                    )
+                    if t["pnl"] <= max_loss:
+                        bot.close_trade(s, f"Hard SL ({max_loss}%)", curr)
+                        continue
+
                     # --- INTEGRACIÓN KANBAN ---
                     if t.get("kanban_item_id"):
                         if t.get("status") == "OPEN" and not t.get("kanban_moved_to_open"):
@@ -661,22 +674,16 @@ def run_guardian_loop(bot):
                         bot.close_trade(s, reason, curr)
                         continue
 
-                    # HARD STOP LOSS: Límite absoluto de pérdida
-                    max_loss = (
-                        Config.SHADOW_HARD_SL_PERCENT
-                        if t.get("is_shadow", False)
-                        else Config.REAL_HARD_SL_PERCENT
-                    )
-
                     # PRE-HARD SL WARNING: evaluar trailing antes de llegar al Hard SL
+                    # max_loss ya fue calculado arriba (antes del exit engine).
                     pre_sl_warning = max_loss * 0.5  # -1.5% para REAL, -2.5% para SHADOW
                     if t["pnl"] <= pre_sl_warning and not t.get("pre_sl_warning_logged", False):
                         t["pre_sl_warning_logged"] = True
                         bot.log(
-                            f"⚠️ PRE-SL WARNING {s}: PnL {t['pnl']:.2f}%接近 Hard SL ({max_loss}%) | "
-                            f"forzando evaluación de trailing/BE"
+                            f"⚠️ PRE-SL WARNING {s}: PnL {t['pnl']:.2f}%\u63a5\u8fd1 Hard SL ({max_loss}%) | "
+                            f"forzando evaluaci\u00f3n de trailing/BE"
                         )
-                        # Forzar re-evaluación del exit engine
+                        # Forzar re-evaluaci\u00f3n del exit engine
                         if bool(getattr(Config, "EXIT_ENGINE_V1_ENABLED", True)):
                             snap_ctx = t.get("market_snapshot", {}) or {}
                             current_atr = float(
@@ -692,13 +699,11 @@ def run_guardian_loop(bot):
                             )
                             if bool(exit_eval.get("should_exit", False)):
                                 exit_reason = str(exit_eval.get("reason", "PRE_SL_EXIT"))
-                                bot.log(f"🚨 PRE-SL EXIT {s}: {exit_reason} | PnL {t['pnl']:.2f}%")
+                                bot.log(
+                                    f"\U0001f6a8 PRE-SL EXIT {s}: {exit_reason} | PnL {t['pnl']:.2f}%"
+                                )
                                 bot.close_trade(s, exit_reason, curr)
                                 continue
-
-                    if t["pnl"] <= max_loss:
-                        bot.close_trade(s, f"Hard SL ({max_loss}%)", curr)
-                        continue
 
                     _handle_tp1(bot, s, t, curr)
                     if bool(getattr(bot, "halt_system_active", False)) or bool(

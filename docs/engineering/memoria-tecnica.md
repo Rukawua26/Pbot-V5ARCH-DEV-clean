@@ -37,6 +37,267 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-10 - Housekeeping fail-safe y heartbeat PAPER testnet
+
+Problema:
+- Un import incorrecto de `reporter` en el reporte móvil periódico propagaba `ModuleNotFoundError` al loop principal. Como `last_report_time` no avanzaba, el bot reintentaba cada 10 segundos y no alcanzaba el escaneo de señales.
+- El heartbeat llamaba `exchange.fetch_status()` en Binance testnet, que intenta un endpoint SAPI sin URL sandbox y marcaba la API offline aunque los endpoints Futures públicos funcionaran.
+
+Cambios:
+- `core/bot_housekeeping.py`: usa `tools.reporter`, contiene cualquier fallo de generación o encolado, aplica backoff exponencial de 60 a 3600 segundos y emite métricas `mobile_report`.
+- `tools/notifier.py`: el encolado de mensajes devuelve `True/False` para que tareas opcionales puedan distinguir aceptación local de descarte o excepción.
+- `core/config/operational.py`: agrega `AUTO_MOBILE_REPORTS_ENABLED` con default `True`.
+- `core/bot_runtime_ops.py`: espera `init_complete`; en `PAPER + USE_TESTNET` prueba conectividad mediante `execution.fetch_ticker("BTC/USDT")` y conserva `fetch_status()` fuera de ese caso.
+- `tests/test_low_coverage_ops.py`: cubre contención, backoff, recuperación, desactivación, reporte diario y separación del probe testnet.
+
+Reglas preventivas:
+- Tareas opcionales de housekeeping nunca deben propagar errores al loop de escaneo.
+- Un reintento periódico fallido debe tener backoff y telemetría; no puede reiniciar el ciclo cada 10 segundos.
+- En PAPER testnet no usar endpoints SAPI no soportados para determinar salud de Binance Futures.
+
+Validación:
+- Suite completa: 1132 tests OK, 2 skipped.
+- `ruff check`, `ruff format --check`, `compileall`, smoke modular, contratos arquitectónicos y guard de `pass` silenciosos: OK.
+- Reinicio PAPER observado: ciclo de 30 pares completado, operación SHADOW registrada y sin nuevos errores `No module named 'reporter'` ni fallos SAPI del heartbeat.
+
+### 2026-07-09 - Plan de Reparacion de Edge — Fase 0 y 1 completadas
+
+Documento completo: `docs/runbooks/plan-reparacion-edge.md`. Registrado en roadmap (#10).
+
+Fase 0 (diagnostico base) — COMPLETADA:
+- Config efectiva cargada congelada (ver snapshot en plan).
+- Estado de DB: 49 trades SHADOW, winrate 26.5%, avg pnl -2.06%.
+- 94.4% de perdidas con MFE<=0.5% (fallo de entrada, no de salida).
+- confianza no calibrada (avg win 74.38 vs avg loss 74.41).
+- Vetos dominantes recientes: COHERENCIA 692, MARKET_BREADTH_FEAR 318, SIDE_PARITY ~430, HMM_RANGE_PENALTY 125.
+
+Fase 1 (bootstrap) — COMPLETADA:
+- Confirmado: no existe ningun modelo ML en el workspace.
+- `core/bot_models_startup.py:97` cae a `bootstrap_heuristic_mode=True` por ausencia de todos los archivos de modelo.
+- En DB: `4062/4161` señales como `BOOTSTRAP_NONE`.
+- `conflict_ab.log` (1222 conflictos) NO es evidencia valida de desalineacion ML vs reglas: `ml_pure_prob=0.0` cuando `bootstrap_heuristic_mode=True` (`core/bot_signals.py:242`). Es codigo de "no hay modelo", no "modelo en contra".
+- `tools/train_models.py` requiere minimo 50 muestras; hay 49 trades y 33 snapshots. Dataset insuficiente.
+
+Decision tomada con el usuario:
+- Periodo de acumulacion en SHADOW hasta 100-150 trades.
+- Para acumular data, relajar filtros de entrada que hoy bloquean todos los trades (Fase 2).
+- No tocar estrategia ni score aun.
+- No reentrenar ghost model hasta tener dataset suficiente (100-150 muestras).
+- No pasar a REAL en este periodo.
+
+### 2026-07-09 - Experimento 1: Ablacion de filtros de calidad (EN EJECUCION)
+
+Plan aprobado: desnudar el sistema de filtros, aceptar entrada de trades basura y reconstruir capa por capa hasta encontrar el punto de quiebre. Documento completo: `docs/runbooks/plan-reparacion-edge.md` (Fase 7).
+
+Cambio aplicado en `.env` (no en codigo):
+- 11 filtros de calidad pausados: `DIRECTIONAL_COHERENCE_FILTER`, `SIDE_PARITY_FILTER_ENABLED`, `GLOBAL_FEAR_GREED_FILTER_ENABLED`, `GLOBAL_BTC_DOM_FILTER_ENABLED`, `HMM_RANGE_VETO`, `OI_FILTER_ENABLED`, `CVD_FILTER_ENABLED`, `MTF_FILTER_ENABLED`, `EMA_ALIGNMENT_FILTER_ENABLED`, `EMA_SLOPE_FILTER_ENABLED`, `BREAKOUT_WATCH_ENABLED` -> todos `false`.
+- Seguridad runtime intacta: `HALT`, `INTEGRITY_LOCK`, cooldowns, limits, watchdog, SL/TP, reconciliacion.
+- Parametros de umbral intactos: `SHADOW_MODE_MIN=55.0`, `REAL_MODE_THRESHOLD=70.0`, `MAX_ENTRY_SL_PCT=3.5`, `SHOCK_MIN_DIST_PCT=0.18`, `MIN_RISK_REWARD_RATIO=1.5`.
+- Bootstrap 4/5 intacto (no relajado).
+- `PAPER_MODE=true`, `EXECUTION_BACKEND=live`.
+
+Veto embebido sin flag descubierto:
+- `MARKET_BREADTH_FEAR` (`core/signals/filters.py:562`): veto siempre activo si el contexto reporta `FEAR`. No tiene flag de activacion. Si persiste tras ablacion, hay que investigarlo como capa embebida (Escenario E).
+
+Fix de `.env` duplicado:
+- Las lineas 86-87 del `.env` (seccion SHADOW VALIDATION CAMPAIGN) tenian `GLOBAL_FEAR_GREED_FILTER_ENABLED=true` y `GLOBAL_BTC_DOM_FILTER_ENABLED=true` que pisaban las nuevas lineas de ablacion porque aparecian despues. `load_dotenv` mantiene la ultima ocurrencia. Corregido poniendo ambas a `false` en ambas secciones.
+
+Validacion:
+- Flags efectivos confirmados: los 11 filtros cargan `False`.
+- `tests/test_filters_execution_mode.py` + `tests/test_filters_pure_functions.py`: 62/62 OK.
+- `scripts/smoke_modular_imports.sh`: OK.
+- `compileall core config.py`: OK.
+
+Reglas preventivas:
+- No confiar en `conflict_ab.log` mientras estemos en bootstrap: sus `ML_CONFIDENCE 0.0%` son ruido de "sin modelo", no senal de decision.
+- No reducir `--min-samples` de `tools/train_models.py` para forzar entrenamiento con 49 muestras: alto riesgo de overfit.
+- No tocar `core/bot_models_startup.py`: su comportamiento de caer a bootstrap ante ausencia de modelo es correcto.
+- No reintroducir varios filtros a la vez tras el Experimento 1: un cambio por experimento para aislar el diagnostico.
+- No pasar a `REAL` hasta cumplir winrate SHADOW mejorado + buckets de confianza calibrados + 100-150 trades acumulados.
+
+Que sigue:
+- Correr ventana 24-48h en SHADOW.
+- Extraer metricas con el checklist de lectura post-experimento del plan.
+- Clasificar en Escenario A-F y decidir Experimento 2 (bootstrap relaxation) o reintroduccion de filtros.
+
+### 2026-07-09 - Experimento 2: Relajar bootstrap SHADOW de 4/5 a 3/5 reglas (EN EJECUCION)
+
+Trigger: Experimento 1 confirmo Escenario B. Radar mostro 13/23 señales en `BOOTSTRAP NO_FIRE` con 2-3 reglas. `BEAR_REVERSAL_VETO` pausado previamente (threshold 100.0).
+
+Cambios aplicados:
+- `core/config/manager.py`: añadido `BOOTSTRAP_SHADOW_MIN_HITS = _env_int("BOOTSTRAP_SHADOW_MIN_HITS", 4)` con default 4 (preserva comportamiento original).
+- `core/signals/filters.py:235`: `bootstrap_ready_shadow` ahora usa `Config.BOOTSTRAP_SHADOW_MIN_HITS` en vez de hardcoded `4`.
+- `.env`: `BOOTSTRAP_SHADOW_MIN_HITS=3`.
+- `bootstrap_ready_real` sigue en `5/5` (REAL no se toca).
+
+Reglas preventivas:
+- No bajar `BOOTSTRAP_SHADOW_MIN_HITS` por debajo de 3 sin medir calidad de entradas.
+- No cambiar `bootstrap_ready_real` de `5/5` para REAL: es la guarda de seguridad cuando no hay modelo ML.
+- Reintroducir `BOOTSTRAP_SHADOW_MIN_HITS=4` solo tras acumular 100-150 trades y entrenar ghost model.
+
+Validacion:
+- `compileall core/signals/filters.py core/config/manager.py`: OK.
+- `ruff check` + `ruff format --check`: OK.
+- `tests/test_filters_execution_mode.py`: 21/21 OK.
+- `BOOTSTRAP_SHADOW_MIN_HITS=3` confirmado cargado.
+
+### 2026-07-09 - Experimento 3: Reactivar coherencia direccional (EN EJECUCION)
+
+Trigger: baseline ya genera entrada/salida correctamente y acumulo >60 trades SHADOW. El siguiente paso del plan es reintroducir un filtro por vez.
+
+Cambio aplicado:
+- `.env`: `DIRECTIONAL_COHERENCE_FILTER=true`.
+
+Mantener igual:
+- `BOOTSTRAP_SHADOW_MIN_HITS=3`.
+- `MARKOV_PREVETO_BEARISH_REVERSAL_MIN=100.0`.
+- `SIDE_PARITY_FILTER_ENABLED=false` y resto de filtros de calidad pausados.
+
+Objetivo:
+- Medir si alinear trades con `current_sentiment` reduce entradas contra sesgo direccional sin secar el flujo.
+- Con sentiment alcista, se espera bloquear la mayoria de `SELL` y dejar pasar `BUY`.
+
+Regla preventiva:
+- No reactivar otro filtro hasta cerrar ventana de observacion de Experimento 3.
+
+### 2026-07-10 - Experimento 3: pausar `MARKET_BREADTH_FEAR` para aislar coherencia
+
+Trigger: radar con `DIRECTIONAL_COHERENCE_FILTER=true` mostro que los SELL quedan bloqueados correctamente por coherencia, pero los BUY quedaron bloqueados masivamente por `MARKET_BREADTH_FEAR: FEAR (100% dump)`.
+
+Cambios aplicados:
+- `core/config/manager.py`: añadido `MARKET_BREADTH_FEAR_FILTER_ENABLED = _env_bool("MARKET_BREADTH_FEAR_FILTER_ENABLED", True)`.
+- `core/signals/filters.py`: `MARKET_BREADTH_FEAR` ahora respeta `MARKET_BREADTH_FEAR_FILTER_ENABLED`.
+- `.env`: `MARKET_BREADTH_FEAR_FILTER_ENABLED=false`.
+- `tests/test_market_breadth.py`: cobertura para flag activo (veta) y flag apagado (permite).
+
+Objetivo:
+- Mantener `DIRECTIONAL_COHERENCE_FILTER=true` y eliminar el veto residual que impedia medir si los BUY pasan en sentimiento alcista.
+
+Validacion:
+- `tests.test_market_breadth` + `tests.test_filters_execution_mode`: 30/30 OK.
+- `ruff check` OK.
+- `ruff format --check` OK.
+
+Regla preventiva:
+- No reactivar `MARKET_BREADTH_FEAR_FILTER_ENABLED` hasta cerrar la observacion del Experimento 3 y decidir si aporta calidad o solo seca flujo.
+
+### 2026-07-10 - Fase Torniquete: MIN_ATR_PCT, cap direccional SHADOW, HARD_SL ajustado
+
+Trigger: Analisis de 183 trades SHADOW revelo que activos con ATR bajo (<0.5%) generan 93% de perdidas acumuladas, y clusters de hasta 13 BUY simultaneos amplifican perdidas correlacionadas.
+
+Diagnostico corregido por asesor externo:
+- MAE tracking FUNCIONA correctamente: 0.3% MAE en precio -> -5.1% PnL con 10x leverage + fees. No era bug, era interpretacion erronea mia.
+- Confianza INVERTIDA: bucket [65-68] tiene 33.3% WR (+0.52% avg), bucket [80-90] tiene 15.0% WR (-2.42% avg). La heuristica bootstrap recompensa atributos no predictivos.
+- ATR pct > 0.7% mejora WR de 23.6% a 25.9% y avg PnL de -1.81% a -1.65%. Umbral optimo: 0.6%.
+
+Cambios:
+
+1. MIN_ATR_PCT filter (core/config/manager.py, core/signals/filters.py, .env):
+   - MIN_ATR_PCT=0.006 (0.6%). Veta simbolos con ATR ratio < threshold.
+   - MIN_ATR_PCT_FILTER_ENABLED=true (env-overridable).
+   - Umbral 0.6% bloquea ~11% de trades, mejora WR de 23.6% a 26.1%.
+   - tests/test_min_atr_filter.py: 4 tests.
+
+2. Cap direccional SHADOW (core/trade_entry.py, .env):
+   - MAX_SHADOW_DIRECTIONAL_TRADES=3. Limita trades SHADOW por direccion.
+   - Evita cluster 13 BUY simultaneos (causa raiz de drawdown masivo en dump).
+   - tests/test_shadow_directional_cap.py: 4 tests.
+
+3. HARD_SL mas ajustado (core/config/manager.py, .env):
+   - SHADOW_HARD_SL_PERCENT=-3.5 (antes -5.0%).
+   - REAL_HARD_SL_PERCENT=-3.0. Ambos env-overridable via manager.py.
+
+Hallazgo arquitectonico no resuelto: el ATR SL (entry - ATR x 2.0) y el HARD_SL (-3.5%) estan desalineados con 10x leverage. El HARD_SL dispara a ~0.35% price move (3.5% PnL), muy antes del ATR SL a 1-2% price (10-20% PnL). El mecanismo ATR SL es irrelevante mientras el HARD_SL fijo sea mas restrictivo. Solucion futura: reducir STOP_LOSS_ATR_MODIFIER a ~0.6 o reducir leverage.
+
+Reglas preventivas:
+- No bajar MIN_ATR_PCT bajo 0.005 sin re-medir distribucion ATR winners vs losers.
+- No subir MAX_SHADOW_DIRECTIONAL_TRADES sobre 5 sin medir correlacion en clusters.
+- No subir SHADOW_HARD_SL_PERCENT sobre -3.0 sin validar alineacion con ATR SL.
+- Si cambia leverage, recalibrar SHADOW_HARD_SL_PERCENT.
+
+Que sigue:
+- Encender bot, medir 50-100 trades SHADOW contra baseline.
+- Evaluar si STOP_LOSS_ATR_MODIFIER necesita reduccion (Fase 3.1 profunda).
+
+Reglas preventivas:
+
+### 2026-07-11 - Fix: Hard SL priority over ExitEngineV1 (TIME_DECAY_ESCAPE_VELOCITY)
+
+Trigger: Post-config (id>=188) mostro perdidas de -18.63% (GALA) y -9.71% (MON) cerradas como TIME_DECAY_ESCAPE_VELOCITY cuando HARD_SL era -3.5%. El Hard SL absoluto nunca disparaba porque el exit engine corria primero.
+
+Causa raiz:
+- En `core/bot_guardian.py`, `ExitEngineV1.evaluate_exit()` se ejecutaba en linea ~490, ANTES del chequeo `if t["pnl"] <= max_loss` en linea ~699.
+- `check_time_decay_exit()` en `core/risk/exit_engine_v1.py` no tenia PnL floor: cerraba por time decay sin importar si el PnL ya superaba el Hard SL.
+- `check_flat_volatility_exit()` tenia el mismo problema.
+- Resultado: trades con PnL -18% se cerraban como TIME_DECAY_ESCAPE_VELOCITY en vez de Hard SL (-3.5%).
+
+Cambios:
+
+1. Reordenar Hard SL check en guardian (`core/bot_guardian.py`):
+   - Mover `if t["pnl"] <= max_loss: bot.close_trade(...)` a justo despues del calculo de PnL (linea ~480), ANTES del exit engine.
+   - Eliminar el chequeo duplicado de max_loss en la seccion posterior.
+   - El PRE-SL WARNING ahora reutiliza max_loss ya calculado.
+
+2. PnL floor en exit engine (`core/risk/exit_engine_v1.py`):
+   - `check_time_decay_exit()`: retorna None si `pnl_pct <= hard_sl_percent`. Defense-in-depth.
+   - `check_flat_volatility_exit()`: mismo guard. No cerrar por flat vol si PnL ya paso Hard SL.
+
+3. Reactivar HMM_RANGE_VETO (`.env`):
+   - `HMM_RANGE_VETO=true` (antes false). Bloquea BUY en regimen RANGE/BEAR_TREND.
+   - Post-config mostro 21/29 trades BUY en BEAR_TREND/RANGE con HMM_RANGE_PENALTY.
+
+4. Tests (`tests/test_hard_sl_priority.py`): 6 tests de regresion.
+   - time_decay no dispara cuando PnL <= SHADOW_HARD_SL_PERCENT.
+   - time_decay no dispara cuando PnL <= REAL_HARD_SL_PERCENT.
+   - time_decay si dispara cuando PnL > Hard SL (comportamiento normal).
+   - flat_volatility no dispara cuando PnL <= Hard SL.
+   - flat_volatility si dispara cuando PnL > Hard SL.
+   - evaluate_exit() completo no retorna TIME_DECAY cuando PnL past Hard SL.
+
+Reglas preventivas:
+- El Hard SL absoluto debe ser SIEMPRE el primer check despues de calcular PnL, antes que cualquier exit engine, trailing, o price SL.
+- No introducir checks de salida antes del Hard SL en el guardian loop.
+- check_time_decay_exit y check_flat_volatility_exit deben respetar el PnL floor del Hard SL.
+- Si se cambia SHADOW_HARD_SL_PERCENT, verificar que el exit engine respete el nuevo valor.
+
+Reglas preventivas:
+- No confiar en `conflict_ab.log` mientras estemos en bootstrap: sus `ML_CONFIDENCE 0.0%` son ruido de "sin modelo", no senal de decision.
+- No reducir `--min-samples` de `tools/train_models.py` para forzar entrenamiento con 49 muestras: alto riesgo de overfit.
+- No tocar `core/bot_models_startup.py`: su comportamiento de caer a bootstrap ante ausencia de modelo es correcto.
+
+Que sigue (Fase 2):
+- Rankear filtros activos que bloquean entrada SHADOW hoy.
+- Relajar solo los que vetan mucho sin mejorar winrate de los que pasan.
+- Un cambio por experimento, ventana de 48-72h en SHADOW.
+
+### 2026-07-09 - Fix: cierre REAL fallido activa HALT (fail-safe)
+
+Commit: pendiente hasta cerrar este cambio.
+
+Que cambia:
+
+- `core/trade_exit.py`: en el bloque `except` de `close_trade` para cierres REALES, `close_failed` ahora se inicializa en `True` (fail-safe) en lugar de `False`. Solo se revierte a `False` cuando la orden reporta filled Y el exchange confirma posición plana via `_exchange_position_is_flat`.
+- `tests/test_trade_exit.py`: agrega 3 tests de regresion:
+  - `test_unclassified_exception_without_filled_order_halts`: excepcion generica + order no filled debe HALT.
+  - `test_unclassified_exception_with_filled_and_flat_does_not_halt`: orden filled + posicion plana NO debe HALT (cierre valido).
+  - `test_unclassified_exception_filled_but_not_flat_halts`: orden filled pero posicion sigue viva debe HALT.
+
+Reglas preventivas:
+
+- En el bloque `except` de cierre REAL, nunca inicializar `close_failed = False`. Asumir fallo y solo descartar si el exchange confirma posicion plana.
+- Respetar el invariante "ante estado live ambiguo, preferir HALT y reconciliacion antes de continuar".
+- No atajar excepciones genericas sin clasificar y dejar la posicion viva sin HALT; duplica riesgo de exposicion.
+
+Validacion registrada:
+
+- `tests/test_trade_exit.py` OK (28/28).
+- `ruff check` y `ruff format --check` OK.
+- `compileall core/trade_exit.py tests/test_trade_exit.py` OK.
+- `tools/regression_contracts.py` OK.
+- `tools/check_no_silent_pass.py` OK.
+- `scripts/smoke_modular_imports.sh` OK.
+- `tests/test_runtime_safety_regressions.py` OK.
+
 ### 2026-07-09 - Sprint 4 cuantitativo: escala y sensibilidad pasiva
 
 Commit: `a501874 feat: add passive slope telemetry and triage scale preset`
