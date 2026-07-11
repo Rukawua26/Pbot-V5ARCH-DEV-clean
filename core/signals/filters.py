@@ -229,10 +229,11 @@ def _evaluate_bootstrap_heuristic(audit_signal, ctx):
         hits.append("ATR_OK")
 
     hit_count = len(hits)
+    bootstrap_shadow_min = int(getattr(Config, "BOOTSTRAP_SHADOW_MIN_HITS", 4))
     return {
         "heuristic_hits": hits,
         "heuristic_confidence": min(90.0, 48.0 + (hit_count * 8.0)),
-        "bootstrap_ready_shadow": hit_count >= 4,
+        "bootstrap_ready_shadow": hit_count >= bootstrap_shadow_min,
         "bootstrap_ready_real": hit_count >= 5,
     }
 
@@ -543,6 +544,25 @@ def _apply_entry_filters_and_adjust_prob(
             filter_reason = ema_reason
             bot.log(f"⛔ {symbol}: {ema_reason}")
 
+    # [MIN_ATR_PCT] Veto por volatilidad insuficiente (Fase 1: Torniquete)
+    if filter_passed and bool(getattr(Config, "MIN_ATR_PCT_FILTER_ENABLED", True)):
+        min_atr = float(getattr(Config, "MIN_ATR_PCT", 0.005))
+        atr_pct_val = float(ctx.get("atr_pct", 0.0) or 0.0)
+        if atr_pct_val < min_atr:
+            filter_passed = False
+            filter_reason = f"MIN_ATR_PCT: ATR {atr_pct_val * 100:.3f}% < {min_atr * 100:.3f}%"
+            bot.log(f"⛔ {symbol}: {filter_reason}")
+            append_execution_event(
+                bot,
+                "MIN_ATR_PCT_VETO",
+                {
+                    "symbol": symbol,
+                    "side": audit_signal,
+                    "atr_pct": atr_pct_val,
+                    "min_atr_pct": min_atr,
+                },
+            )
+
     # [BEAR_TREND PREVETO] Veto directo si hay alta probabilidad de reversión alcista
     if filter_passed and audit_signal == "BUY" and btc_regime == "BEAR_TREND":
         bearish_reversal_min = float(getattr(Config, "MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0))
@@ -559,7 +579,11 @@ def _apply_entry_filters_and_adjust_prob(
                     f"prob={reversal_prob:.1f}% [{regime_reason}]"
                 )
 
-    if audit_signal == "BUY" and str(ctx.get("market_breadth_sentiment", "")).upper() == "FEAR":
+    if (
+        bool(getattr(Config, "MARKET_BREADTH_FEAR_FILTER_ENABLED", True))
+        and audit_signal == "BUY"
+        and str(ctx.get("market_breadth_sentiment", "")).upper() == "FEAR"
+    ):
         fear_threshold = float(getattr(Config, "MARKET_BREADTH_FEAR_THRESHOLD", 0.70) or 0.70)
         dump_ratio = float(ctx.get("market_breadth_dump_ratio", 0.0) or 0.0)
         if dump_ratio < fear_threshold:

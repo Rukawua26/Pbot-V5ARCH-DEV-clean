@@ -601,6 +601,27 @@ def execute_order(
                     bot.data_service.sanitize_context(context),
                 )
             return _discard_pending_signal("MAX_SHADOW")
+        elif is_shadow:
+            shadow_side = sum(
+                1 for t in actives if t.get("side") == side and t.get("is_shadow", False)
+            )
+            shadow_dir_limit = int(getattr(Config, "MAX_SHADOW_DIRECTIONAL_TRADES", 3))
+            if shadow_side >= shadow_dir_limit:
+                bot.log(
+                    f"\u23f3 LÍMITE DIRECCIONAL SHADOW ({side}: {shadow_side}/{shadow_dir_limit}): "
+                    f"{symbol} ignorado."
+                )
+                append_execution_event(
+                    bot,
+                    "MAX_SHADOW_DIRECTIONAL",
+                    {
+                        "symbol": symbol,
+                        "side": side,
+                        "shadow_side_count": shadow_side,
+                        "limit": shadow_dir_limit,
+                    },
+                )
+                return _discard_pending_signal("MAX_SHADOW_DIRECTIONAL")
 
     has_same_symbol_real = any(
         isinstance(t, dict)

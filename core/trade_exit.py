@@ -183,7 +183,10 @@ def close_trade(
 
             except Exception as e:
                 bot.log(f"❌ ERROR CRÍTICO CERRANDO {symbol}: {e}")
-                close_failed = False
+                # Fail-safe: ante excepción durante el cierre REAL, asumir fallo.
+                # Solo revertimos a "no fallo" si el exchange confirma posición plana,
+                # respetando el invariante "ante estado live ambiguo, preferir HALT".
+                close_failed = True
 
                 if (
                     "notional" in str(e).lower()
@@ -191,20 +194,23 @@ def close_trade(
                     or "insufficient" in str(e).lower()
                 ):
                     bot.log(f"⚠️ Error de min notional/dust detectado para {symbol}")
-                    close_failed = True
-                elif not isinstance(order, dict) or not _order_looks_filled(order):
-                    bot.log(f"⚠️ Close order para {symbol} no confirmado como filled")
-                    close_failed = True
-                else:
+                elif isinstance(order, dict) and _order_looks_filled(order):
+                    # Orden reporta filled: solo descartamos fallo si exchange confirma plana.
                     try:
-                        if not _exchange_position_is_flat(bot, symbol, trade.get("side")):
+                        if _exchange_position_is_flat(bot, symbol, trade.get("side")):
+                            bot.log(
+                                f"✅ {symbol}: orden filled y posición plana confirmada "
+                                f"tras excepción no clasificada — continuando cierre"
+                            )
+                            close_failed = False
+                        else:
                             bot.log(f"⚠️ Posición remota no está plana tras close para {symbol}")
-                            close_failed = True
                     except Exception as flat_error:
                         bot.log(
                             f"⚠️ No se pudo verificar posición plana tras close para {symbol}: {flat_error}"
                         )
-                        close_failed = True
+                else:
+                    bot.log(f"⚠️ Close order para {symbol} no confirmado como filled")
 
                 if close_failed:
                     bot.is_paused = True

@@ -54,6 +54,17 @@ class Config(OperationalConfig, StrategyConfig):
     GENETIC_BATCH_ENABLED = _env_bool("GENETIC_BATCH_ENABLED", True)
     GENETIC_BATCH_MIN_TRADES = _env_int("GENETIC_BATCH_MIN_TRADES", 50)
 
+    # --- Filtro de volatilidad minima (Fase 1: Torniquete) ---
+    MIN_ATR_PCT = _env_float("MIN_ATR_PCT", 0.006)
+    MIN_ATR_PCT_FILTER_ENABLED = _env_bool("MIN_ATR_PCT_FILTER_ENABLED", True)
+
+    # --- Cap de correlacion por direccion (Fase 1: Torniquete) ---
+    MAX_SHADOW_DIRECTIONAL_TRADES = _env_int("MAX_SHADOW_DIRECTIONAL_TRADES", 3)
+
+    # --- Limites de perdida por trade (Fase 1: Torniquete) ---
+    SHADOW_HARD_SL_PERCENT = _env_float("SHADOW_HARD_SL_PERCENT", -5.0)
+    REAL_HARD_SL_PERCENT = _env_float("REAL_HARD_SL_PERCENT", -3.0)
+
     # --- ML weight overrides ---
     XGB_WEIGHT = _env_float("XGB_WEIGHT", 0.30)
     LGB_WEIGHT = _env_float("LGB_WEIGHT", 0.30)
@@ -113,6 +124,10 @@ class Config(OperationalConfig, StrategyConfig):
         "MARKOV_SNAPSHOT_PERSIST_INTERVAL_SECONDS", 5 * 60
     )
     MARKOV_PREVETO_BEARISH_REVERSAL_MIN = _env_float("MARKOV_PREVETO_BEARISH_REVERSAL_MIN", 85.0)
+
+    # [Experimento 2 - Ablacion] Minimo de reglas heuristicas para disparar SHADOW.
+    # Default 4 (comportamiento original). Bajar a 3 para acumular data sin modelo ML.
+    BOOTSTRAP_SHADOW_MIN_HITS = _env_int("BOOTSTRAP_SHADOW_MIN_HITS", 4)
     BEAR_COUNTER_WEIGHT = _env_float("BEAR_COUNTER_WEIGHT", 0.70)
 
     # --- BEAR_TREND pair universe reduction ---
@@ -220,6 +235,7 @@ class Config(OperationalConfig, StrategyConfig):
     GLOBAL_BTC_DOM_FILTER_ENABLED = _env_bool("GLOBAL_BTC_DOM_FILTER_ENABLED", True)
     GLOBAL_FEAR_VETO_THRESHOLD = _env_int("GLOBAL_FEAR_VETO_THRESHOLD", 20)
     GLOBAL_BTC_DOM_BOOST_THRESHOLD = _env_float("GLOBAL_BTC_DOM_BOOST_THRESHOLD", 65.0)
+    MARKET_BREADTH_FEAR_FILTER_ENABLED = _env_bool("MARKET_BREADTH_FEAR_FILTER_ENABLED", True)
 
     # --- SHADOW validation campaign telemetry (observational only) ---
     SHADOW_VALIDATION_ENABLED = _env_bool("SHADOW_VALIDATION_ENABLED", False)
