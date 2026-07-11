@@ -20,6 +20,37 @@
 3. **Score mal calibrado** — `prob_final` no separa ganadores de perdedores.
 4. **Sin edge en RANGE** — casi todo el historial cae en este regimen y ahi no hay ventaja.
 
+### Causa exacta confirmada: confianza bootstrap invertida
+
+Estado: confirmado durante Fase 0/Fase Torniquete. No es una desviacion del plan; es la explicacion mecanica del punto 3 (`Score mal calibrado`).
+
+El bot no esta usando una probabilidad aprendida mientras corre en `bootstrap_heuristic_mode`. La confianza se calcula en `core/signals/filters.py` como:
+
+```python
+heuristic_confidence = min(90.0, 48.0 + (hit_count * 8.0))
+```
+
+Cada `hit` suma el mismo peso (+8), aunque no todos tienen valor predictivo real:
+
+| Hit | Condicion BUY | Riesgo detectado |
+| :--- | :--- | :--- |
+| `EMA_ALIGN` | `close >= ema` | compra fuerza ya extendida. |
+| `ADX_OK` | `adx >= 18` | confirma tendencia ya desarrollada, no necesariamente entrada temprana. |
+| `RSI_OK` | `52 <= rsi <= 68` | compra momentum; en regimen lateral/bajista puede ser techo local. |
+| `VOL_OK` | `vol_rel >= 1.05` | puede confirmar euforia tardia. |
+| `ATR_OK` | `0 < atr_pct <= 0.05` | premia volatilidad contenida, pero el dato posterior mostro mejor WR con ATR alto (`atr_pct > 0.007`). |
+
+Evidencia posterior:
+- Bucket bajo/intermedio rinde mejor que bucket alto: `[65-68]` tuvo 33.3% WR y `80-90` tuvo 15.0% WR en el analisis ampliado.
+- En los ultimos 20 trades post-fix, `65-70` tuvo 75.0% WR y +2.41% avg, mientras `70-75` tuvo 12.5% WR y -2.74% avg.
+- La confianza alta no mide probabilidad de exito; mide cantidad de confluencias trend-following. En mercado lateral/mean-reverting, mas confluencias suele significar entrada mas tardia.
+
+Implicacion para Fase 1:
+- No entrenar ni evaluar el modelo usando `heuristic_confidence` como verdad objetivo.
+- `prob_final` bootstrap debe tratarse como feature sospechosa o auxiliar, no como label ni probabilidad calibrada.
+- La Fase 1 debe validar si un modelo aprendido corrige la inversion por bucket antes de permitir uso en REAL.
+- Si el dataset sigue siendo pequeno, preferir recalibracion/ablation de hits antes que forzar entrenamiento con pocas muestras.
+
 ## Reglas De Trabajo
 
 - Un cambio por experimento.
@@ -49,6 +80,8 @@
 
 **Meta**: confirmar si el problema principal es ausencia de modelo.
 
+**Insumo desde Fase 0**: la ausencia de modelo ya no es solo falta de ML; deja activa una heuristica bootstrap invertida. La Fase 1 debe comprobar que el modelo aprendido mejora la calibracion por buckets y no replica el sesgo de comprar fuerza tardia.
+
 ### Estado
 - Confirmado: no existe ningun modelo en el workspace (`.pkl`/`.h5`).
 - No existe el directorio `models/`.
@@ -65,6 +98,9 @@
 - [x] Confirmar `core/bot_models_startup.py` y ausencia de modelos.
 - [x] Verificar dataset insuficiente (49 < 50 minimo).
 - [x] Decidir: periodo de acumulacion SHADOW + relajar filtros de entrada.
+- [ ] Al entrenar, excluir `heuristic_confidence` como label objetivo y auditar si conviene usarlo solo como feature auxiliar.
+- [ ] Validar calibracion post-modelo: buckets altos deben ganar mas que buckets bajos en out-of-sample.
+- [ ] Comparar modelo vs bootstrap por regimen (`RANGE`, `BEAR_TREND`, `BULL_TREND`) y por side.
 - [ ] Relajar filtros que bloquean entrada hoy (Fase 2).
 - [ ] Corregir telemetria de `conflict_ab.log` para no contaminar con `ml_pure_prob=0` de bootstrap.
 - [ ] Reentrenar ghost model cuando dataset alcance 100-150 muestras.
@@ -108,11 +144,15 @@
 
 **Meta**: validar si la confianza sirve o esta rota.
 
+**Estado actual**: rota/invertida en bootstrap. La causa exacta esta documentada en Fase 0: `heuristic_confidence = 48 + hits*8`, donde los hits premian confluencias trend-following que en regimen lateral/bajista llegan tarde.
+
 ### Pasos
 - [ ] Medir winrate por bucket de `prob_final`: 55-60, 60-65, 65-70, 70-75, 75-80, 80+.
 - [ ] Comparar `ml_pure_prob` vs `prob_final` vs `prob_final` post-filtros.
 - [ ] Buscar inflacion del score: donde sube, que regla/consenso lo infla.
 - [ ] Si score alto no mejora winrate, esta mal calibrado.
+- [ ] Medir cada `heuristic_hit` individual (`EMA_ALIGN`, `ADX_OK`, `RSI_OK`, `VOL_OK`, `ATR_OK`) contra WR/avg PnL; quitar o invertir hits con edge negativo.
+- [ ] Validar especificamente si `ATR_OK` debe cambiar de baja volatilidad a umbral minimo (`atr_pct >= MIN_ATR_PCT`).
 
 ### Criterio de exito
 - Confirmar que bucket 80% realmente gana mas que bucket 70%.
