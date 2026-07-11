@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
-from threading import RLock
+from threading import Event, RLock
 from types import SimpleNamespace
 from unittest.mock import MagicMock, mock_open, patch
 
@@ -133,16 +133,75 @@ class BotRuntimeOpsTest(unittest.TestCase):
     def test_heartbeat_loop_sets_online_then_stops(self):
         from core.bot_runtime_ops import heartbeat_loop
 
-        bot = SimpleNamespace(is_running=True, api_status="", log=MagicMock())
+        bot = SimpleNamespace(
+            is_running=True, api_status="", log=MagicMock(), init_complete=Event()
+        )
+        bot.init_complete.set()
 
         def fetch_status():
             bot.is_running = False
             return {"status": "ok"}
 
         bot.execution = SimpleNamespace(exchange=SimpleNamespace(fetch_status=fetch_status))
-        with patch("core.bot_runtime_ops.time.sleep"):
+        with (
+            patch("core.bot_runtime_ops.Config.USE_TESTNET", False),
+            patch("core.bot_runtime_ops.time.sleep"),
+        ):
             heartbeat_loop(bot)
 
+        self.assertEqual(bot.api_status, "🟢 ONLINE")
+
+    def test_heartbeat_loop_uses_public_ticker_in_paper_testnet(self):
+        from core.bot_runtime_ops import heartbeat_loop
+
+        fetch_status = MagicMock()
+        bot = SimpleNamespace(
+            is_running=True,
+            api_status="",
+            log=MagicMock(),
+            init_complete=MagicMock(),
+        )
+
+        def fetch_ticker(symbol):
+            self.assertEqual(symbol, "BTC/USDT")
+            bot.is_running = False
+            return {"last": 1.0}
+
+        bot.execution = SimpleNamespace(
+            exchange=SimpleNamespace(fetch_status=fetch_status), fetch_ticker=fetch_ticker
+        )
+        with (
+            patch("core.bot_runtime_ops.Config.PAPER_MODE", True),
+            patch("core.bot_runtime_ops.Config.USE_TESTNET", True),
+            patch("core.bot_runtime_ops.time.sleep"),
+        ):
+            heartbeat_loop(bot)
+
+        bot.init_complete.wait.assert_called_once_with()
+        fetch_status.assert_not_called()
+        self.assertEqual(bot.api_status, "🟢 ONLINE")
+
+    def test_heartbeat_loop_keeps_status_probe_in_real_testnet(self):
+        from core.bot_runtime_ops import heartbeat_loop
+
+        bot = SimpleNamespace(is_running=True, api_status="", log=MagicMock())
+
+        def fetch_status():
+            bot.is_running = False
+            return {"status": "ok"}
+
+        fetch_ticker = MagicMock()
+        bot.execution = SimpleNamespace(
+            exchange=SimpleNamespace(fetch_status=fetch_status), fetch_ticker=fetch_ticker
+        )
+        with (
+            patch("core.bot_runtime_ops.Config.PAPER_MODE", False),
+            patch("core.bot_runtime_ops.Config.USE_TESTNET", True),
+            patch("core.bot_runtime_ops.time.sleep"),
+        ):
+            heartbeat_loop(bot)
+
+        fetch_ticker.assert_not_called()
         self.assertEqual(bot.api_status, "🟢 ONLINE")
 
     def test_instinctive_safety_forces_shadow_on_high_atr(self):
@@ -166,6 +225,118 @@ class BotRuntimeOpsTest(unittest.TestCase):
 
         self.assertEqual(close_all_positions_emergency(bot), 2)
         self.assertEqual(bot.close_trade.call_count, 2)
+
+
+class BotHousekeepingTest(unittest.TestCase):
+    @staticmethod
+    def _bot():
+        return SimpleNamespace(
+            balance=1000.0,
+            log=MagicMock(),
+            day_report_sent=False,
+            daily_backup_done=False,
+            last_ml_health_check=1_000_000.0,
+            last_perf_check=1_000_000.0,
+            _mobile_report_failure_count=0,
+            _mobile_report_retry_after=0.0,
+            _mobile_report_last_success=0.0,
+            _mobile_report_last_error="",
+        )
+
+    def test_mobile_report_failure_is_contained_and_backed_off(self):
+        from core.bot_housekeeping import _send_mobile_report
+
+        bot = self._bot()
+        with (
+            patch("core.bot_housekeeping.time.time", return_value=100.0),
+            patch(
+                "tools.reporter.generate_mobile_report", side_effect=ModuleNotFoundError("reporter")
+            ) as generate,
+            patch("core.bot_housekeeping.append_runtime_metric") as metric,
+        ):
+            self.assertFalse(_send_mobile_report(bot))
+            self.assertFalse(_send_mobile_report(bot))
+
+        generate.assert_called_once_with(1000.0)
+        self.assertEqual(bot._mobile_report_failure_count, 1)
+        self.assertEqual(bot._mobile_report_retry_after, 160.0)
+        self.assertIn("reporter", bot._mobile_report_last_error)
+        metric.assert_called_once()
+        self.assertFalse(metric.call_args.args[1]["ok"])
+
+    def test_periodic_report_failure_does_not_escape_or_advance_timestamp(self):
+        from core.bot_housekeeping import run_periodic_housekeeping
+
+        bot = self._bot()
+        now = datetime(2026, 7, 10, 12, 0)
+        with (
+            patch("core.bot_housekeeping.Config.AUTO_MOBILE_REPORTS_ENABLED", True),
+            patch("core.bot_housekeeping.time.time", return_value=20_000.0),
+            patch("tools.reporter.generate_mobile_report", side_effect=RuntimeError("generation")),
+            patch("core.bot_housekeeping.append_runtime_metric"),
+        ):
+            result = run_periodic_housekeeping(bot, now, 0.0, 20_000.0, 20_000.0)
+
+        self.assertEqual(result[0], 0.0)
+        self.assertEqual(bot._mobile_report_failure_count, 1)
+
+    def test_mobile_report_recovers_after_backoff(self):
+        from core.bot_housekeeping import _send_mobile_report
+
+        bot = self._bot()
+        with (
+            patch("core.bot_housekeeping.time.time", side_effect=[100.0, 161.0]),
+            patch(
+                "tools.reporter.generate_mobile_report",
+                side_effect=[RuntimeError("generation"), "report"],
+            ) as generate,
+            patch("core.bot_housekeeping.send_telegram_msg", return_value=True) as send,
+            patch("core.bot_housekeeping.append_runtime_metric"),
+        ):
+            self.assertFalse(_send_mobile_report(bot))
+            self.assertTrue(_send_mobile_report(bot))
+
+        self.assertEqual(generate.call_count, 2)
+        send.assert_called_once_with("report")
+        self.assertEqual(bot._mobile_report_failure_count, 0)
+        self.assertEqual(bot._mobile_report_retry_after, 0.0)
+        self.assertEqual(bot._mobile_report_last_success, 161.0)
+
+    def test_periodic_reports_can_be_disabled(self):
+        from core.bot_housekeeping import run_periodic_housekeeping
+
+        bot = self._bot()
+        with (
+            patch("core.bot_housekeeping.Config.AUTO_MOBILE_REPORTS_ENABLED", False),
+            patch("core.bot_housekeeping.time.time", return_value=20_000.0),
+            patch("tools.reporter.generate_mobile_report") as generate,
+        ):
+            result = run_periodic_housekeeping(
+                bot, datetime(2026, 7, 10, 12, 0), 0.0, 20_000.0, 20_000.0
+            )
+
+        generate.assert_not_called()
+        self.assertEqual(result, (0.0, 20_000.0, 20_000.0))
+
+    def test_daily_report_success_sets_state_and_timestamp(self):
+        from core.bot_housekeeping import run_periodic_housekeeping
+
+        bot = self._bot()
+        with (
+            patch("core.bot_housekeeping.Config.AUTO_MOBILE_REPORTS_ENABLED", True),
+            patch("core.bot_housekeeping.time.time", return_value=30_000.0),
+            patch("tools.reporter.generate_mobile_report", return_value="report"),
+            patch("core.bot_housekeeping.send_telegram_msg", return_value=True) as send,
+            patch("core.bot_housekeeping.append_runtime_metric"),
+        ):
+            result = run_periodic_housekeeping(
+                bot, datetime(2026, 7, 10, 23, 0), 29_000.0, 30_000.0, 30_000.0
+            )
+
+        send.assert_called_once_with("📅 *REPORTE DE CIERRE DIARIO*\nreport")
+        self.assertTrue(bot.day_report_sent)
+        self.assertEqual(result[0], 30_000.0)
+        self.assertEqual(bot._mobile_report_last_success, 30_000.0)
 
 
 class SymbolControlsTest(unittest.TestCase):

@@ -310,25 +310,206 @@ def _get_db():
 
 
 @app.get("/api/v1/trades")
-def get_trades(limit: int = 100, type: str = "all", _=Depends(verify_key)):
+def get_trades(
+    limit: int = 100,
+    type: str = "all",
+    date: str = "",
+    start: str = "",
+    end: str = "",
+    _=Depends(verify_key),
+):
     limit = _clamp_limit(limit)
     conn = _get_db()
     try:
-        where_clause = ""
-        params: tuple = ()
+        clauses: list[str] = []
+        params: list = []
+
         if type == "real":
-            where_clause = " WHERE is_shadow = ?"
-            params = (0,)
+            clauses.append("is_shadow = ?")
+            params.append(0)
         elif type == "shadow":
-            where_clause = " WHERE is_shadow = ?"
-            params = (1,)
-        total = conn.execute(f"SELECT COUNT(*) FROM trades{where_clause}", params).fetchone()[0]
+            clauses.append("is_shadow = ?")
+            params.append(1)
+
+        if date:
+            clauses.append("substr(timestamp, 1, 10) = ?")
+            params.append(date)
+        elif start and end:
+            clauses.append("timestamp >= ?")
+            params.append(start)
+            clauses.append("timestamp <= ?")
+            params.append(end)
+        elif start:
+            clauses.append("timestamp >= ?")
+            params.append(start)
+        elif end:
+            clauses.append("timestamp <= ?")
+            params.append(end)
+
+        where_clause = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        param_tuple = tuple(params)
+
+        total = conn.execute(f"SELECT COUNT(*) FROM trades{where_clause}", param_tuple).fetchone()[
+            0
+        ]
         rows = conn.execute(
             f"SELECT * FROM trades{where_clause} ORDER BY timestamp DESC LIMIT ?",
-            params + (limit,),
+            param_tuple + (limit,),
         ).fetchall()
         trades = [{k: r[k] for k in r.keys()} for r in rows]
         return {"trades": trades, "total": total}
+    finally:
+        conn.close()
+
+
+@app.get("/api/v1/trades/daily-summary")
+def get_trades_daily_summary(date: str = "", type: str = "all", _=Depends(verify_key)):
+    """Metricas agregadas para un dia exacto. Si no se pasa date, usa hoy UTC."""
+    from datetime import UTC, datetime
+
+    if not date:
+        date = datetime.now(UTC).strftime("%Y-%m-%d")
+
+    conn = _get_db()
+    try:
+        clauses = ["substr(timestamp, 1, 10) = ?"]
+        params: list = [date]
+        if type == "real":
+            clauses.append("is_shadow = ?")
+            params.append(0)
+        elif type == "shadow":
+            clauses.append("is_shadow = ?")
+            params.append(1)
+        where_clause = " WHERE " + " AND ".join(clauses)
+
+        row = conn.execute(
+            f"SELECT COUNT(*), "
+            f"SUM(CASE WHEN pnl_percent > 0 THEN 1 ELSE 0 END), "
+            f"SUM(CASE WHEN pnl_percent <= 0 THEN 1 ELSE 0 END), "
+            f"COALESCE(ROUND(AVG(pnl_percent), 4), 0), "
+            f"COALESCE(ROUND(AVG(CASE WHEN pnl_percent > 0 THEN pnl_percent END), 4), 0), "
+            f"COALESCE(ROUND(AVG(CASE WHEN pnl_percent <= 0 THEN pnl_percent END), 4), 0), "
+            f"COALESCE(ROUND(SUM(pnl), 4), 0), "
+            f"SUM(CASE WHEN reason LIKE '%Hard SL%' THEN 1 ELSE 0 END), "
+            f"SUM(CASE WHEN reason LIKE '%Trailing%' THEN 1 ELSE 0 END), "
+            f"SUM(CASE WHEN reason LIKE '%Time Limit%' THEN 1 ELSE 0 END), "
+            f"COALESCE(ROUND(AVG(mfe_percent), 4), 0), "
+            f"COALESCE(ROUND(AVG(mae_percent), 4), 0) "
+            f"FROM trades{where_clause}",
+            tuple(params),
+        ).fetchone()
+
+        total = int(row[0] or 0)
+        wins = int(row[1] or 0)
+        losses = int(row[2] or 0)
+        avg_pnl = float(row[3] or 0)
+        avg_win = float(row[4] or 0)
+        avg_loss = float(row[5] or 0)
+        pnl_total = float(row[6] or 0)
+        hard_sl = int(row[7] or 0)
+        trailing = int(row[8] or 0)
+        time_limit = int(row[9] or 0)
+        avg_mfe = float(row[10] or 0)
+        avg_mae = float(row[11] or 0)
+
+        shadow_count = conn.execute(
+            f"SELECT COUNT(*) FROM trades{where_clause} AND is_shadow = 1", tuple(params)
+        ).fetchone()[0]
+        real_count = total - shadow_count
+
+        reason_rows = conn.execute(
+            f"SELECT reason, COUNT(*) AS cnt, "
+            f"SUM(CASE WHEN pnl_percent > 0 THEN 1 ELSE 0 END) AS wins "
+            f"FROM trades{where_clause} GROUP BY reason ORDER BY cnt DESC LIMIT 10",
+            tuple(params),
+        ).fetchall()
+        reasons = [
+            {"reason": r[0] or "OTHER", "count": int(r[1]), "wins": int(r[2])} for r in reason_rows
+        ]
+
+        symbol_rows = conn.execute(
+            f"SELECT symbol, COUNT(*) AS cnt, "
+            f"COALESCE(ROUND(AVG(pnl_percent), 4), 0) AS avg_pnl "
+            f"FROM trades{where_clause} GROUP BY symbol ORDER BY cnt DESC LIMIT 10",
+            tuple(params),
+        ).fetchall()
+        symbols = [
+            {"symbol": r[0], "count": int(r[1]), "avg_pnl": float(r[2])} for r in symbol_rows
+        ]
+
+        return {
+            "date": date,
+            "total": total,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": round((wins / total * 100), 1) if total > 0 else 0.0,
+            "avg_pnl": avg_pnl,
+            "avg_win": avg_win,
+            "avg_loss": avg_loss,
+            "pnl_total": pnl_total,
+            "hard_sl": hard_sl,
+            "trailing": trailing,
+            "time_limit": time_limit,
+            "avg_mfe": avg_mfe,
+            "avg_mae": avg_mae,
+            "shadow_count": shadow_count,
+            "real_count": real_count,
+            "reasons": reasons,
+            "symbols": symbols,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/api/v1/trades/calendar")
+def get_trades_calendar(year: int = 0, month: int = 0, type: str = "all", _=Depends(verify_key)):
+    """Agregados por dia para un mes. Defaults a mes actual UTC."""
+    from datetime import UTC, datetime
+
+    now = datetime.now(UTC)
+    year = int(year) if year else now.year
+    month = int(month) if month else now.month
+    if month < 1 or month > 12:
+        month = now.month
+    month_str = f"{year:04d}-{month:02d}"
+
+    conn = _get_db()
+    try:
+        type_clause = ""
+        type_params: list = []
+        if type == "real":
+            type_clause = " AND is_shadow = 0"
+        elif type == "shadow":
+            type_clause = " AND is_shadow = 1"
+
+        rows = conn.execute(
+            "SELECT substr(timestamp, 1, 10) AS day, "
+            "COUNT(*) AS cnt, "
+            "SUM(CASE WHEN pnl_percent > 0 THEN 1 ELSE 0 END) AS wins, "
+            "SUM(CASE WHEN pnl_percent <= 0 THEN 1 ELSE 0 END) AS losses, "
+            "COALESCE(ROUND(SUM(pnl), 4), 0) AS pnl_total, "
+            "COALESCE(ROUND(AVG(pnl_percent), 4), 0) AS avg_pnl, "
+            "SUM(CASE WHEN reason LIKE '%Hard SL%' THEN 1 ELSE 0 END) AS hard_sl "
+            "FROM trades "
+            "WHERE substr(timestamp, 1, 7) = ?" + type_clause + " "
+            "GROUP BY day ORDER BY day ASC",
+            (month_str, *type_params),
+        ).fetchall()
+
+        days = [
+            {
+                "date": r[0],
+                "count": int(r[1]),
+                "wins": int(r[2]),
+                "losses": int(r[3]),
+                "pnl_total": float(r[4]),
+                "avg_pnl": float(r[5]),
+                "hard_sl": int(r[6]),
+                "win_rate": round((int(r[2]) / int(r[1]) * 100), 1) if int(r[1]) > 0 else 0.0,
+            }
+            for r in rows
+        ]
+        return {"year": year, "month": month, "days": days}
     finally:
         conn.close()
 

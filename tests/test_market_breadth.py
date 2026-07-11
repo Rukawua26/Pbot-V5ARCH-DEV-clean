@@ -147,6 +147,7 @@ class MarketBreadthTest(unittest.TestCase):
 
         self.assertEqual(ctx["trend"], "RANGO")
 
+    @patch("core.signals.filters.Config.MARKET_BREADTH_FEAR_FILTER_ENABLED", True)
     @patch("core.signals.filters.Config.BREAKOUT_WATCH_ENABLED", False)
     @patch("core.signals.filters.Strategy.check_entry_filters")
     def test_entry_filter_vetoes_buy_when_market_breadth_is_fear(self, mocked_filters):
@@ -188,6 +189,48 @@ class MarketBreadthTest(unittest.TestCase):
         self.assertFalse(passed)
         self.assertIn("MARKET_BREADTH_FEAR", reason)
         self.assertEqual(updated_ctx["market_breadth_sentiment"], "FEAR")
+
+    @patch("core.signals.filters.Config.MARKET_BREADTH_FEAR_FILTER_ENABLED", False)
+    @patch("core.signals.filters.Config.BREAKOUT_WATCH_ENABLED", False)
+    @patch("core.signals.filters.Strategy.check_entry_filters")
+    def test_entry_filter_allows_buy_when_market_breadth_fear_filter_disabled(self, mocked_filters):
+        mocked_filters.return_value = (True, "Filter Pass", "RANGO", {})
+        bot = SimpleNamespace(
+            db_lock=RLock(),
+            brain=SimpleNamespace(
+                get_genetic_params=MagicMock(return_value={}),
+                get_stats_by_trend=MagicMock(return_value={}),
+            ),
+            log=MagicMock(),
+            _get_shock_distance_pct=MagicMock(return_value=(None, None)),
+            _get_market_regime=MagicMock(return_value="RANGE"),
+            _calculate_quant_consensus=MagicMock(side_effect=lambda prob, _ctx: (prob, "OK")),
+            bootstrap_heuristic_mode=False,
+        )
+        ctx = {
+            "rsi": 55,
+            "adx": 25,
+            "atr_pct": 0.01,
+            "close": 100.0,
+            "atr": 1.0,
+            "trend": "RANGO",
+            "market_breadth_sentiment": "FEAR",
+            "market_breadth_dump_ratio": 0.75,
+        }
+
+        _prob, passed, reason, _updated_ctx = _apply_entry_filters_and_adjust_prob(
+            bot,
+            "BTC/USDT",
+            "BTC/USDT",
+            _df(100, 55, 99),
+            "BUY",
+            80.0,
+            ctx,
+            1.2,
+        )
+
+        self.assertTrue(passed)
+        self.assertNotIn("MARKET_BREADTH_FEAR", reason or "")
 
 
 if __name__ == "__main__":

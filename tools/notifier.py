@@ -4,12 +4,13 @@ SNIPER AI - NOTIFIER MODULE v118.2
 Módulo de notificaciones para Telegram con reintentos y cola.
 """
 
-import time
-import threading
-import queue
 import itertools
-from enum import Enum
+import queue
+import threading
+import time
 from collections.abc import Callable
+from enum import Enum
+
 from config import Config
 from core.telegram_api import sanitize_telegram_error, telegram_post
 
@@ -89,12 +90,9 @@ class NotificationQueue:
                     return True
                 elif response.status_code == 429:  # Rate limited
                     time.sleep(2**attempt)  # Exponential backoff
-                elif (
-                    response.status_code == 400
-                    and (
-                        payload.get("json", {}).get("parse_mode") == "Markdown"
-                        or payload.get("data", {}).get("parse_mode") == "Markdown"
-                    )
+                elif response.status_code == 400 and (
+                    payload.get("json", {}).get("parse_mode") == "Markdown"
+                    or payload.get("data", {}).get("parse_mode") == "Markdown"
                 ):
                     if "json" in payload:
                         fallback_json = dict(payload["json"])
@@ -124,7 +122,7 @@ class NotificationQueue:
 
     def send(self, message, priority=Priority.INFO):
         if not _telegram_configured():
-            return
+            return False
 
         payload = {
             "chat_id": Config.TELEGRAM_CHAT_ID,
@@ -141,6 +139,7 @@ class NotificationQueue:
                 priority,
             )
         )
+        return True
 
     def send_photo(
         self,
@@ -194,9 +193,7 @@ def get_queue():
     global _notifier_queue
     if _notifier_queue is None:
         _notifier_queue = NotificationQueue(
-            rate_limit_seconds=float(
-                getattr(Config, "TELEGRAM_RATE_LIMIT_SECONDS", 1.2) or 1.2
-            )
+            rate_limit_seconds=float(getattr(Config, "TELEGRAM_RATE_LIMIT_SECONDS", 1.2) or 1.2)
         )
     return _notifier_queue
 
@@ -204,9 +201,10 @@ def get_queue():
 def send_telegram_msg(message, priority=Priority.INFO):
     """Envía un mensaje a Telegram con cola y reintentos."""
     try:
-        get_queue().send(message, priority)
+        return bool(get_queue().send(message, priority))
     except Exception as e:
         print(f"⚠️ Telegram Error: {sanitize_telegram_error(e)}")
+        return False
 
 
 def send_telegram_photo(caption, photo_buffer, priority=Priority.INFO):

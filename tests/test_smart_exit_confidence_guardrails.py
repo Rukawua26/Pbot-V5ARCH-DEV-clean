@@ -357,7 +357,7 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         bot.lock = threading.Lock()
         bot.price_lock = threading.Lock()
         bot.active_trades = {"XPL/USDT": trade}
-        bot.live_prices = {"XPLUSDT": 0.998}
+        bot.live_prices = {"XPLUSDT": 0.999}
         bot.log = MagicMock()
         bot.close_trade = MagicMock()
         bot.sync_wallet = MagicMock()
@@ -365,7 +365,7 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         bot._exit_eval_last_log = {}
         bot.ghost_model = None
         bot.ghost_model_type = None
-        bot.execution = SimpleNamespace(fetch_ticker=MagicMock(return_value={"last": 0.998}))
+        bot.execution = SimpleNamespace(fetch_ticker=MagicMock(return_value={"last": 0.999}))
         bot.exit_engine = SimpleNamespace(
             evaluate_exit=MagicMock(return_value={"should_exit": False, "reason": "HOLD"})
         )

@@ -122,9 +122,9 @@ class BootAndNotifierTest(unittest.TestCase):
     def test_notification_queue_keeps_fifo_inside_priority(self, _mocked_thread):
         queue = NotificationQueue(max_retries=1, rate_limit_seconds=0)
         queue.running = False
-        queue.send("first", Priority.INFO)
-        queue.send("critical", Priority.CRITICAL)
-        queue.send("second", Priority.INFO)
+        self.assertTrue(queue.send("first", Priority.INFO))
+        self.assertTrue(queue.send("critical", Priority.CRITICAL))
+        self.assertTrue(queue.send("second", Priority.INFO))
 
         first_item = queue.queue.get_nowait()
         second_item = queue.queue.get_nowait()
@@ -145,8 +145,8 @@ class BootAndNotifierTest(unittest.TestCase):
         queue = NotificationQueue(max_retries=1, rate_limit_seconds=0)
         queue.running = False
 
-        queue.send("first", Priority.INFO)
-        queue.send("second", Priority.INFO)
+        self.assertFalse(queue.send("first", Priority.INFO))
+        self.assertFalse(queue.send("second", Priority.INFO))
 
         self.assertEqual(mocked_print.call_count, 1)
         self.assertIn("Telegram no configurado", mocked_print.call_args.args[0])

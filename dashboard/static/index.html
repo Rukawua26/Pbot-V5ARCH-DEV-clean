@@ -462,11 +462,49 @@
                     <div class="p-4 pb-2 flex flex-wrap items-center gap-3">
                         <h2 class="font-bold text-sm uppercase tracking-wider">📊 Historial de Trades</h2>
                         <div style="display:flex;gap:4px;">
-                            <button class="btn-filter active" onclick="setTradeFilter('all')">ALL <span class="text-muted" style="font-size:9px;">(473)</span></button>
-                            <button class="btn-filter" onclick="setTradeFilter('shadow')">SHADOW <span class="text-muted" style="font-size:9px;">(471)</span></button>
-                            <button class="btn-filter" onclick="setTradeFilter('real')">REAL <span class="text-muted" style="font-size:9px;">(2)</span></button>
+                            <button class="btn-filter active" onclick="setTradeFilter('all')">ALL</button>
+                            <button class="btn-filter" onclick="setTradeFilter('shadow')">SHADOW</button>
+                            <button class="btn-filter" onclick="setTradeFilter('real')">REAL</button>
+                        </div>
+                        <div style="display:flex;gap:4px;margin-left:auto;align-items:center;flex-wrap:wrap;">
+                            <span class="text-[10px] text-muted uppercase tracking-wider">Vista:</span>
+                            <button class="btn-filter active" id="btn-mode-historico" onclick="setTradeMode('historico')">Histórico</button>
+                            <button class="btn-filter" id="btn-mode-dia" onclick="setTradeMode('dia')">Por Día</button>
                         </div>
                     </div>
+
+                    <!-- Panel de dia (visible solo en modo dia) -->
+                    <div id="day-panel" style="display:none;" class="px-4 pb-3">
+                        <div class="panel p-3">
+                            <!-- Barra de fechas rapidas -->
+                            <div class="flex flex-wrap gap-2 items-center mb-3">
+                                <button class="btn-filter" onclick="loadDayOffset(0)">Hoy</button>
+                                <button class="btn-filter" onclick="loadDayOffset(1)">Ayer</button>
+                                <button class="btn-filter" onclick="loadDayOffset(2)">-2d</button>
+                                <button class="btn-filter" onclick="loadDayOffset(7)">-7d</button>
+                                <input id="day-picker" type="date" class="input-lite" style="width:auto;min-width:150px;" onchange="loadDayPicker()" />
+                            </div>
+
+                            <!-- Calendario mensual colapsable -->
+                            <div class="flex items-center gap-2 mb-2">
+                                <button class="btn-filter" onclick="toggleCalendar()">📅 Calendario</button>
+                                <span id="cal-month-label" class="text-[11px] text-muted mono"></span>
+                            </div>
+                            <div id="calendar-wrap" style="display:none;">
+                                <div class="flex items-center justify-between mb-2">
+                                    <button class="btn-filter" onclick="changeCalendarMonth(-1)">◀</button>
+                                    <span id="cal-title" class="text-sm font-bold text-theme"></span>
+                                    <button class="btn-filter" onclick="changeCalendarMonth(1)">▶</button>
+                                </div>
+                                <div id="calendar-grid" class="grid grid-cols-7 gap-1 text-center" style="font-size:11px;"></div>
+                            </div>
+
+                            <!-- Metricas del dia -->
+                            <div id="day-summary-cards" style="margin-top:12px;" class="grid grid-cols-3 lg:grid-cols-6 gap-2"></div>
+                            <div id="day-reasons" style="margin-top:10px;" class="flex flex-wrap gap-1"></div>
+                        </div>
+                    </div>
+
                     <div class="px-4 pb-0">
                         <div id="trade-summary-cards" class="grid grid-cols-5 gap-2 mb-3"></div>
                     </div>
@@ -592,7 +630,8 @@
     <script>
         var API = '/api/v1'; var H = {};
         var tradeChartInstance = null, equityChartInstance = null, consensusChartInstance = null;
-        var tradeFilter = 'all';
+        var tradeFilter = 'all', tradeMode = 'historico', selectedTradeDate = todayIso();
+        var calendarCursor = new Date();
         var radarFilter = 'all', lastRadar = [];
         var consensusFilter = 'all', lastConsensusRounds = [];
         var tradeAllCount = 473, tradeShadowCount = 471, tradeRealCount = 2;
@@ -915,19 +954,123 @@
         }
 
         /* ===== TRADES ===== */
+        function todayIso() {
+            var d = new Date();
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().slice(0, 10);
+        }
+
+        function dateOffsetIso(daysAgo) {
+            var d = new Date();
+            d.setDate(d.getDate() - daysAgo);
+            d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+            return d.toISOString().slice(0, 10);
+        }
+
         function setTradeFilter(t) {
             tradeFilter=t;
-            document.querySelectorAll('#tab-trades .btn-filter, [data-pane="trades"] .btn-filter').forEach(function(b){
-                b.classList.toggle('active',b.textContent.trim().toLowerCase().startsWith(t));
+            document.querySelectorAll('[data-pane="trades"] .btn-filter').forEach(function(b){
+                var label=b.textContent.trim().toLowerCase();
+                if(['all','shadow','real'].some(function(x){return label.startsWith(x);})) b.classList.toggle('active',label.startsWith(t));
             });
             fetchTrades();
         }
 
+        function setTradeMode(mode) {
+            tradeMode = mode;
+            document.getElementById('btn-mode-historico').classList.toggle('active', mode === 'historico');
+            document.getElementById('btn-mode-dia').classList.toggle('active', mode === 'dia');
+            document.getElementById('day-panel').style.display = mode === 'dia' ? 'block' : 'none';
+            var input = document.getElementById('day-picker');
+            if (input && !input.value) input.value = selectedTradeDate;
+            fetchTrades();
+        }
+
+        function loadDayOffset(daysAgo) {
+            selectedTradeDate = dateOffsetIso(daysAgo);
+            var input = document.getElementById('day-picker');
+            if (input) input.value = selectedTradeDate;
+            setTradeMode('dia');
+        }
+
+        function loadDayPicker() {
+            var input = document.getElementById('day-picker');
+            selectedTradeDate = input && input.value ? input.value : todayIso();
+            setTradeMode('dia');
+        }
+
+        function toggleCalendar() {
+            var wrap = document.getElementById('calendar-wrap');
+            wrap.style.display = wrap.style.display === 'none' ? 'block' : 'none';
+            if (wrap.style.display === 'block') fetchCalendar();
+        }
+
+        function changeCalendarMonth(delta) {
+            calendarCursor.setMonth(calendarCursor.getMonth() + delta);
+            fetchCalendar();
+        }
+
         function fetchTrades() {
             if(!hasApiKey())return;
-            fetch(API+'/trades?limit=100&type='+tradeFilter,{headers:H}).then(function(r){if(!r.ok)return;r.json().then(function(d){
+            var url = API+'/trades?limit=300&type='+tradeFilter;
+            if (tradeMode === 'dia') url += '&date=' + encodeURIComponent(selectedTradeDate);
+            fetch(url,{headers:H}).then(function(r){if(!r.ok)return;r.json().then(function(d){
                 var tr=d.trades||[]; renderTradeTable(tr); renderTradeChart(tr); renderTradeSummary(tr,d.total);
+                if (tradeMode === 'dia') { fetchDailySummary(); fetchCalendar(); }
             })}).catch(function(e){console.error(e);});
+        }
+
+        function fetchDailySummary() {
+            fetch(API+'/trades/daily-summary?date='+encodeURIComponent(selectedTradeDate)+'&type='+tradeFilter,{headers:H}).then(function(r){if(!r.ok)return;r.json().then(function(s){
+                renderDailySummary(s || {});
+            })}).catch(function(e){console.error(e);});
+        }
+
+        function fetchCalendar() {
+            var y = calendarCursor.getFullYear(), m = calendarCursor.getMonth() + 1;
+            document.getElementById('cal-month-label').textContent = y + '-' + String(m).padStart(2,'0');
+            fetch(API+'/trades/calendar?year='+y+'&month='+m+'&type='+tradeFilter,{headers:H}).then(function(r){if(!r.ok)return;r.json().then(function(d){
+                renderCalendar(d || {year:y,month:m,days:[]});
+            })}).catch(function(e){console.error(e);});
+        }
+
+        function renderDailySummary(s) {
+            var el=document.getElementById('day-summary-cards');
+            var total=Number(s.total||0), wr=Number(s.win_rate||0), pnl=Number(s.pnl_total||0), hard=Number(s.hard_sl||0);
+            el.innerHTML='<div class="stat-card"><div class="val glow-blue">'+total+'</div><div class="lbl">Trades '+esc(s.date||selectedTradeDate)+'</div></div>'+ 
+                '<div class="stat-card"><div class="val '+(wr>=45?'glow-green':'glow-red')+'">'+wr.toFixed(1)+'%</div><div class="lbl">Win Rate</div></div>'+ 
+                '<div class="stat-card"><div class="val '+(pnl>=0?'glow-green':'glow-red')+'">'+fm$(pnl)+'</div><div class="lbl">PnL Día</div></div>'+ 
+                '<div class="stat-card"><div class="val '+(hard? 'glow-red':'glow-green')+'">'+hard+'</div><div class="lbl">Hard SL</div></div>'+ 
+                '<div class="stat-card"><div class="val glow-green">'+fmtP(Number(s.avg_mfe||0))+'</div><div class="lbl">Avg MFE</div></div>'+ 
+                '<div class="stat-card"><div class="val glow-red">'+fmtP(Number(s.avg_mae||0))+'</div><div class="lbl">Avg MAE</div></div>';
+            var reasons=s.reasons||[], symbols=s.symbols||[];
+            document.getElementById('day-reasons').innerHTML =
+                (reasons.length?reasons.map(function(r){return '<span class="badge badge-blue">'+esc(r.reason).slice(0,34)+': '+Number(r.count||0)+'</span>';}).join(''):'<span class="text-xs text-muted">Sin razones de salida para este día</span>')+
+                (symbols.length?' <span class="text-xs text-muted ml-2">Top: '+esc(symbols.slice(0,4).map(function(x){return x.symbol+'('+x.count+')';}).join(', '))+'</span>':'');
+        }
+
+        function renderCalendar(data) {
+            var grid=document.getElementById('calendar-grid'), year=Number(data.year), month=Number(data.month)-1;
+            var title=new Date(year,month,1).toLocaleDateString('es',{month:'long',year:'numeric'});
+            document.getElementById('cal-title').textContent=title;
+            var byDate={}; (data.days||[]).forEach(function(d){byDate[d.date]=d;});
+            var first=new Date(year,month,1), startDay=(first.getDay()+6)%7, daysInMonth=new Date(year,month+1,0).getDate();
+            var html=['L','M','X','J','V','S','D'].map(function(x){return '<div class="text-muted" style="padding:4px;">'+x+'</div>';}).join('');
+            for(var i=0;i<startDay;i++) html+='<div></div>';
+            for(var day=1;day<=daysInMonth;day++){
+                var iso=year+'-'+String(month+1).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+                var d=byDate[iso], pnl=d?Number(d.pnl_total||0):0, cls=pnl>0?'rgba(57,255,20,0.12)':pnl<0?'rgba(255,0,85,0.12)':'var(--inset-bg)';
+                var border=iso===selectedTradeDate?'var(--neon-blue)':'var(--border-panel)';
+                html+='<button class="calendar-day" onclick="selectCalendarDate(\''+iso+'\')" style="border:1px solid '+border+';background:'+cls+';color:var(--text);border-radius:10px;padding:7px 4px;min-height:54px;cursor:pointer;">'+
+                    '<div class="font-bold">'+day+'</div><div class="mono text-[10px]">'+(d?Number(d.count||0)+' ops':'')+'</div><div class="mono text-[10px] '+(pnl>=0?'text-emerald-400':'text-rose-400')+'">'+(d?fm$(pnl):'')+'</div></button>';
+            }
+            grid.innerHTML=html;
+        }
+
+        function selectCalendarDate(iso) {
+            selectedTradeDate=iso;
+            document.getElementById('day-picker').value=iso;
+            setTradeMode('dia');
         }
 
         function renderTradeTable(arr) {
@@ -947,7 +1090,8 @@
 
         function renderTradeChart(arr) {
             var can=document.getElementById('tradeChart');
-            if(!can||!arr||!arr.length)return;
+            if(!can)return;
+            if(!arr||!arr.length){if(tradeChartInstance){tradeChartInstance.destroy();tradeChartInstance=null;}return;}
             if(tradeChartInstance){tradeChartInstance.destroy();tradeChartInstance=null;}
             var lab=arr.map(function(t,i){return'#'+(arr.length-i);}).reverse();
             var val=arr.map(function(t){return Number(t.pnl_percent||0);}).reverse();

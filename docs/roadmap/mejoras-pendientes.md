@@ -277,7 +277,141 @@ Orden de ejecucion obligatorio:
 3. Sprint 3: genetica batch. IMPLEMENTADO.
 4. Sprint 4: triage 2x + telemetria slope comparativa. IMPLEMENTADO.
 
-### 8. Dashboard Votos / Consenso — Mejora visual y explicabilidad
+### 8. Medicion y validacion SHADOW de optimizaciones cuantitativas
+
+Estado: pendiente de implementar y ejecutar.
+
+Objetivo: crear una capa minima de metricas y validacion que permita confirmar, con evidencia, si los Sprints 1-4 realmente mejoraron el bot antes de seguir ajustando thresholds o activar nuevas automatizaciones.
+
+Que debe permitir verificar:
+
+1. Si `RISK_REWARD_VETO` mejora la calidad de trades aceptados.
+2. Si `CHEAP_PREFILTER_VETO` reduce costo de scan sin perder senales validas.
+3. Si `GENETIC_BATCH` no degrada main loop ni WebSocket.
+4. Si la comparacion `ema50_slope` lookback `2` vs `4` aporta senal util o solo ruido.
+5. Si FVG, macro y consenso anaden informacion incremental real.
+
+Entregables minimos:
+
+1. Metricas SHADOW visibles y exportables.
+2. Reporte resumido por campana.
+3. Criterios de aceptacion objetivos por bloque.
+4. Checklist de cierre para decidir por mejora: `KEEP`, `TUNE`, `ROLLBACK` o `PROMOTE_TO_NEXT_PHASE`.
+
+Metricas minimas requeridas:
+
+1. `rrr_veto_rate_pct`
+2. `accepted_trade_avg_rrr`
+3. `scan_cycle_latency_ms`
+4. `cheap_prefilter_veto_rate_pct`
+5. `heavy_analysis_calls_per_cycle`
+6. `genetic_batch_runs`
+7. `genetic_batch_avg_duration_ms`
+8. `loop_stall_events`
+9. `ema_slope_2_vs_4_disagreement_rate`
+10. `macro_veto_rate_pct`
+11. `macro_boost_rate_pct`
+12. `shadow_winrate`
+13. `avg_win`
+14. `avg_loss`
+15. `drawdown_shadow`
+
+Criterio de cierre:
+
+1. Existe campana SHADOW con muestra suficiente.
+2. Existe reporte legible por campana.
+3. Existe decision documentada por bloque:
+    - RRR.
+    - pre-filtros.
+    - genetica batch.
+    - slope comparativo.
+    - macro/FVG/consenso.
+
+Resultado esperado al cerrar:
+
+1. Saber que optimizaciones se mantienen.
+2. Saber cuales requieren tuning.
+3. Saber cuales deben revertirse.
+4. Saber si ya hay base para pasar a Auto-Replication.
+
+Implementacion sugerida en fases:
+
+#### Fase 1 — Campana SHADOW de medicion
+
+Estado: pendiente hasta tener datos medidos de la campana SHADOW.
+
+Objetivo: decidir ajustes e implementaciones nuevas con evidencia, no por intuicion.
+
+1. Ejecutar PAPER/SHADOW con:
+    - `FVG_TRACKER_ENABLED=true`
+    - `GLOBAL_MARKET_PROVIDER_ENABLED=true`
+    - `SHADOW_VALIDATION_ENABLED=true`
+2. Medir durante 48h a 7 dias:
+    - impacto real de `RISK_REWARD_VETO`.
+    - latencia media del ciclo tras `CHEAP_PREFILTER_VETO`.
+    - si `GENETIC_BATCH` afecta main loop o WebSocket.
+    - comparacion pasiva `ema50_slope` lookback `2` vs `4`.
+3. Generar reporte con `tools/shadow_validation_report.py`.
+4. Criterio de salida:
+    - evidencia estadistica suficiente.
+    - sin degradacion runtime.
+    - sin timeouts anomalos.
+
+#### Fase 2 — Ajuste fino con evidencia
+
+1. Revisar thresholds macro:
+    - `fear<20` veto.
+    - `btc_dominance>65` boost.
+2. Revisar consenso/trailing:
+    - `agent_override_rate_pct`.
+    - winrate SHADOW.
+    - avg win / avg loss.
+3. Ajustar solo con muestra cerrada suficiente:
+    - `MIN_RISK_REWARD_RATIO`.
+    - `RISK_REWARD_HIGH_VOL_MIN_RATIO`.
+    - `SIGNAL_AGENT_OVERRIDE_THRESHOLD`.
+    - multiplicadores de trailing.
+4. Criterio de salida:
+    - WR SHADOW >45%.
+    - mejor relacion avg win / avg loss.
+    - sin subir drawdown.
+
+#### Fase 3 — Dashboard y operacion local
+
+1. Decidir si se usara el dashboard API.
+2. Si se usa:
+    - definir `SNIPER_API_KEY` segura.
+    - documentarla en `.env.example` si aplica.
+3. Si no se usa:
+    - apagar inicio del API o silenciar warning.
+4. Mantener auditoria read-only de votos, consenso y vetos por simbolo.
+
+#### Fase 4 — Auto-Replication de estrategias ganadoras
+
+1. Precondiciones:
+    - al menos 1 semana de datos SHADOW utiles en `trade_context_snapshots`.
+    - minimo 20 muestras cerradas relevantes.
+2. Validar primero que agregar macro al vector de similitud mejora correlacion.
+3. Implementar replica solo en SHADOW:
+    - `REPLICATION_ENABLED`.
+    - `REPLICATION_MODE=shadow`.
+    - `REPLICATION_MIN_WINNERS`.
+    - `REPLICATION_MIN_SIMILARITY`.
+4. Insertar logica post-similarity-search en `core/trade_entry.py`.
+5. Registrar eventos y veto visible en radar/dashboard.
+6. Criterio de salida:
+    - WR replicado >65%.
+    - no saltarse filtros macro ni riesgo.
+    - no tocar `REAL`.
+
+Prioridad recomendada:
+
+1. Campana SHADOW de medicion.
+2. Ajuste fino de thresholds.
+3. Dashboard/operacion local.
+4. Auto-Replication solo si la evidencia lo justifica.
+
+### 9. Dashboard Votos / Consenso — Mejora visual y explicabilidad
 
 Estado: implementado localmente, pendiente de commit/cierre.
 
@@ -329,3 +463,20 @@ Pendiente opcional:
 1. Commit de la mejora visual junto con este roadmap.
 2. Captura visual post-cambio para comparar antes/despues.
 3. Si el usuario lo desea, agregar tooltip detallado por punto del grafico con `symbol`, `side`, `status`, `reason` y `prob_final`.
+
+### 10. Plan de Reparacion de Edge — EN PROGRESO
+
+Diagnostico: el bot es selectivo en volumen pero no efectivo. Winrate SHADOW 26.5%, avg pnl -2.06%. La selectividad no esta filtrando edge real; esta filtrando por restricciones (bootstrap + filtros duros). Causas raiz probables: (1) ausencia de modelo ML cargo, (2) sobre-filtrado, (3) score mal calibrado, (4) sin edge en RANGE.
+
+Plan completo en `docs/runbooks/plan-reparacion-edge.md`.
+
+Fases:
+0. Congelar diagnostico base — COMPLETADO.
+1. Salir de bootstrap — PENDIENTE.
+2. Rankear filtros — PENDIENTE.
+3. Confirmar entrada vs salida — PENDIENTE.
+4. Calibrar score — PENDIENTE.
+5. Edge por regimen — PENDIENTE.
+6. Experimentos controlados A/B — PENDIENTE.
+
+Criterio de exito: winrate SHADOW mejorado, buckets altos de confianza ganan mas que bajos, menos trades en Hard SL, no pasar a REAL hasta cumplir todo.
