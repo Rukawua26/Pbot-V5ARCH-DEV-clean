@@ -420,6 +420,83 @@ class TestCloseTradeRealFailurePath(unittest.TestCase):
             ANY,
         )
 
+    @patch("core.trade_exit.time.sleep", return_value=None)
+    @patch("core.trade_exit.append_execution_event")
+    @patch("core.trade_exit.send_telegram_msg")
+    @patch("core.trade_exit._order_looks_filled", return_value=False)
+    @patch("core.trade_exit._exchange_position_is_flat", return_value=False)
+    def test_unclassified_exception_without_filled_order_halts(
+        self, _flat, _filled, _tg, append_event, _sleep
+    ):
+        """Excepción no clasificada + order no filled debe activar HALT (fail-safe)."""
+        from core.trade_exit import close_trade
+        from core.trade_state import TradeStatus
+
+        bot = self._bot()
+        # Forzamos excepción genérica no clasificada (sin 'notional' ni 'insufficient')
+        bot.execution.close_position = MagicMock(
+            side_effect=RuntimeError("connection reset by peer")
+        )
+        with patch.object(Config, "PAPER_MODE", False):
+            close_trade(bot, "BTC/USDT", "MANUAL_CLOSE", 50100.0)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        self.assertEqual(bot.active_trades["BTC/USDT"]["status"], TradeStatus.EXIT_STUCK.value)
+        append_event.assert_any_call(bot, "REAL_CLOSE_FAILED_HALT", ANY)
+
+    @patch("core.trade_exit.time.sleep", return_value=None)
+    @patch("core.trade_exit.append_execution_event")
+    @patch("core.trade_exit.send_telegram_msg")
+    @patch("core.trade_exit._order_looks_filled", return_value=True)
+    @patch("core.trade_exit._exchange_position_is_flat", return_value=True)
+    def test_unclassified_exception_with_filled_and_flat_does_not_halt(
+        self, _flat, _filled, _tg, append_event, _sleep
+    ):
+        """Excepción genérica + order filled + posición plana NO debe HALT (cierre válido)."""
+        from core.trade_exit import close_trade
+
+        bot = self._bot()
+        bot.execution.close_position = MagicMock(
+            return_value={"id": "close-1", "status": "closed", "filled": 0.001}
+        )
+        # Excepción genérica posterior al close (ej. falla un télem)
+        bot.execution.fetch_my_trades = MagicMock(side_effect=RuntimeError("telemetry error"))
+        # Aserciones de cierre: debe completar la rama de éxito y NO activar HALT.
+        with patch.object(Config, "PAPER_MODE", False):
+            # No debe lanzar excepción no controlada y debe borrar el trade activo
+            try:
+                close_trade(bot, "BTC/USDT", "MANUAL_CLOSE", 51000.0)
+            except Exception:
+                pass  # fetch_my_trades falla internamente con log, no propaga
+        self.assertFalse(bot.is_paused or bot.integrity_lock_active or bot.halt_system_active)
+        # No se emitió REAL_CLOSE_FAILED_HALT
+        for call in append_event.call_args_list:
+            self.assertNotEqual(call.args[1], "REAL_CLOSE_FAILED_HALT")
+
+    @patch("core.trade_exit.time.sleep", return_value=None)
+    @patch("core.trade_exit.append_execution_event")
+    @patch("core.trade_exit.send_telegram_msg")
+    @patch("core.trade_exit._order_looks_filled", return_value=True)
+    @patch("core.trade_exit._exchange_position_is_flat", return_value=False)
+    def test_unclassified_exception_filled_but_not_flat_halts(
+        self, _flat, _filled, _tg, append_event, _sleep
+    ):
+        """Orden filled pero posición NO plana tras excepción genérica debe HALT."""
+        from core.trade_exit import close_trade
+        from core.trade_state import TradeStatus
+
+        bot = self._bot()
+        # Close lanza excepción genérica; la orden reporta filled pero la posición sigue viva
+        bot.execution.close_position = MagicMock(side_effect=RuntimeError("partial timeout"))
+        with patch.object(Config, "PAPER_MODE", False):
+            close_trade(bot, "BTC/USDT", "MANUAL_CLOSE", 50100.0)
+
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.halt_system_active)
+        self.assertEqual(bot.active_trades["BTC/USDT"]["status"], TradeStatus.EXIT_STUCK.value)
+
 
 class TestCloseTradeRealSuccessPath(unittest.TestCase):
     def _bot(self, trade_overrides=None, stagnation=None):
