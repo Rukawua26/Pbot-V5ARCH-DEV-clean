@@ -204,6 +204,10 @@ def init_realtime_and_monitoring(
     bot.last_market_update = 0
     bot.last_pm_check = 0
     bot.day_report_sent = False
+    bot._mobile_report_failure_count = 0
+    bot._mobile_report_retry_after = 0.0
+    bot._mobile_report_last_success = 0.0
+    bot._mobile_report_last_error = ""
     bot.daily_backup_done = False
     bot.last_cache_save = monotonic_now()
     bot._api_weight_logged_time = monotonic_now()

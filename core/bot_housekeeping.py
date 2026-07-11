@@ -2,17 +2,71 @@ import subprocess
 import sys
 import time
 
+from config import Config
 from core.model_loader import ROOT, resolve_script_path
+from core.runtime_metrics import append_runtime_metric
 from tools.notifier import send_telegram_msg
 
 
-def run_periodic_housekeeping(bot, now, last_report_time, last_coach_time, last_log_check):
-    if now.hour == 23 and now.minute == 0 and not getattr(bot, "day_report_sent", False):
-        bot.log("📊 Enviando reporte diario 23:00...")
-        from reporter import generate_mobile_report
+def _send_mobile_report(bot, *, prefix="", log_message="") -> bool:
+    now_ts = time.time()
+    retry_after = float(getattr(bot, "_mobile_report_retry_after", 0.0) or 0.0)
+    if now_ts < retry_after:
+        return False
 
-        send_telegram_msg("📅 *REPORTE DE CIERRE DIARIO*\n" + generate_mobile_report(bot.balance))
-        bot.day_report_sent = True
+    if log_message:
+        bot.log(log_message)
+
+    try:
+        from tools.reporter import generate_mobile_report
+
+        report = generate_mobile_report(bot.balance)
+        if not send_telegram_msg(prefix + report):
+            raise RuntimeError("Telegram report was not queued")
+    except Exception as error:
+        failures = int(getattr(bot, "_mobile_report_failure_count", 0) or 0) + 1
+        retry_seconds = min(3600, 60 * (2 ** min(failures - 1, 6)))
+        bot._mobile_report_failure_count = failures
+        bot._mobile_report_retry_after = now_ts + retry_seconds
+        bot._mobile_report_last_error = str(error)[:180]
+        bot.log(
+            f"⚠️ Reporte móvil falló; reintento en {retry_seconds}s: {bot._mobile_report_last_error}"
+        )
+        append_runtime_metric(
+            "mobile_report",
+            {
+                "ok": False,
+                "failure_count": failures,
+                "retry_seconds": retry_seconds,
+                "error_type": type(error).__name__,
+                "error": bot._mobile_report_last_error,
+            },
+        )
+        return False
+
+    bot._mobile_report_failure_count = 0
+    bot._mobile_report_retry_after = 0.0
+    bot._mobile_report_last_success = now_ts
+    bot._mobile_report_last_error = ""
+    append_runtime_metric("mobile_report", {"ok": True})
+    return True
+
+
+def run_periodic_housekeeping(bot, now, last_report_time, last_coach_time, last_log_check):
+    reports_enabled = bool(getattr(Config, "AUTO_MOBILE_REPORTS_ENABLED", True))
+    if (
+        reports_enabled
+        and now.hour == 23
+        and now.minute == 0
+        and not getattr(bot, "day_report_sent", False)
+    ):
+        if _send_mobile_report(
+            bot,
+            prefix="📅 *REPORTE DE CIERRE DIARIO*\n",
+            log_message="📊 Enviando reporte diario 23:00...",
+        ):
+            bot.day_report_sent = True
+            last_report_time = time.time()
     if now.hour == 0:
         bot.day_report_sent = False
 
@@ -28,13 +82,9 @@ def run_periodic_housekeeping(bot, now, last_report_time, last_coach_time, last_
     if now.hour == 1:
         bot.daily_backup_done = False
 
-    if time.time() - last_report_time > (4 * 3600):
-        bot.log("📱 Enviando reporte móvil automático...")
-        from reporter import generate_mobile_report
-
-        rep = generate_mobile_report(bot.balance)
-        send_telegram_msg(rep)
-        last_report_time = time.time()
+    if reports_enabled and time.time() - last_report_time > (4 * 3600):
+        if _send_mobile_report(bot, log_message="📱 Enviando reporte móvil automático..."):
+            last_report_time = time.time()
 
     if time.time() - last_coach_time > 3600:
         try:

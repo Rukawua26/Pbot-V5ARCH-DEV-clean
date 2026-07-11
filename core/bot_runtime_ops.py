@@ -2,13 +2,24 @@ import time
 
 import ccxt
 
+from config import Config
+
 
 def heartbeat_loop(bot):
+    init_complete = getattr(bot, "init_complete", None)
+    if init_complete is not None:
+        init_complete.wait()
+
     while bot.is_running:
         exchange = bot.execution.exchange  # Copia local para evitar condición de carrera
         if exchange is not None:
             try:
-                exchange.fetch_status()
+                if bool(getattr(Config, "PAPER_MODE", True)) and bool(
+                    getattr(Config, "USE_TESTNET", False)
+                ):
+                    bot.execution.fetch_ticker("BTC/USDT")
+                else:
+                    exchange.fetch_status()
                 bot.api_status = "🟢 ONLINE"
             except (ccxt.NetworkError, ccxt.ExchangeError) as error:
                 bot.api_status = "🔴 OFFLINE"
