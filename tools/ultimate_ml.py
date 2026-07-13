@@ -105,9 +105,14 @@ class UltimateMLSystem:
         print("\n📈 CLASIFICADORES (Dirección):")
 
         xgb_c = XGBClassifier(
-            n_estimators=200,
-            max_depth=6,
+            n_estimators=100,
+            max_depth=3,
             learning_rate=0.05,
+            min_child_weight=10,
+            subsample=0.75,
+            colsample_bytree=0.70,
+            reg_alpha=0.5,
+            reg_lambda=5.0,
             random_state=42,
             use_label_encoder=False,
             eval_metric="logloss",
@@ -119,9 +124,15 @@ class UltimateMLSystem:
         self.clf_models["xgb"] = xgb_c
 
         lgb_c = LGBMClassifier(
-            n_estimators=200,
-            max_depth=6,
+            n_estimators=100,
+            max_depth=3,
+            num_leaves=7,
+            min_child_samples=25,
             learning_rate=0.05,
+            subsample=0.75,
+            colsample_bytree=0.70,
+            reg_alpha=0.5,
+            reg_lambda=5.0,
             random_state=42,
             verbose=-1,
             class_weight={0: 1.0, 1: pos_weight},
@@ -132,9 +143,12 @@ class UltimateMLSystem:
         self.clf_models["lgb"] = lgb_c
 
         rf_c = RandomForestClassifier(
-            n_estimators=200,
-            max_depth=10,
-            class_weight={0: 1.0, 1: pos_weight},
+            n_estimators=300,
+            max_depth=4,
+            min_samples_split=20,
+            min_samples_leaf=10,
+            max_features="sqrt",
+            class_weight="balanced_subsample",
             random_state=42,
             n_jobs=-1,
         )
@@ -147,7 +161,18 @@ class UltimateMLSystem:
 
         cv_reg = TimeSeriesSplit(n_splits=5)
 
-        xgb_r = XGBRegressor(n_estimators=200, max_depth=6, learning_rate=0.05, random_state=42)
+        xgb_r = XGBRegressor(
+            n_estimators=100,
+            max_depth=3,
+            learning_rate=0.05,
+            min_child_weight=10,
+            subsample=0.75,
+            colsample_bytree=0.70,
+            reg_alpha=0.5,
+            reg_lambda=5.0,
+            objective="reg:pseudohubererror",
+            random_state=42,
+        )
         r2 = cross_val_score(xgb_r, X, y_regress, cv=cv_reg, scoring="r2").mean()
         rmse = np.sqrt(
             -cross_val_score(
@@ -159,9 +184,16 @@ class UltimateMLSystem:
         self.reg_models["xgb"] = xgb_r
 
         lgb_r = LGBMRegressor(
-            n_estimators=200,
-            max_depth=6,
+            n_estimators=100,
+            max_depth=3,
+            num_leaves=7,
+            min_child_samples=25,
             learning_rate=0.05,
+            subsample=0.75,
+            colsample_bytree=0.70,
+            reg_alpha=0.5,
+            reg_lambda=5.0,
+            objective="huber",
             random_state=42,
             verbose=-1,
         )
@@ -175,7 +207,16 @@ class UltimateMLSystem:
         lgb_r.fit(X, y_regress)
         self.reg_models["lgb"] = lgb_r
 
-        rf_r = RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42, n_jobs=-1)
+        rf_r = RandomForestRegressor(
+            n_estimators=300,
+            max_depth=4,
+            min_samples_split=20,
+            min_samples_leaf=10,
+            max_features="sqrt",
+            criterion="absolute_error",
+            random_state=42,
+            n_jobs=-1,
+        )
         r2 = cross_val_score(rf_r, X, y_regress, cv=cv_reg, scoring="r2").mean()
         rmse = np.sqrt(
             -cross_val_score(rf_r, X, y_regress, cv=cv_reg, scoring="neg_mean_squared_error").mean()

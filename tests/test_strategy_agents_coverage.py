@@ -144,7 +144,15 @@ class GhostAgentCoverageTest(unittest.TestCase):
         from core.strategy.agents.ghost_agent import GhostAgent
 
         row = GhostAgent()._build_feature_row(
-            ["rsi", "adx", "vol_rel", "btc_delta_5m", "funding_rate", "unknown"],
+            [
+                "rsi",
+                "adx",
+                "vol_rel",
+                "btc_delta_tf",
+                "btc_delta_5m",
+                "funding_rate",
+                "unknown",
+            ],
             rsi=55,
             adx=25,
             vol_rel=1.4,
@@ -152,10 +160,11 @@ class GhostAgentCoverageTest(unittest.TestCase):
             atr_pct=0.02,
             funding_rate=0.0003,
         )
-        self.assertEqual(row.shape, (1, 6))
+        self.assertEqual(row.shape, (1, 7))
         self.assertEqual(row[0, 0], 55.0)
         self.assertEqual(row[0, 3], -0.7)
-        self.assertEqual(row[0, 5], 0.0)
+        self.assertEqual(row[0, 4], -0.7)
+        self.assertEqual(row[0, 6], 0.0)
 
     def test_get_ai_boost_clamps_and_applies_heuristics(self):
         from core.strategy.agents.ghost_agent import GhostAgent

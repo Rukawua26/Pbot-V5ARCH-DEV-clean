@@ -23,6 +23,8 @@ bot_output.log
 
 # Local databases / state
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 
 # ML models / binaries (local)

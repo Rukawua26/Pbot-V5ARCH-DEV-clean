@@ -106,6 +106,7 @@ class GhostAgent(BaseAgent):
             "vol_rel": float(vol_rel),
             "atr_pct": float(atr_pct),
             "btc_delta": float(btc_delta),
+            "btc_delta_tf": float(btc_delta),
             "btc_delta_5m": float(btc_delta),
             "funding_rate": float(funding_rate),
             "dist_ema": 0.0,

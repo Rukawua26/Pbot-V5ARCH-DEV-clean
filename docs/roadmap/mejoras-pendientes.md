@@ -472,7 +472,7 @@ Plan completo en `docs/runbooks/plan-reparacion-edge.md`.
 
 Fases:
 0. Congelar diagnostico base — COMPLETADO.
-1. Salir de bootstrap — PENDIENTE.
+1. Salir de bootstrap — INTENTADO / MODELO RECHAZADO POR OOS.
 2. Rankear filtros — PENDIENTE.
 3. Confirmar entrada vs salida — PENDIENTE.
 4. Calibrar score — PENDIENTE.
@@ -480,3 +480,5 @@ Fases:
 6. Experimentos controlados A/B — PENDIENTE.
 
 Criterio de exito: winrate SHADOW mejorado, buckets altos de confianza ganan mas que bajos, menos trades en Hard SL, no pasar a REAL hasta cumplir todo.
+
+Resultado Fase 1 (2026-07-13): se entreno Ghost offline con dataset curado (279 trades, outliers >10% excluidos, `UNKNOWN` excluido), pero fallo gate ciego `F1 >= 0.30` en OOS (0.2581). No se publico modelo; runtime sigue en bootstrap.

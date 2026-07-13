@@ -98,12 +98,39 @@ Implicacion para Fase 1:
 - [x] Confirmar `core/bot_models_startup.py` y ausencia de modelos.
 - [x] Verificar dataset insuficiente (49 < 50 minimo).
 - [x] Decidir: periodo de acumulacion SHADOW + relajar filtros de entrada.
-- [ ] Al entrenar, excluir `heuristic_confidence` como label objetivo y auditar si conviene usarlo solo como feature auxiliar.
-- [ ] Validar calibracion post-modelo: buckets altos deben ganar mas que buckets bajos en out-of-sample.
-- [ ] Comparar modelo vs bootstrap por regimen (`RANGE`, `BEAR_TREND`, `BULL_TREND`) y por side.
+- [x] Al entrenar, excluir `heuristic_confidence` como label objetivo y auditar si conviene usarlo solo como feature auxiliar.
+- [x] Validar calibracion post-modelo: buckets altos deben ganar mas que buckets bajos en out-of-sample.
+- [ ] Comparar modelo vs bootstrap por regimen (`RANGE`, `BEAR_TREND`, `BULL_TREND`) y por side cuando el modelo supere gates globales.
 - [ ] Relajar filtros que bloquean entrada hoy (Fase 2).
 - [ ] Corregir telemetria de `conflict_ab.log` para no contaminar con `ml_pure_prob=0` de bootstrap.
-- [ ] Reentrenar ghost model cuando dataset alcance 100-150 muestras.
+- [x] Reentrenar ghost model cuando dataset alcance 100-150 muestras.
+
+### Ejecucion 2026-07-13 — Ghost Model rechazado por OOS
+
+Se ejecuto Fase 1 con dataset curado, sin activar runtime.
+
+Curacion aplicada en `tools/train_models.py` / vista `vw_training_dataset`:
+- Solo `is_shadow=1`.
+- Excluir `is_dirty` e `is_adopted`.
+- Requerir `market_snapshot` valido y `pnl_percent` real.
+- Excluir ruido `ABS(pnl_percent) < 0.10`.
+- Excluir slippage/extremos `ABS(pnl_percent) > 10.0`.
+- Excluir `exit_reason='UNKNOWN'`.
+- Entrenar Ghost solo con features disponibles en runtime: `rsi`, `adx`, `vol_rel`, `atr_pct`, `funding_rate`, `btc_delta_tf`.
+
+Resultado del entrenamiento offline (`--ghost-only --no-legacy-copy`):
+- Dataset curado: 279 trades.
+- Train cronologico: 195 trades.
+- OOS bloqueado: 84 trades (69 losses, 15 wins).
+- Bootstrap OOS: AP=0.2200, Brier=0.4806, F1=0.3030.
+- Ghost OOS: AP=0.2395, Brier=0.2056, F1=0.2581.
+- Gates: AP > prevalencia OK, AP > bootstrap OK, Brier mejora >10% OK, F1 >= 0.30 FAIL.
+- Decision: **modelo descartado, no se publico artefacto**. Runtime permanece en bootstrap.
+
+Implicacion:
+- Fase 1 confirma que ya hay data suficiente para intentar entrenamiento, pero no hay evidencia ciega suficiente para reemplazar bootstrap.
+- No activar `REQUIRE_GHOST_MODEL_FOR_TRADING=True` ni copiar modelos hasta que Ghost supere todos los gates OOS.
+- Siguiente paso alineado al plan: avanzar Fase 2/Fase 3 para mejorar calidad de entradas y reducir `HARD_SL` antes de reintentar entrenamiento con 500-1000 trades o mejores features.
 
 ## Fase 2 — Rankear Filtros
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pickle
 import shutil
@@ -14,7 +15,10 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
+    brier_score_loss,
     f1_score,
+    log_loss,
     mean_squared_error,
     precision_score,
     r2_score,
@@ -22,8 +26,6 @@ from sklearn.metrics import (
 )
 from sklearn.neural_network import MLPClassifier
 from sklearn.preprocessing import StandardScaler
-
-from core.model_loader import safe_pickle_load
 
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
@@ -38,6 +40,7 @@ class DatasetBundle:
     x_consensus: np.ndarray
     y_class: np.ndarray
     y_reg: np.ndarray
+    bootstrap_prob: np.ndarray
     timestamps: np.ndarray
     rows: int
     filtered_noise_rows: int
@@ -46,14 +49,55 @@ class DatasetBundle:
 
 
 def _load_runtime_classes():
-    from ultimate_ml import UltimateMLSystem
-
     from core.strategy.consensus_nn import AgentConsensusNN
+    from tools.ultimate_ml import UltimateMLSystem
 
     return AgentConsensusNN, UltimateMLSystem
 
 
-def load_trade_rows(db_path: Path, min_abs_pnl: float) -> tuple[list[sqlite3.Row], int]:
+CURATED_VIEW = "vw_training_dataset"
+VALID_EXIT_REASONS = ("HARD_SL", "DYNAMIC_SL", "TAKE_PROFIT")
+GHOST_RUNTIME_FEATURES = [
+    "rsi",
+    "adx",
+    "vol_rel",
+    "atr_pct",
+    "funding_rate",
+    "btc_delta_tf",
+]
+
+
+def ensure_curated_training_view(db_path: Path, min_abs_pnl: float, max_abs_pnl: float) -> None:
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.execute(f"DROP VIEW IF EXISTS {CURATED_VIEW}")
+        conn.execute(
+            f"""
+            CREATE VIEW {CURATED_VIEW} AS
+            SELECT id, timestamp, symbol, side, pnl_percent, market_snapshot,
+                   exit_reason, market_regime, entry_confidence
+            FROM trades
+            WHERE is_shadow = 1
+              AND COALESCE(is_dirty, 0) = 0
+              AND COALESCE(is_adopted, 0) = 0
+              AND market_snapshot IS NOT NULL
+              AND market_snapshot != ''
+              AND pnl_percent IS NOT NULL
+              AND pnl_percent != -99.0
+              AND ABS(pnl_percent) >= {float(min_abs_pnl):.12g}
+              AND ABS(pnl_percent) <= {float(max_abs_pnl):.12g}
+              AND exit_reason IN ('HARD_SL', 'DYNAMIC_SL', 'TAKE_PROFIT')
+            """
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def load_trade_rows(
+    db_path: Path, min_abs_pnl: float, max_abs_pnl: float = 10.0
+) -> tuple[list[sqlite3.Row], int]:
+    ensure_curated_training_view(db_path, min_abs_pnl, max_abs_pnl)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     filtered_noise = conn.execute(
@@ -64,22 +108,17 @@ def load_trade_rows(db_path: Path, min_abs_pnl: float) -> tuple[list[sqlite3.Row
           AND market_snapshot != ''
           AND pnl_percent IS NOT NULL
           AND pnl_percent != -99.0
-          AND ABS(pnl_percent) < ?
+           AND (ABS(pnl_percent) < ? OR ABS(pnl_percent) > ? OR exit_reason = 'UNKNOWN')
         """,
-        (min_abs_pnl,),
+        (min_abs_pnl, max_abs_pnl),
     ).fetchone()[0]
     rows = conn.execute(
         """
-        SELECT id, timestamp, symbol, pnl_percent, market_snapshot
-        FROM trades
-        WHERE market_snapshot IS NOT NULL
-          AND market_snapshot != ''
-          AND pnl_percent IS NOT NULL
-          AND pnl_percent != -99.0
-          AND ABS(pnl_percent) >= ?
-        ORDER BY id ASC
+        SELECT id, timestamp, symbol, side, pnl_percent, market_snapshot,
+               exit_reason, market_regime, entry_confidence
+        FROM vw_training_dataset
+        ORDER BY timestamp ASC, id ASC
         """,
-        (min_abs_pnl,),
     ).fetchall()
     conn.close()
     return rows, int(filtered_noise)
@@ -94,6 +133,7 @@ def build_dataset(rows: list[sqlite3.Row], filtered_noise_rows: int) -> DatasetB
     consensus_features = []
     y_class = []
     y_reg = []
+    bootstrap_prob = []
     timestamps = []
     valid_consensus = 0
 
@@ -103,6 +143,7 @@ def build_dataset(rows: list[sqlite3.Row], filtered_noise_rows: int) -> DatasetB
             if not isinstance(snap, dict):
                 continue
             pnl = float(row["pnl_percent"])
+            snap["timestamp"] = row["timestamp"]
             features = extractor.extract_features(snap)
             ghost_features.append(features)
 
@@ -114,16 +155,24 @@ def build_dataset(rows: list[sqlite3.Row], filtered_noise_rows: int) -> DatasetB
             )
             y_class.append(1 if pnl > 0 else 0)
             y_reg.append(pnl)
+            raw_bootstrap = snap.get("prob_final", snap.get("heuristic_confidence", 50.0))
+            bootstrap_prob.append(max(0.0, min(1.0, float(raw_bootstrap) / 100.0)))
             ts = pd.to_datetime(row["timestamp"], utc=True, errors="coerce")
             timestamps.append(ts.to_datetime64() if not pd.isna(ts) else np.datetime64("NaT"))
         except Exception:
             continue
 
+    x_ghost = pd.DataFrame(ghost_features)
+    for column in GHOST_RUNTIME_FEATURES:
+        if column not in x_ghost:
+            x_ghost[column] = 0.0
+
     return DatasetBundle(
-        x_ghost=pd.DataFrame(ghost_features),
+        x_ghost=x_ghost[GHOST_RUNTIME_FEATURES],
         x_consensus=np.array(consensus_features, dtype=float),
         y_class=np.array(y_class, dtype=int),
         y_reg=np.array(y_reg, dtype=float),
+        bootstrap_prob=np.array(bootstrap_prob, dtype=float),
         timestamps=np.array(timestamps, dtype="datetime64[ns]"),
         rows=len(rows),
         filtered_noise_rows=filtered_noise_rows,
@@ -148,28 +197,100 @@ def validate_dataset(bundle: DatasetBundle, min_samples: int) -> None:
         raise SystemExit("Timestamps inválidos: walk-forward requiere fechas válidas.")
 
 
-def train_ghost(bundle: DatasetBundle, output_path: Path, positive_class_weight: float) -> dict:
+def _write_sha256_sidecar(path: Path) -> Path:
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    sidecar = path.with_suffix(path.suffix + ".sha256")
+    sidecar.write_text(digest, encoding="utf-8")
+    return sidecar
+
+
+def _classification_metrics(y_true: np.ndarray, proba: np.ndarray) -> dict:
+    preds = (proba >= 0.5).astype(int)
+    return {
+        "f1": float(f1_score(y_true, preds, zero_division=0)),
+        "average_precision": float(average_precision_score(y_true, proba)),
+        "brier": float(brier_score_loss(y_true, proba)),
+        "log_loss": float(log_loss(y_true, proba, labels=[0, 1])),
+        "predicted_wins": int(preds.sum()),
+    }
+
+
+def train_ghost(
+    bundle: DatasetBundle,
+    output_path: Path,
+    positive_class_weight: float,
+    holdout_ratio: float = 0.30,
+    min_oos_samples: int = 60,
+    min_oos_class_samples: int = 15,
+) -> dict:
     _, UltimateMLSystem = _load_runtime_classes()
+    split = int(len(bundle.x_ghost) * (1.0 - holdout_ratio))
+    if split <= 0 or split >= len(bundle.x_ghost):
+        raise SystemExit("Ghost: holdout cronologico invalido.")
+    train_x = bundle.x_ghost.iloc[:split]
+    train_y = bundle.y_class[:split]
+    train_reg = bundle.y_reg[:split]
+    oos_x = bundle.x_ghost.iloc[split:]
+    oos_y = bundle.y_class[split:]
+    oos_bootstrap = bundle.bootstrap_prob[split:]
+    class_counts = np.bincount(oos_y, minlength=2)
+    if len(oos_y) < min_oos_samples or int(class_counts.min()) < min_oos_class_samples:
+        raise SystemExit(
+            "Ghost: holdout OOS insuficiente para decision ciega: "
+            f"samples={len(oos_y)}, classes={class_counts.tolist()}. No se publica artefacto."
+        )
+
     trainer = UltimateMLSystem(model_path=str(output_path))
     trainer.train(
-        bundle.x_ghost,
-        bundle.y_class,
-        bundle.y_reg,
+        train_x,
+        train_y,
+        train_reg,
         positive_class_weight=positive_class_weight,
     )
 
-    model_data = safe_pickle_load(str(output_path))
+    _write_sha256_sidecar(output_path)
+    with output_path.open("rb") as model_file:
+        model_data = pickle.load(model_file)
+    classifiers = list(model_data.get("clf", {}).values())
+    regressors = list(model_data.get("reg", {}).values())
+    if not classifiers or not regressors:
+        raise SystemExit("Ghost: artefacto sin clasificadores/regresores utilizables.")
+    oos_proba = np.mean([clf.predict_proba(oos_x)[:, 1] for clf in classifiers], axis=0)
+    model_metrics = _classification_metrics(oos_y, oos_proba)
+    bootstrap_metrics = _classification_metrics(oos_y, oos_bootstrap)
+    prevalence = float(oos_y.mean())
+    gates = {
+        "average_precision_above_prevalence": model_metrics["average_precision"] > prevalence,
+        "average_precision_beats_bootstrap": model_metrics["average_precision"]
+        > bootstrap_metrics["average_precision"],
+        "brier_improves_bootstrap_10pct": model_metrics["brier"]
+        <= bootstrap_metrics["brier"] * 0.90,
+        "f1_at_least_0_30": model_metrics["f1"] >= 0.30,
+    }
+    metrics = {
+        "samples": int(len(bundle.x_ghost)),
+        "train_samples": int(split),
+        "oos_samples": int(len(oos_y)),
+        "oos_class_counts": {"losses": int(class_counts[0]), "wins": int(class_counts[1])},
+        "oos_prevalence": prevalence,
+        "oos_model": model_metrics,
+        "oos_bootstrap": bootstrap_metrics,
+        "publication_gates": gates,
+        "publication_approved": bool(all(gates.values())),
+    }
     clf = model_data.get("clf", {}).get("rf")
     reg = model_data.get("reg", {}).get("rf")
-    metrics = {"samples": int(len(bundle.x_ghost))}
     if clf is not None and hasattr(clf, "predict"):
-        pred = clf.predict(bundle.x_ghost)
-        metrics["rf_train_accuracy"] = float(accuracy_score(bundle.y_class, pred))
-        metrics["rf_train_f1"] = float(f1_score(bundle.y_class, pred, zero_division=0))
+        pred = clf.predict(train_x)
+        metrics["rf_train_accuracy"] = float(accuracy_score(train_y, pred))
+        metrics["rf_train_f1"] = float(f1_score(train_y, pred, zero_division=0))
     if reg is not None and hasattr(reg, "predict"):
-        pred_reg = reg.predict(bundle.x_ghost)
-        metrics["rf_train_r2"] = float(r2_score(bundle.y_reg, pred_reg))
-        metrics["rf_train_rmse"] = float(np.sqrt(mean_squared_error(bundle.y_reg, pred_reg)))
+        pred_reg = reg.predict(train_x)
+        metrics["rf_train_r2"] = float(r2_score(train_reg, pred_reg))
+        metrics["rf_train_rmse"] = float(np.sqrt(mean_squared_error(train_reg, pred_reg)))
+    if not metrics["publication_approved"]:
+        output_path.unlink(missing_ok=True)
+        output_path.with_suffix(output_path.suffix + ".sha256").unlink(missing_ok=True)
     return metrics
 
 
@@ -417,6 +538,7 @@ def train_consensus(
             }
         )
     )
+    _write_sha256_sidecar(output_path)
     return {
         "samples": int(len(bundle.x_consensus)),
         "train_samples": int(len(bundle.x_consensus)),
@@ -436,7 +558,9 @@ def train_consensus(
 def publish_legacy(models_dir: Path, root_dir: Path) -> None:
     copies = {
         models_dir / "agent_models.pkl": root_dir / "agent_models.pkl",
+        models_dir / "agent_models.pkl.sha256": root_dir / "agent_models.pkl.sha256",
         models_dir / "v118_1H_consensus.pkl": root_dir / "v118_1H_consensus.pkl",
+        models_dir / "v118_1H_consensus.pkl.sha256": root_dir / "v118_1H_consensus.pkl.sha256",
     }
     for src, dst in copies.items():
         if src.exists():
@@ -449,20 +573,25 @@ def main() -> None:
     parser.add_argument("--models-dir", type=Path, default=DEFAULT_MODELS_DIR)
     parser.add_argument("--min-samples", type=int, default=50)
     parser.add_argument("--min-abs-pnl", type=float, default=0.10)
+    parser.add_argument("--max-abs-pnl", type=float, default=10.0)
     parser.add_argument("--positive-class-weight", type=float, default=3.0)
     parser.add_argument("--min-consensus-f1", type=float, default=0.35)
     parser.add_argument("--min-consensus-recall", type=float, default=0.30)
     parser.add_argument("--walk-forward-train-months", type=int, default=3)
     parser.add_argument("--walk-forward-val-months", type=int, default=1)
     parser.add_argument("--min-walk-forward-windows", type=int, default=1)
+    parser.add_argument("--ghost-holdout-ratio", type=float, default=0.30)
+    parser.add_argument("--ghost-min-oos-samples", type=int, default=60)
+    parser.add_argument("--ghost-min-oos-class-samples", type=int, default=15)
     parser.add_argument("--no-legacy-copy", action="store_true")
+    parser.add_argument("--ghost-only", action="store_true")
     args = parser.parse_args()
 
     if not args.db.exists():
         raise SystemExit(f"DB no encontrada: {args.db}")
     args.models_dir.mkdir(parents=True, exist_ok=True)
 
-    rows, filtered_noise_rows = load_trade_rows(args.db, args.min_abs_pnl)
+    rows, filtered_noise_rows = load_trade_rows(args.db, args.min_abs_pnl, args.max_abs_pnl)
     bundle = build_dataset(rows, filtered_noise_rows)
     validate_dataset(bundle, args.min_samples)
 
@@ -474,26 +603,45 @@ def main() -> None:
         if tmp_path.exists():
             tmp_path.unlink()
 
-    ghost_metrics = train_ghost(bundle, ghost_tmp_path, args.positive_class_weight)
-    consensus_metrics = train_consensus(
+    ghost_metrics = train_ghost(
         bundle,
-        consensus_tmp_path,
-        positive_class_weight=args.positive_class_weight,
-        min_val_f1=args.min_consensus_f1,
-        min_recall=args.min_consensus_recall,
-        train_months=args.walk_forward_train_months,
-        val_months=args.walk_forward_val_months,
-        min_walk_forward_windows=args.min_walk_forward_windows,
+        ghost_tmp_path,
+        args.positive_class_weight,
+        holdout_ratio=args.ghost_holdout_ratio,
+        min_oos_samples=args.ghost_min_oos_samples,
+        min_oos_class_samples=args.ghost_min_oos_class_samples,
     )
+    consensus_metrics = None
+    if ghost_metrics.get("publication_approved") and not args.ghost_only:
+        consensus_metrics = train_consensus(
+            bundle,
+            consensus_tmp_path,
+            positive_class_weight=args.positive_class_weight,
+            min_val_f1=args.min_consensus_f1,
+            min_recall=args.min_consensus_recall,
+            train_months=args.walk_forward_train_months,
+            val_months=args.walk_forward_val_months,
+            min_walk_forward_windows=args.min_walk_forward_windows,
+        )
 
-    ghost_tmp_path.replace(ghost_path)
-    consensus_tmp_path.replace(consensus_path)
+    if ghost_metrics.get("publication_approved"):
+        ghost_tmp_path.replace(ghost_path)
+        ghost_tmp_path.with_suffix(ghost_tmp_path.suffix + ".sha256").replace(
+            ghost_path.with_suffix(ghost_path.suffix + ".sha256")
+        )
+    if ghost_metrics.get("publication_approved") and not args.ghost_only:
+        consensus_tmp_path.replace(consensus_path)
+        consensus_tmp_path.with_suffix(consensus_tmp_path.suffix + ".sha256").replace(
+            consensus_path.with_suffix(consensus_path.suffix + ".sha256")
+        )
 
     manifest = {
         "db": str(args.db),
         "rows_loaded": bundle.rows,
         "filtered_noise_rows": bundle.filtered_noise_rows,
         "min_abs_pnl": float(args.min_abs_pnl),
+        "max_abs_pnl": float(args.max_abs_pnl),
+        "curated_view": CURATED_VIEW,
         "valid_ghost_rows": bundle.valid_ghost,
         "valid_consensus_vote_rows": bundle.valid_consensus,
         "class_balance": {
@@ -512,6 +660,10 @@ def main() -> None:
     (args.models_dir / "training_manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
     )
+
+    if not ghost_metrics.get("publication_approved"):
+        print(json.dumps(manifest, indent=2, sort_keys=True))
+        raise SystemExit("Ghost no supera gates OOS; artefacto descartado.")
 
     if not args.no_legacy_copy:
         publish_legacy(args.models_dir, ROOT)
