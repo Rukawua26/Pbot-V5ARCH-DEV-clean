@@ -526,6 +526,22 @@ def _apply_entry_filters_and_adjust_prob(
             },
         )
 
+    if filter_passed and bool(getattr(Config, "BULL_TREND_ENTRY_VETO_ENABLED", True)):
+        if btc_regime in {"BULL_TREND", "BULL_STRONG"}:
+            filter_passed = False
+            filter_reason = f"BULL_TREND_ENTRY_VETO ({btc_regime})"
+            bot.log(f"⛔ {symbol}: {filter_reason}")
+            append_execution_event(
+                bot,
+                "BULL_TREND_ENTRY_VETO",
+                {
+                    "symbol": symbol,
+                    "side": audit_signal,
+                    "btc_regime": btc_regime,
+                    "paper_mode": bool(getattr(Config, "PAPER_MODE", True)),
+                },
+            )
+
     # [SIDE_PARITY] Calidad mínima simétrica para BUY y SELL
     if filter_passed:
         parity_ok, parity_reason = _apply_side_quality_parity_filter(

@@ -172,6 +172,8 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
             continue
 
         audit_signal, mode, price, prob_final, ind, votos = analysis
+        if isinstance(ind, dict) and "spread" not in ind:
+            ind["spread"] = triage_entry.get("spread", 0.0)
         append_execution_event(
             bot,
             "SIGNAL_ANALYZED",

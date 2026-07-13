@@ -37,6 +37,26 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-07-13 - Fix: spread real alimenta RRR y veto experimental BULL_TREND
+
+Trigger: analisis post-fix mostro profit factor ~0.64, 95%+ de perdidas con MAE <=0.5% y cero eventos `RISK_REWARD_VETO`. Auditoria externa pidio verificar signo SELL, unidades de spread y origen del spread real.
+
+Diagnostico:
+- El signo de SELL en `_evaluate_risk_reward_filter` era correcto: SELL penaliza `estimated_entry = entry * (1 - penalty)`.
+- Las unidades eran correctas: `spread` se trata como fraccion y se aplica multiplicando el precio.
+- Bug real: `core/market_intelligence.py` calculaba `spread` desde book ticker, pero no lo propagaba en el item `ranked`; `core/signals/context.py` recibia `ind.get("spread", 0.0)`, por lo que snapshots y RRR llegaban con `spread=0.0`.
+
+Cambios:
+- `core/market_intelligence.py`: cada entrada de triaje conserva `spread` calculado desde bid/ask.
+- `core/bot_signals.py`: antes de construir contexto, copia `triage_entry["spread"]` a `ind["spread"]` cuando `Strategy.analyze` no lo trae.
+- `core/config/manager.py` y `core/signals/filters.py`: nuevo `BULL_TREND_ENTRY_VETO_ENABLED` default `true`, con veto explicito `BULL_TREND_ENTRY_VETO` para pausar entradas en `BULL_TREND/BULL_STRONG` tras muestra reciente de 25 trades con 12% WR y avg -3.35%.
+- Tests: `test_market_intelligence_and_balance`, `test_bot_signal_scan_cycle`, `test_min_atr_filter`, `test_regime_hmm`.
+
+Reglas preventivas:
+- El `spread` usado por RRR debe venir del book ticker reciente y viajar en el contexto de señal; no debe caer silenciosamente a `0.0` salvo ausencia real de dato.
+- Si se agrega un filtro por regimen, debe tener flag de config y evento/log explicito para medirlo como experimento reversible.
+- No considerar Sprint/RRR validado hasta observar eventos `RISK_REWARD_VETO` o confirmar en telemetria que el spread real llega a snapshots.
+
 ### 2026-07-10 - Housekeeping fail-safe y heartbeat PAPER testnet
 
 Problema:

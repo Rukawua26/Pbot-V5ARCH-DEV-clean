@@ -55,6 +55,7 @@ class TestMinAtrFilter(unittest.TestCase):
         with (
             patch.object(Config, "MIN_ATR_PCT", 0.005),
             patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", True),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
         ):
             result = _apply_entry_filters_and_adjust_prob(
                 bot, "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, ctx, 1.5
@@ -78,6 +79,7 @@ class TestMinAtrFilter(unittest.TestCase):
         with (
             patch.object(Config, "MIN_ATR_PCT", 0.005),
             patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", True),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
         ):
             result = _apply_entry_filters_and_adjust_prob(
                 bot, "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, ctx, 1.5
@@ -100,9 +102,51 @@ class TestMinAtrFilter(unittest.TestCase):
         with (
             patch.object(Config, "MIN_ATR_PCT", 0.005),
             patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", False),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
         ):
             result = _apply_entry_filters_and_adjust_prob(
                 bot, "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, ctx, 1.5
+            )
+
+        self.assertTrue(result[1])
+
+    @patch("core.signals.filters.Strategy.check_entry_filters")
+    @patch("core.signals.filters._resolve_btc_regime_adjustment")
+    @patch("core.signals.filters._apply_markov_regime_weight")
+    def test_bull_trend_entry_veto_blocks_when_enabled(
+        self, mock_markov, mock_regime, mock_strategy
+    ):
+        mock_strategy.return_value = (True, "OK", "BULL_TREND", {})
+        mock_regime.return_value = (1.0, "BULL_ALIGNED", False)
+        mock_markov.return_value = (1.0, "BULL_ALIGNED", False, True, "OK", "BULL_TREND")
+
+        with (
+            patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", False),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", True),
+        ):
+            result = _apply_entry_filters_and_adjust_prob(
+                self._make_bot(), "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, self._make_ctx(), 1.5
+            )
+
+        self.assertFalse(result[1])
+        self.assertIn("BULL_TREND_ENTRY_VETO", result[2])
+
+    @patch("core.signals.filters.Strategy.check_entry_filters")
+    @patch("core.signals.filters._resolve_btc_regime_adjustment")
+    @patch("core.signals.filters._apply_markov_regime_weight")
+    def test_bull_trend_entry_veto_allows_when_disabled(
+        self, mock_markov, mock_regime, mock_strategy
+    ):
+        mock_strategy.return_value = (True, "OK", "BULL_TREND", {})
+        mock_regime.return_value = (1.0, "BULL_ALIGNED", False)
+        mock_markov.return_value = (1.0, "BULL_ALIGNED", False, True, "OK", "BULL_TREND")
+
+        with (
+            patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", False),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
+        ):
+            result = _apply_entry_filters_and_adjust_prob(
+                self._make_bot(), "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, self._make_ctx(), 1.5
             )
 
         self.assertTrue(result[1])
@@ -111,6 +155,7 @@ class TestMinAtrFilter(unittest.TestCase):
         """Config should have correct defaults."""
         self.assertGreaterEqual(Config.MIN_ATR_PCT, 0.0)
         self.assertTrue(hasattr(Config, "MIN_ATR_PCT_FILTER_ENABLED"))
+        self.assertTrue(hasattr(Config, "BULL_TREND_ENTRY_VETO_ENABLED"))
         self.assertTrue(hasattr(Config, "MAX_SHADOW_DIRECTIONAL_TRADES"))
 
 

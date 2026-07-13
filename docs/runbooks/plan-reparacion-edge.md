@@ -132,6 +132,20 @@ Implicacion:
 - No activar `REQUIRE_GHOST_MODEL_FOR_TRADING=True` ni copiar modelos hasta que Ghost supere todos los gates OOS.
 - Siguiente paso alineado al plan: avanzar Fase 2/Fase 3 para mejorar calidad de entradas y reducir `HARD_SL` antes de reintentar entrenamiento con 500-1000 trades o mejores features.
 
+### Ejecucion 2026-07-13 — Fase 2 quick fix: RRR con spread real + BULL_TREND veto
+
+Motivo: revision externa de Sprint RRR detecto que no bastaba con tener `_evaluate_risk_reward_filter`; habia que verificar que el `spread` usado fuera real. En DB los snapshots recientes mostraban `spread=0.0` y no habia eventos `RISK_REWARD_VETO`.
+
+Resultado:
+- `market_intelligence` ahora conserva `spread` calculado desde book ticker en cada item de triaje.
+- `bot_signals` propaga ese `spread` al `ind/context` antes de construir el snapshot y antes de ejecutar RRR.
+- `BULL_TREND_ENTRY_VETO_ENABLED=true` por default bloquea entradas en `BULL_TREND/BULL_STRONG` como experimento reversible, dado el rendimiento reciente negativo del regimen.
+
+Criterio de observacion post-reinicio:
+- Nuevos snapshots deben mostrar `spread > 0` cuando Binance entregue bid/ask.
+- Deben empezar a aparecer eventos/logs `RISK_REWARD_VETO` si el RRR efectivo cae bajo umbral.
+- Medir 50-100 trades: objetivo inmediato `HARD_SL < 60%`, PF > 0.8 y desaparicion de trades en BULL_TREND.
+
 ## Fase 2 — Rankear Filtros
 
 **Meta**: descubrir que filtro hoy corta mas trades.

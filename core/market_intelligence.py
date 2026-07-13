@@ -458,6 +458,7 @@ def get_active_market_snapshot(bot, pool_limit=None):
                     "symbol_raw": sym,
                     "rvol": 1.0,  # Legacy alias fallback
                     "vol_24h": vol_24h,
+                    "spread": spread,
                     "status": "ACTIVE",
                     "ticker": ticker,
                 }

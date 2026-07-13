@@ -57,6 +57,7 @@ class Config(OperationalConfig, StrategyConfig):
     # --- Filtro de volatilidad minima (Fase 1: Torniquete) ---
     MIN_ATR_PCT = _env_float("MIN_ATR_PCT", 0.006)
     MIN_ATR_PCT_FILTER_ENABLED = _env_bool("MIN_ATR_PCT_FILTER_ENABLED", True)
+    BULL_TREND_ENTRY_VETO_ENABLED = _env_bool("BULL_TREND_ENTRY_VETO_ENABLED", True)
 
     # --- Cap de correlacion por direccion (Fase 1: Torniquete) ---
     MAX_SHADOW_DIRECTIONAL_TRADES = _env_int("MAX_SHADOW_DIRECTIONAL_TRADES", 3)

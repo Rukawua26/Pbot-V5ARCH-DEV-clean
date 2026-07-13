@@ -114,6 +114,47 @@ class BotSignalScanCycleTest(unittest.TestCase):
         )
         bot.update_radar.assert_called_once()
 
+    def test_triary_spread_is_propagated_to_execution_context(self):
+        captured = {}
+
+        def build_context(symbol_raw, symbol, df_main, price, ind, audit_signal):
+            captured["ind_spread"] = ind.get("spread")
+            ctx = {"spread": ind.get("spread", 0.0), "tier": "IRON"}
+            return {"signal": audit_signal, "mode": "SHADOW"}, ctx, "⚪", 1.0
+
+        bot = self._scan_bot(
+            _analyze_symbol_candidate=MagicMock(
+                return_value=("BUY", "SHADOW", 100.0, 80.0, {"rsi": {"val": 55}}, {})
+            ),
+            _build_symbol_context=MagicMock(side_effect=build_context),
+            _apply_entry_filters_and_adjust_prob=MagicMock(
+                return_value=(80.0, True, "Filter Pass", {"spread": 0.0015, "tier": "IRON"})
+            ),
+            _resolve_audit_verdict_and_stats=MagicMock(return_value="🧪 SHADOW"),
+            _update_signal_diagnostics=MagicMock(),
+            _plan_execution_mode=MagicMock(
+                return_value=(True, True, "🧪 SHADOW", True, "Filter Pass")
+            ),
+            _execute_and_update_symbol=MagicMock(),
+            scanner_history=[],
+            scanner_lock=None,
+            bootstrap_heuristic_mode=True,
+            last_ml_confidence=0.0,
+            last_ghost_weight=0.0,
+        )
+
+        run_signal_scan_cycle(
+            bot,
+            [{"symbol": "BTC/USDT", "spread": 0.0015}],
+            self._valid_results(),
+            self._signal_stats(),
+            pnl_real_hoy=0.0,
+        )
+
+        self.assertEqual(captured["ind_spread"], 0.0015)
+        bot._execute_and_update_symbol.assert_called_once()
+        self.assertEqual(bot._execute_and_update_symbol.call_args.kwargs["ctx"]["spread"], 0.0015)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -474,14 +474,17 @@ class RegimeRangeFilterTests(unittest.TestCase):
             with patch.object(filters.Config, "HMM_RANGE_VETO", True):
                 with patch.object(filters.Config, "PAPER_MODE", True):
                     with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
-                        with patch.object(
-                            filters.Strategy,
-                            "check_entry_filters",
-                            return_value=(
-                                True,
-                                "OK",
-                                "CALM",
-                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                        with (
+                            patch.object(filters.Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
+                            patch.object(
+                                filters.Strategy,
+                                "check_entry_filters",
+                                return_value=(
+                                    True,
+                                    "OK",
+                                    "CALM",
+                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                ),
                             ),
                         ):
                             prob_final, filter_passed, filter_reason, updated_ctx = (
@@ -679,14 +682,17 @@ class RegimeRangeFilterTests(unittest.TestCase):
             with patch.object(filters.Config, "MARKOV_SNAPSHOT_STALE_SECONDS", 6 * 3600.0):
                 with patch.object(filters.Config, "MARKOV_BULL_STRONG_WEIGHT", 1.10):
                     with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
-                        with patch.object(
-                            filters.Strategy,
-                            "check_entry_filters",
-                            return_value=(
-                                True,
-                                "OK",
-                                "CALM",
-                                {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                        with (
+                            patch.object(filters.Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
+                            patch.object(
+                                filters.Strategy,
+                                "check_entry_filters",
+                                return_value=(
+                                    True,
+                                    "OK",
+                                    "CALM",
+                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                ),
                             ),
                         ):
                             prob_final, filter_passed, filter_reason, updated_ctx = (

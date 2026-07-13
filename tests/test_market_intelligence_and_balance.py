@@ -178,6 +178,10 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
         self.assertIn("BETA/USDT", symbols)
         self.assertNotIn("BULL/USDT", symbols)
         self.assertIn("LOWVOL/USDT", symbols)
+        alpha = next(item for item in ranked if item["symbol"] == "ALPHA/USDT")
+        beta = next(item for item in ranked if item["symbol"] == "BETA/USDT")
+        self.assertAlmostEqual(alpha["spread"], 0.001)
+        self.assertAlmostEqual(beta["spread"], 0.0005)
         execution.load_markets.assert_not_called()
 
     @patch.object(market_intelligence.Config, "TOP_TRIAGE_COUNT", 2)
