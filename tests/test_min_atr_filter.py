@@ -156,6 +156,7 @@ class TestMinAtrFilter(unittest.TestCase):
         self.assertGreaterEqual(Config.MIN_ATR_PCT, 0.0)
         self.assertTrue(hasattr(Config, "MIN_ATR_PCT_FILTER_ENABLED"))
         self.assertTrue(hasattr(Config, "BULL_TREND_ENTRY_VETO_ENABLED"))
+        self.assertTrue(hasattr(Config, "HMM_RANGE_LEARNING_OVERRIDE_ENABLED"))
         self.assertTrue(hasattr(Config, "MAX_SHADOW_DIRECTIONAL_TRADES"))
 
 

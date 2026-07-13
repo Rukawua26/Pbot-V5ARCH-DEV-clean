@@ -191,6 +191,7 @@ class MarketBreadthTest(unittest.TestCase):
         self.assertEqual(updated_ctx["market_breadth_sentiment"], "FEAR")
 
     @patch("core.signals.filters.Config.MARKET_BREADTH_FEAR_FILTER_ENABLED", False)
+    @patch("core.signals.filters.Config.HMM_RANGE_LEARNING_OVERRIDE_ENABLED", True)
     @patch("core.signals.filters.Config.BREAKOUT_WATCH_ENABLED", False)
     @patch("core.signals.filters.Strategy.check_entry_filters")
     def test_entry_filter_allows_buy_when_market_breadth_fear_filter_disabled(self, mocked_filters):

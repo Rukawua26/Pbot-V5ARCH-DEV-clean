@@ -457,7 +457,7 @@ class RegimeRangeFilterTests(unittest.TestCase):
         self.assertIn("FILTER_APPLIED", emitted_events)
         bot.breakout_agent.evaluate_breakout.assert_not_called()
 
-    def test_range_veto_allows_shadow_learning_with_penalty(self):
+    def test_range_veto_blocks_shadow_learning_by_default(self):
         ctx = {
             "rsi": 55.0,
             "adx": 22.0,
@@ -475,6 +475,57 @@ class RegimeRangeFilterTests(unittest.TestCase):
                 with patch.object(filters.Config, "PAPER_MODE", True):
                     with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
                         with (
+                            patch.object(filters.Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
+                            patch.object(
+                                filters.Strategy,
+                                "check_entry_filters",
+                                return_value=(
+                                    True,
+                                    "OK",
+                                    "CALM",
+                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                ),
+                            ),
+                        ):
+                            prob_final, filter_passed, filter_reason, updated_ctx = (
+                                filters._apply_entry_filters_and_adjust_prob(
+                                    bot,
+                                    "TEST/USDT",
+                                    "TEST/USDT",
+                                    pd.DataFrame(),
+                                    "BUY",
+                                    80.0,
+                                    ctx,
+                                    1.0,
+                                )
+                            )
+
+        self.assertEqual(prob_final, 0.0)
+        self.assertFalse(filter_passed)
+        self.assertEqual(filter_reason, "RANGE REGIME VETO")
+        self.assertEqual(updated_ctx["regime_reason"], "RANGE_VETO")
+
+    def test_range_veto_allows_shadow_learning_only_with_override(self):
+        ctx = {
+            "rsi": 55.0,
+            "adx": 22.0,
+            "atr_pct": 0.01,
+            "close": 100.0,
+            "atr": 1.0,
+            "trend": "RANGO",
+            "tier": "IRON",
+        }
+        bot = self._build_bot("RANGE")
+        bot.execution_mode = "shadow_live"
+
+        with patch.object(filters.Config, "HMM_RANGE_PENALTY", 0.5):
+            with patch.object(filters.Config, "HMM_RANGE_VETO", True):
+                with patch.object(filters.Config, "PAPER_MODE", True):
+                    with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                        with (
+                            patch.object(
+                                filters.Config, "HMM_RANGE_LEARNING_OVERRIDE_ENABLED", True
+                            ),
                             patch.object(filters.Config, "BULL_TREND_ENTRY_VETO_ENABLED", False),
                             patch.object(
                                 filters.Strategy,

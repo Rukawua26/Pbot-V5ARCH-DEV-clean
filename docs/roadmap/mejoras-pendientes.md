@@ -484,3 +484,5 @@ Criterio de exito: winrate SHADOW mejorado, buckets altos de confianza ganan mas
 Resultado Fase 1 (2026-07-13): se entreno Ghost offline con dataset curado (279 trades, outliers >10% excluidos, `UNKNOWN` excluido), pero fallo gate ciego `F1 >= 0.30` en OOS (0.2581). No se publico modelo; runtime sigue en bootstrap.
 
 Actualizacion Fase 2 quick fix (2026-07-13): se reparo propagacion de `spread` real al RRR validator y se activo veto configurable de entradas en `BULL_TREND/BULL_STRONG`. Observar 50-100 trades post-reinicio antes de reentrenar Ghost.
+
+Actualizacion Fase 2 RANGE (2026-07-13): `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false` deja `RANGE` como veto duro tambien en SHADOW. Reabrir solo si el flujo operativo queda insuficiente y como experimento explicito.

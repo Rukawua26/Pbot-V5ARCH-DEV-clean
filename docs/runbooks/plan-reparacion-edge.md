@@ -146,6 +146,20 @@ Criterio de observacion post-reinicio:
 - Deben empezar a aparecer eventos/logs `RISK_REWARD_VETO` si el RRR efectivo cae bajo umbral.
 - Medir 50-100 trades: objetivo inmediato `HARD_SL < 60%`, PF > 0.8 y desaparicion de trades en BULL_TREND.
 
+### Ejecucion 2026-07-13 — Fase 2: RANGE hard veto
+
+Motivo: despues del quick fix anterior hubo 11 trades nuevos, todos `SELL` en `RANGE`, con 0% WR y 10 `HARD_SL`. El `spread` real ya aparecia en snapshots, por lo que la ruta de perdida dominante era `HMM_RANGE_PENALTY` permitiendo aprendizaje en `RANGE`.
+
+Cambio:
+- `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false` por default.
+- `allow_range_learning` ya no se activa solo por estar en PAPER/SHADOW; requiere override explicito.
+- `HMM_RANGE_VETO=true` ahora produce `RANGE REGIME VETO` duro tambien en SHADOW.
+
+Criterio de observacion post-reinicio:
+- 0 trades nuevos con `market_regime='RANGE'`.
+- Si el flujo cae demasiado, reabrir de forma controlada con `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=true` o con condiciones adicionales, no con override implicito.
+- Mantener medicion de 50-100 trades antes de reentrenar Ghost.
+
 ## Fase 2 — Rankear Filtros
 
 **Meta**: descubrir que filtro hoy corta mas trades.

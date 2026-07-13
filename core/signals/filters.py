@@ -489,8 +489,10 @@ def _apply_entry_filters_and_adjust_prob(
             ctx["hurst_boost"] = "RANDOM_PENALTY"
             bot.log(f"⚠️ {symbol}: Hurst aleatorio (H≈0.5) → x{random_penalty:.2f}")
 
-    allow_range_learning = range_veto and (
-        bool(getattr(Config, "PAPER_MODE", True)) or _is_shadow_learning_runtime(bot)
+    allow_range_learning = (
+        range_veto
+        and bool(getattr(Config, "HMM_RANGE_LEARNING_OVERRIDE_ENABLED", False))
+        and (bool(getattr(Config, "PAPER_MODE", True)) or _is_shadow_learning_runtime(bot))
     )
     if allow_range_learning:
         range_veto = False

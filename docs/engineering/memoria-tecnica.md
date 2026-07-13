@@ -57,6 +57,20 @@ Reglas preventivas:
 - Si se agrega un filtro por regimen, debe tener flag de config y evento/log explicito para medirlo como experimento reversible.
 - No considerar Sprint/RRR validado hasta observar eventos `RISK_REWARD_VETO` o confirmar en telemetria que el spread real llega a snapshots.
 
+### 2026-07-13 - Fase 2: RANGE hard veto en PAPER/SHADOW
+
+Trigger: tras el fix de spread/BULL_TREND, los primeros 11 trades cerrados fueron todos `SELL` en `RANGE`: 0% WR, avg -3.36%, 10/11 `HARD_SL`. El `spread` ya llegaba real (>0), por lo que el problema inmediato era que `allow_range_learning` seguia convirtiendo `HMM_RANGE_VETO=true` en `HMM_RANGE_PENALTY` dentro de PAPER/SHADOW.
+
+Cambio:
+- Nuevo flag `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false` por default.
+- `core/signals/filters.py`: `allow_range_learning` solo relaja `RANGE_VETO` si el flag esta activo y el runtime es PAPER/SHADOW.
+- Con default `false`, `RANGE` vuelve a ser veto duro aunque el bot este en SHADOW.
+
+Reglas preventivas:
+- No permitir aprendizaje en `RANGE` por defecto mientras el regimen tenga PF negativo y alta tasa de `HARD_SL`.
+- Si se necesita reabrir flujo, activar `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=true` como experimento explicito, no por comportamiento implicito de PAPER/SHADOW.
+- Medir 50-100 trades post-reinicio: 0 entradas en `RANGE`, `HARD_SL < 60%`, PF > 0.8.
+
 ### 2026-07-10 - Housekeeping fail-safe y heartbeat PAPER testnet
 
 Problema:
