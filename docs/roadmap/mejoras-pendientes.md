@@ -485,4 +485,4 @@ Resultado Fase 1 (2026-07-13): se entreno Ghost offline con dataset curado (279 
 
 Actualizacion Fase 2 quick fix (2026-07-13): se reparo propagacion de `spread` real al RRR validator y se activo veto configurable de entradas en `BULL_TREND/BULL_STRONG`. Observar 50-100 trades post-reinicio antes de reentrenar Ghost.
 
-Actualizacion Fase 2 RANGE (2026-07-13): `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false` deja `RANGE` como veto duro tambien en SHADOW. Reabrir solo si el flujo operativo queda insuficiente y como experimento explicito.
+Actualizacion Fase 2 RANGE (2026-07-13): `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false` debe dejar `RANGE` como veto duro tambien en SHADOW. El primer intento fue anulado por Markov (`range_veto=False` en `hmm_state == "RANGE"`); corregido para que el hard veto domine salvo override explicito. Reabrir solo si el flujo operativo queda insuficiente.

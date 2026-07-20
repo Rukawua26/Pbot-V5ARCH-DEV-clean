@@ -71,6 +71,11 @@ Reglas preventivas:
 - Si se necesita reabrir flujo, activar `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=true` como experimento explicito, no por comportamiento implicito de PAPER/SHADOW.
 - Medir 50-100 trades post-reinicio: 0 entradas en `RANGE`, `HARD_SL < 60%`, PF > 0.8.
 
+Correccion posterior:
+- El experimento inicial no fue valido: `_apply_markov_regime_weight` hacia `range_veto = False` para cualquier `hmm_state == "RANGE"`, incluso con `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false`.
+- Se corrigio para que Markov no pueda relajar `RANGE_VETO` sin override explicito. `RANGE_BREAKOUT_ANTICIPATION`, `HMM_RANGE_PENALTY` y `RANGE_MARKOV_PENALTY` solo quedan permitidos con `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=true`.
+- Test preventivo: `test_markov_range_breakout_cannot_override_hard_range_veto_by_default`.
+
 ### 2026-07-10 - Housekeeping fail-safe y heartbeat PAPER testnet
 
 Problema:

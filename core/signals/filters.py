@@ -145,27 +145,36 @@ def _apply_markov_regime_weight(
     decision = None
 
     if hmm_state == "RANGE":
-        range_veto = False
-        if markov_prob >= breakout_min:
-            regime_weight = float(getattr(Config, "MARKOV_RANGE_BREAKOUT_WEIGHT", 0.90))
-            regime_reason = "RANGE_BREAKOUT_ANTICIPATION"
-            decision = "range_breakout_allowed"
+        range_learning_override = bool(
+            getattr(Config, "HMM_RANGE_LEARNING_OVERRIDE_ENABLED", False)
+        )
+        if range_veto and not range_learning_override:
+            regime_reason = "RANGE_VETO"
+            decision = "range_hard_veto"
             if filter_passed:
-                filter_reason = regime_reason
-        elif markov_prob < dead_zone_max:
-            # [HOTFIX v118.1] Dead zone: aplicar penalización standard en lugar de veto total
-            # El mercado lateral estancado reduce probabilidades pero no bloquea señales válidas
-            regime_weight = float(getattr(Config, "MARKOV_RANGE_STANDARD_WEIGHT", 0.75))
-            regime_reason = "HMM_RANGE_PENALTY"
-            decision = "range_dead_zone_penalty"
-            if filter_passed:
-                filter_reason = regime_reason
+                filter_reason = "RANGE REGIME VETO"
         else:
-            regime_weight = float(getattr(Config, "MARKOV_RANGE_STANDARD_WEIGHT", 0.75))
-            regime_reason = "RANGE_MARKOV_PENALTY"
-            decision = "range_standard_penalty"
-            if filter_passed:
-                filter_reason = regime_reason
+            range_veto = False
+            if markov_prob >= breakout_min:
+                regime_weight = float(getattr(Config, "MARKOV_RANGE_BREAKOUT_WEIGHT", 0.90))
+                regime_reason = "RANGE_BREAKOUT_ANTICIPATION"
+                decision = "range_breakout_allowed"
+                if filter_passed:
+                    filter_reason = regime_reason
+            elif markov_prob < dead_zone_max:
+                # [HOTFIX v118.1] Dead zone: aplicar penalización standard en lugar de veto total
+                # El mercado lateral estancado reduce probabilidades pero no bloquea señales válidas
+                regime_weight = float(getattr(Config, "MARKOV_RANGE_STANDARD_WEIGHT", 0.75))
+                regime_reason = "HMM_RANGE_PENALTY"
+                decision = "range_dead_zone_penalty"
+                if filter_passed:
+                    filter_reason = regime_reason
+            else:
+                regime_weight = float(getattr(Config, "MARKOV_RANGE_STANDARD_WEIGHT", 0.75))
+                regime_reason = "RANGE_MARKOV_PENALTY"
+                decision = "range_standard_penalty"
+                if filter_passed:
+                    filter_reason = regime_reason
     elif hmm_state in {"BULL_STRONG", "BULL_TREND"} and audit_signal == "BUY" and allow_boost:
         regime_weight = float(getattr(Config, "MARKOV_BULL_STRONG_WEIGHT", 1.10))
         regime_reason = "MARKOV_BULL_ALIGNED"

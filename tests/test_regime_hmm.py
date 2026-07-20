@@ -625,14 +625,19 @@ class RegimeRangeFilterTests(unittest.TestCase):
                 with patch.object(filters.Config, "MARKOV_BREAKOUT_MIN", 75.0):
                     with patch.object(filters.Config, "MARKOV_RANGE_BREAKOUT_WEIGHT", 0.90):
                         with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
-                            with patch.object(
-                                filters.Strategy,
-                                "check_entry_filters",
-                                return_value=(
-                                    True,
-                                    "OK",
-                                    "CALM",
-                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            with (
+                                patch.object(
+                                    filters.Config, "HMM_RANGE_LEARNING_OVERRIDE_ENABLED", True
+                                ),
+                                patch.object(
+                                    filters.Strategy,
+                                    "check_entry_filters",
+                                    return_value=(
+                                        True,
+                                        "OK",
+                                        "CALM",
+                                        {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                    ),
                                 ),
                             ):
                                 prob_final, filter_passed, filter_reason, updated_ctx = (
@@ -654,6 +659,56 @@ class RegimeRangeFilterTests(unittest.TestCase):
         self.assertEqual(updated_ctx["regime_reason"], "RANGE_BREAKOUT_ANTICIPATION")
         self.assertEqual(updated_ctx["markov_prob"], 82.0)
         self.assertEqual(bot.markov_decision_stats["range_breakout_allowed"], 1)
+
+    def test_markov_range_breakout_cannot_override_hard_range_veto_by_default(self):
+        ctx = {
+            "rsi": 55.0,
+            "adx": 22.0,
+            "atr_pct": 0.01,
+            "close": 100.0,
+            "atr": 1.0,
+            "trend": "RANGO",
+            "tier": "IRON",
+            "hmm_data": {
+                "ts": datetime.now(UTC).isoformat(),
+                "is_ready": True,
+                "state": "RANGE",
+                "bullish_breakout_prob": 90.0,
+            },
+        }
+        bot = self._build_bot("RANGE")
+
+        with patch.object(filters.Config, "HMM_RANGE_VETO", True):
+            with patch.object(filters.Config, "MARKOV_BREAKOUT_MIN", 75.0):
+                with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
+                    with patch.object(
+                        filters.Strategy,
+                        "check_entry_filters",
+                        return_value=(
+                            True,
+                            "OK",
+                            "CALM",
+                            {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                        ),
+                    ):
+                        prob_final, filter_passed, filter_reason, updated_ctx = (
+                            filters._apply_entry_filters_and_adjust_prob(
+                                bot,
+                                "TEST/USDT",
+                                "TEST/USDT",
+                                pd.DataFrame(),
+                                "BUY",
+                                80.0,
+                                ctx,
+                                1.0,
+                            )
+                        )
+
+        self.assertEqual(prob_final, 0.0)
+        self.assertFalse(filter_passed)
+        self.assertEqual(filter_reason, "RANGE REGIME VETO")
+        self.assertEqual(updated_ctx["regime_reason"], "RANGE_VETO")
+        self.assertEqual(bot.markov_decision_stats["range_hard_veto"], 1)
 
     def test_markov_range_stagnant_applies_penalty(self):
         """[HOTFIX v118.1] Dead zone ahora aplica penalización estándar (x0.75)
@@ -681,14 +736,19 @@ class RegimeRangeFilterTests(unittest.TestCase):
                 with patch.object(filters.Config, "MARKOV_DEAD_ZONE_MAX", 30.0):
                     with patch.object(filters.Config, "MARKOV_RANGE_STANDARD_WEIGHT", 0.75):
                         with patch.object(filters.Config, "SIDE_PARITY_FILTER_ENABLED", False):
-                            with patch.object(
-                                filters.Strategy,
-                                "check_entry_filters",
-                                return_value=(
-                                    True,
-                                    "OK",
-                                    "CALM",
-                                    {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                            with (
+                                patch.object(
+                                    filters.Config, "HMM_RANGE_LEARNING_OVERRIDE_ENABLED", True
+                                ),
+                                patch.object(
+                                    filters.Strategy,
+                                    "check_entry_filters",
+                                    return_value=(
+                                        True,
+                                        "OK",
+                                        "CALM",
+                                        {"DAY_WEIGHT": 1.0, "HOUR_WEIGHT": 1.0},
+                                    ),
                                 ),
                             ):
                                 prob_final, filter_passed, filter_reason, updated_ctx = (

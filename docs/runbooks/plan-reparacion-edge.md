@@ -160,6 +160,11 @@ Criterio de observacion post-reinicio:
 - Si el flujo cae demasiado, reabrir de forma controlada con `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=true` o con condiciones adicionales, no con override implicito.
 - Mantener medicion de 50-100 trades antes de reentrenar Ghost.
 
+Correccion posterior:
+- El primer intento no bloqueo `RANGE` realmente: `_apply_markov_regime_weight` ponia `range_veto=False` para `hmm_state == "RANGE"` antes del hard veto.
+- El hard veto queda ahora en la capa Markov tambien: sin `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=true`, ni breakout Markov ni dead-zone pueden convertir `RANGE` a penalizacion.
+- Los 50 trades medidos antes de esta correccion no validan el experimento RANGE: 22/50 siguieron entrando en `RANGE` con PF 0.12.
+
 ## Fase 2 — Rankear Filtros
 
 **Meta**: descubrir que filtro hoy corta mas trades.
