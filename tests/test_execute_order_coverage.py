@@ -142,7 +142,17 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
                 exchange=object(),
                 fetch_ticker=lambda _s: {"last": 100.0},
                 set_leverage=MagicMock(),
-                place_hard_sl=MagicMock(return_value={"id": "sl-1"}),
+                place_hard_sl=MagicMock(
+                    side_effect=lambda symbol, side, amount, stop_price, **kw: {
+                        "id": "sl-1",
+                        "symbol": symbol,
+                        "type": "STOP_MARKET",
+                        "side": "sell" if str(side).lower() == "buy" else "buy",
+                        "amount": amount,
+                        "status": "open",
+                        "info": {"reduceOnly": True},
+                    }
+                ),
             ),
         )
         attrs.update(overrides)
@@ -402,6 +412,43 @@ class ExecuteOrderCoverageTest(unittest.TestCase):
             bot, "BTC/USDT", "BUY", 100.0, 1.0, is_shadow=False, context=self._ctx()
         )
         self.assertEqual(result, "ENTRY_ABORTED_NO_HARD_SL")
+
+    @patch("core.trade_entry.Config.PAPER_MODE", False)
+    @patch("core.trade_entry.send_telegram_msg")
+    @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=False)
+    def test_hard_sl_invalid_ack_triggers_failsafe(self, _, _tg):
+        """ACK truthy pero inválido (side opuesto) debe tratarse igual que
+        un fallo del SL: fail-safe close para no dejar la posición desnuda."""
+        from tests.test_bot_guardian_hard_sl import _valid_hard_sl_ack
+
+        bot = self._min_bot()
+        bot.execution.create_precision_order = MagicMock(
+            return_value={"id": "o1", "status": "closed", "filled": 1.0, "average": 100.0}
+        )
+        # Trade BUY requiere SL 'sell'; el exchange devuelve un ACK con side 'buy'
+        # (respuesta de tipo equivocado o takeover silencioso). NO debe aceptarse.
+        bad_ack = _valid_hard_sl_ack("BTC/USDT", "buy", 1.0)
+        bot.execution.place_hard_sl = MagicMock(return_value=bad_ack)
+        bot.execution.last_hard_sl_error = ""
+
+        import core.trade_entry as te_mod
+
+        called_fail_safe = {"count": 0}
+
+        def _spy_fail_safe(*a, **kw):
+            called_fail_safe["count"] += 1
+            return True
+
+        orig = te_mod._fail_safe_close_when_sl_missing
+        te_mod._fail_safe_close_when_sl_missing = _spy_fail_safe
+        try:
+            result = execute_order(
+                bot, "BTC/USDT", "BUY", 100.0, 1.0, is_shadow=False, context=self._ctx()
+            )
+            self.assertEqual(result, "ENTRY_ABORTED_NO_HARD_SL")
+            self.assertEqual(called_fail_safe["count"], 1)
+        finally:
+            te_mod._fail_safe_close_when_sl_missing = orig
 
     @patch("core.trade_entry.Config.PAPER_MODE", False)
     @patch("core.trade_entry.send_telegram_msg")

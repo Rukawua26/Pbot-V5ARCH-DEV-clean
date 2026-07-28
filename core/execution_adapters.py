@@ -300,6 +300,7 @@ class ShadowExecutionAdapter:
         amount: float,
         stop_price: float,
         client_order_id: str | None = None,
+        params: dict | None = None,
     ):
         ticker = self._live.fetch_ticker(symbol)
         market_price = float(ticker.get("last") or 0.0)
@@ -323,7 +324,9 @@ class ShadowExecutionAdapter:
             "info": {"shadow": True, "reduceOnly": True},
         }
 
-    def close_position(self, symbol: str, side: str, amount: float):
+    def close_position(
+        self, symbol: str, side: str, amount: float, position_side: str | None = None
+    ):
         if self._reject():
             raise RuntimeError("shadow close rejected")
         price = float((self._live.fetch_ticker(symbol) or {}).get("last") or 0.0)
@@ -355,8 +358,10 @@ class ShadowExecutionAdapter:
             "info": {"shadow": True, "reduceOnly": True},
         }
 
-    def close_due_to_degradation(self, symbol: str, side: str, amount: float):
-        return self.close_position(symbol, side, amount)
+    def close_due_to_degradation(
+        self, symbol: str, side: str, amount: float, position_side: str | None = None
+    ):
+        return self.close_position(symbol, side, amount, position_side=position_side)
 
     def cancel_order(self, symbol: str, order_id: str):
         if self._reject():

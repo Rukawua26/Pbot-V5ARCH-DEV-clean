@@ -7,6 +7,19 @@ from unittest.mock import MagicMock, patch
 from core.bot_wallet_sync import _manage_partial_fill_trade, sync_wallet
 
 
+def _valid_hard_sl_ack(symbol: str, sl_side: str, amount: float, order_id: str = "sl-1") -> dict:
+    """ACK estructuralmente válido para hard_sl_ack_looks_valid."""
+    return {
+        "id": order_id,
+        "symbol": symbol,
+        "type": "STOP_MARKET",
+        "side": sl_side.lower(),
+        "amount": amount,
+        "status": "open",
+        "info": {"reduceOnly": True},
+    }
+
+
 class WalletSyncSlRecoveryTest(unittest.TestCase):
     def _base_bot(self):
         bot = SimpleNamespace()
@@ -51,7 +64,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                 }
             ],
             fetch_open_orders=lambda _symbol=None: [],
-            place_hard_sl=MagicMock(return_value={"id": "sl-123"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("BTC/USDT", "sell", 1.0, "sl-123")
+            ),
         )
 
         sync_wallet(bot)
@@ -172,7 +187,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                     "info": {"reduceOnly": True, "type": "STOP_MARKET"},
                 }
             ],
-            place_hard_sl=MagicMock(return_value={"id": "should-not-create"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "should-not-create")
+            ),
         )
 
         sync_wallet(bot)
@@ -207,7 +224,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                 }
             ],
             fetch_open_orders=lambda _symbol=None: [],
-            place_hard_sl=MagicMock(return_value={"id": "new-sl"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "new-sl")
+            ),
         )
 
         sync_wallet(bot)
@@ -303,7 +322,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                 }
             ],
             fetch_open_orders=MagicMock(side_effect=RuntimeError("orders unavailable")),
-            place_hard_sl=MagicMock(return_value={"id": "duplicate-sl"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "duplicate-sl")
+            ),
         )
 
         sync_wallet(bot)
@@ -349,7 +370,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                     "info": {"reduceOnly": True, "type": "STOP_MARKET"},
                 }
             ],
-            place_hard_sl=MagicMock(return_value={"id": "full-sl"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "full-sl")
+            ),
         )
 
         sync_wallet(bot)
@@ -619,7 +642,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
                 }
             ],
             cancel_order=MagicMock(return_value={"id": "entry-ord-1", "status": "canceled"}),
-            place_hard_sl=MagicMock(return_value={"id": "sl-1"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("BNB/USDT", "sell", 4.0, "sl-1")
+            ),
         )
 
         sync_wallet(bot)
@@ -665,7 +690,9 @@ class WalletSyncSlRecoveryTest(unittest.TestCase):
             ],
             fetch_open_orders=MagicMock(side_effect=RuntimeError("exchange down")),
             cancel_order=MagicMock(),
-            place_hard_sl=MagicMock(return_value={"id": "sl-1"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("BNB/USDT", "sell", 4.0, "sl-1")
+            ),
         )
 
         sync_wallet(bot)

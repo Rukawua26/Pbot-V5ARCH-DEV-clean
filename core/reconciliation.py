@@ -6,6 +6,7 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 from core.config.operational import OperationalConfig
+from core.execution_safety import hard_sl_ack_looks_valid, sl_side_for_trade_side
 from core.execution_telemetry import append_execution_event
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import parse_datetime_utc, utc_now, utc_now_iso
@@ -470,14 +471,27 @@ def reconcile_bootstrap_state(bot):
                         symbol,
                     )
             try:
+                orphan_side = str(info["side"])
+                orphan_position_side = (
+                    ("LONG" if orphan_side.upper() == "BUY" else "SHORT")
+                    if bool(getattr(bot, "is_hedge_mode", False))
+                    else None
+                )
                 sl_order = bot.execution.place_hard_sl(
                     symbol,
-                    info["side"],
+                    orphan_side,
                     amount,
                     sl,
                     client_order_id=sl_coid,
+                    params={"positionSide": orphan_position_side} if orphan_position_side else None,
                 )
-                if sl_order:
+                sl_ack_ok, sl_ack_reason = hard_sl_ack_looks_valid(
+                    sl_order,
+                    expected_symbol=symbol,
+                    expected_sl_side=sl_side_for_trade_side(orphan_side),
+                    expected_amount=amount,
+                )
+                if sl_order and sl_ack_ok:
                     adopted_trade["sl_exchange_order_id"] = sl_order.get("id")
                     adopted_trade["status"] = "OPEN"
                     with bot.lock:
@@ -496,12 +510,22 @@ def reconcile_bootstrap_state(bot):
                         bot.brain.save_error_snapshot(
                             symbol,
                             "ORPHAN_HARD_SL_ATTACH_FAILED",
-                            {"sl": sl, "amount": amount, "side": info["side"]},
+                            {
+                                "sl": sl,
+                                "amount": amount,
+                                "side": info["side"],
+                                "ack_reason": sl_ack_reason[:160] if sl_ack_reason else "",
+                            },
                         )
                     append_execution_event(
                         bot,
                         "ORPHAN_HARD_SL_ATTACH_FAILED_HALT",
-                        {"symbol": symbol, "sl": sl, "amount": amount},
+                        {
+                            "symbol": symbol,
+                            "sl": sl,
+                            "amount": amount,
+                            "ack_reason": sl_ack_reason[:120] if sl_ack_reason else "",
+                        },
                     )
             except Exception as e:
                 bot.log(f"⚠️ No se pudo adjuntar SL para huérfana {symbol}: {e}")

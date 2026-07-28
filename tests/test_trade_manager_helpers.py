@@ -60,6 +60,7 @@ class TestFailSafeCloseWhenSlMissing(unittest.TestCase):
 
     def _make_bot(self, close_effect=None, market_effect=None):
         bot = MagicMock()
+        bot.is_hedge_mode = False
         if close_effect:
             bot.execution.close_position.side_effect = close_effect
         else:
@@ -78,12 +79,15 @@ class TestFailSafeCloseWhenSlMissing(unittest.TestCase):
         bot = self._make_bot()
         result = _fail_safe_close_when_sl_missing(bot, "BTC/USDT", "BUY", 0.1)
         self.assertTrue(result)
-        bot.execution.close_position.assert_called_once_with("BTC/USDT", "BUY", 0.1)
+        bot.execution.close_position.assert_called_once_with(
+            "BTC/USDT", "BUY", 0.1, position_side=None
+        )
 
     def test_returns_true_on_market_fallback(self):
         from core.trade_manager import _fail_safe_close_when_sl_missing
 
         bot = MagicMock()
+        bot.is_hedge_mode = False
         bot.execution.close_position.side_effect = Exception("chase limit fail")
         bot.execution.create_reduce_only_market_order.return_value = {"status": "closed"}
         bot.execution.fetch_positions.return_value = []
@@ -92,13 +96,14 @@ class TestFailSafeCloseWhenSlMissing(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(bot.execution.close_position.call_count, 3)
         bot.execution.create_reduce_only_market_order.assert_called_once_with(
-            "BTC/USDT", "SELL", 0.1
+            "BTC/USDT", "SELL", 0.1, params=None
         )
 
     def test_market_fallback_uses_buy_to_close_short(self):
         from core.trade_manager import _fail_safe_close_when_sl_missing
 
         bot = MagicMock()
+        bot.is_hedge_mode = False
         bot.execution.close_position.side_effect = Exception("chase limit fail")
         bot.execution.create_reduce_only_market_order.return_value = {"status": "closed"}
         bot.execution.fetch_positions.return_value = []
@@ -108,7 +113,7 @@ class TestFailSafeCloseWhenSlMissing(unittest.TestCase):
 
         self.assertTrue(result)
         bot.execution.create_reduce_only_market_order.assert_called_once_with(
-            "BTC/USDT", "BUY", 0.1
+            "BTC/USDT", "BUY", 0.1, params=None
         )
 
     @patch("time.sleep", return_value=None)
@@ -340,7 +345,17 @@ class TestTp1FailureNoStateReduction(unittest.TestCase):
             live_prices={},
             execution=SimpleNamespace(
                 fetch_ticker=MagicMock(return_value={"last": 102.0}),
-                place_hard_sl=MagicMock(return_value={"id": "sl-1"}),
+                place_hard_sl=MagicMock(
+                    side_effect=lambda symbol, side, amount, stop_price, **kw: {
+                        "id": "sl-1",
+                        "symbol": symbol,
+                        "type": "STOP_MARKET",
+                        "side": "sell" if str(side).lower() == "buy" else "buy",
+                        "amount": amount,
+                        "status": "open",
+                        "info": {"reduceOnly": True},
+                    }
+                ),
                 create_reduce_only_market_order=(
                     MagicMock(return_value=tp_order_result)
                     if not raise_on_tp

@@ -3,6 +3,7 @@
 ## Knowledge Base
 - Nota de proyecto en `~/docs/agent-context/summaries/pbot.md` (con YAML frontmatter y wikilinks).
 - MOC central: `~/docs/_MOC.md`.
+- Para trabajo Python, ejecuta `python3 "/home/miguel/Aguia refactor aprendizaje/ask.py" "<palabras clave breves>" --language python`; sigue el estado/acción de evidencia, nunca precargues/indexes la guía y prioriza siempre reglas, contratos, invariantes y tests del repositorio.
 
 ## Fuentes De Verdad
 

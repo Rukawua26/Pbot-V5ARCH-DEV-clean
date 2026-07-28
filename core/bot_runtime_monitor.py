@@ -50,7 +50,7 @@ def append_runtime_metric(bot, payload) -> None:
         os.makedirs(metrics_path.parent, exist_ok=True)
         max_bytes = int(os.getenv("RUNTIME_METRICS_MAX_BYTES", "5242880"))
         backups = int(os.getenv("RUNTIME_METRICS_BACKUPS", "3"))
-        _rotate_jsonl(metrics_path, max_bytes=max_bytes, backups=backups)
+        _rotate_jsonl(str(metrics_path), max_bytes=max_bytes, backups=backups)
         with open(metrics_path, "a", encoding="utf-8") as file_obj:
             file_obj.write(json.dumps(payload, ensure_ascii=False) + "\n")
     except Exception as error:

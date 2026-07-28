@@ -936,6 +936,7 @@ class ExecutionService:
         amount: float,
         stop_price: float,
         client_order_id: str | None = None,
+        params: dict | None = None,
     ) -> CCXTOrder | None:
         """Coloca un STOP_MARKET real en Binance para seguridad extrema."""
         if client_order_id is None and not Config.PAPER_MODE:
@@ -952,16 +953,20 @@ class ExecutionService:
             return None
         try:
             sl_side = "sell" if side.lower() == "buy" else "buy"
-            params = {
+            params_out: dict[str, object] = {
                 "stopPrice": self.exchange.price_to_precision(symbol, stop_price_float),
                 "reduceOnly": True,
             }
             if client_order_id:
-                params["newClientOrderId"] = client_order_id
+                params_out["newClientOrderId"] = client_order_id
+            if params:
+                for key, value in params.items():
+                    if value is not None:
+                        params_out[key] = value
             order = self._call_exchange(
                 "place_hard_sl",
                 lambda: self.exchange.create_order(
-                    symbol, "STOP_MARKET", sl_side, amount, None, params
+                    symbol, "STOP_MARKET", sl_side, amount, None, params_out
                 ),
                 retries=3,
                 timeout_s=25.0,
@@ -996,9 +1001,12 @@ class ExecutionService:
         emergency_op_name: str = "close_position_emergency_create_order",
         hard_floor_label: str = "",
         emergency_fail_label: str = "",
+        position_side: str | None = None,
     ) -> CCXTOrder | None:
         exit_side = "sell" if side.lower() == "buy" else "buy"
-        params = {"reduceOnly": True}
+        params: dict[str, object] = {"reduceOnly": True}
+        if position_side:
+            params["positionSide"] = position_side
 
         try:
             self._call_exchange(
@@ -1089,7 +1097,9 @@ class ExecutionService:
         else:
             return self._handle_no_price_exit(symbol, exit_side, amount)
 
-    def close_position(self, symbol: str, side: str, amount: float) -> CCXTOrder | None:
+    def close_position(
+        self, symbol: str, side: str, amount: float, position_side: str | None = None
+    ) -> CCXTOrder | None:
         """
         [v119-CHASE-LIMIT] Cierra posición con Chase Limit + Hard Floor.
         - -2% inicial, persigue hasta -5% (Hard Floor)
@@ -1102,12 +1112,15 @@ class ExecutionService:
                 side,
                 amount,
                 emergency_op_name="close_position_emergency_create_order",
+                position_side=position_side,
             )
         except Exception:
             self.logger.exception(f"❌ Error cerrando posición {symbol}:")
             raise
 
-    def close_due_to_degradation(self, symbol: str, side: str, amount: float) -> CCXTOrder | None:
+    def close_due_to_degradation(
+        self, symbol: str, side: str, amount: float, position_side: str | None = None
+    ) -> CCXTOrder | None:
         """
         [v119-CHASE-LIMIT] Cierra por degradación neuronal con Chase Limit + Hard Floor.
         - -2% inicial, persigue hasta -5% (Hard Floor)
@@ -1126,6 +1139,7 @@ class ExecutionService:
                 emergency_op_name="close_degradation_emergency_create_order",
                 hard_floor_label="degradation",
                 emergency_fail_label="degradation",
+                position_side=position_side,
             )
         except Exception as e:
             self.logger.critical(

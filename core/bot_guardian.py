@@ -2,6 +2,7 @@ import time
 from contextlib import nullcontext
 
 from config import Config
+from core.execution_safety import hard_sl_ack_looks_valid, sl_side_for_trade_side
 from core.execution_telemetry import append_execution_event
 from core.kanban_sync import async_actualizar_pnl, async_mover_tarjeta
 from core.runtime_metrics import append_runtime_metric
@@ -59,14 +60,28 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
     if amount <= 0.0:
         return
 
+    trade_side = str(trade.get("side") or "BUY")
+    hedge_position_side = (
+        ("LONG" if trade_side.upper() == "BUY" else "SHORT")
+        if bool(getattr(bot, "is_hedge_mode", False))
+        else None
+    )
     new_order = bot.execution.place_hard_sl(
         symbol,
-        str(trade.get("side") or "BUY"),
+        trade_side,
         amount,
         new_sl,
         client_order_id=new_coid,
+        params={"positionSide": hedge_position_side} if hedge_position_side else None,
     )
-    if not new_order:
+    sl_ack_ok, sl_ack_reason = hard_sl_ack_looks_valid(
+        new_order,
+        expected_symbol=symbol,
+        expected_sl_side=sl_side_for_trade_side(trade_side),
+        expected_amount=amount,
+    )
+    if not new_order or not sl_ack_ok:
+        ack_detail = sl_ack_reason or str(getattr(bot.execution, "last_hard_sl_error", "") or "")
         bot.is_paused = True
         bot.integrity_lock_active = True
         setattr(bot, "halt_system_active", True)
@@ -76,7 +91,12 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
         append_execution_event(
             bot,
             "HARD_SL_AMEND_FAILED_HALT",
-            {"symbol": symbol, "old_sl": previous_sl, "new_sl": new_sl},
+            {
+                "symbol": symbol,
+                "old_sl": previous_sl,
+                "new_sl": new_sl,
+                "ack_reason": ack_detail[:160],
+            },
         )
         append_runtime_metric(
             "halt",
@@ -85,9 +105,13 @@ def _sync_tightened_hard_sl(bot, symbol: str, trade: dict, previous_sl: float) -
                 "symbol": symbol,
                 "old_sl": previous_sl,
                 "new_sl": new_sl,
+                "ack_reason": ack_detail[:120],
             },
         )
-        bot.log(f"🛑 HARD_SL_AMEND_FAILED {symbol}: SL local {previous_sl} -> {new_sl}")
+        bot.log(
+            f"🛑 HARD_SL_AMEND_FAILED {symbol}: SL local {previous_sl} -> {new_sl} "
+            f"(ack={ack_detail[:120]})"
+        )
         return
 
     cancel_order = getattr(bot.execution, "cancel_order", None)

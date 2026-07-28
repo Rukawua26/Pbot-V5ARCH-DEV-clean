@@ -11,6 +11,19 @@ from core.strategy.agents.ghost_agent import GhostAgent
 from core.time_utils import utc_now, utc_now_iso
 
 
+def _valid_hard_sl_ack(symbol: str, sl_side: str, amount: float, order_id: str = "new-sl") -> dict:
+    """ACK estructuralmente válido para hard_sl_ack_looks_valid."""
+    return {
+        "id": order_id,
+        "symbol": symbol,
+        "type": "STOP_MARKET",
+        "side": sl_side.lower(),
+        "amount": amount,
+        "status": "open",
+        "info": {"reduceOnly": True},
+    }
+
+
 class _PredictProbaModel:
     def predict_proba(self, _features):
         return [[0.35, 0.65]]
@@ -190,7 +203,9 @@ class SmartExitConfidenceGuardrailsTest(unittest.TestCase):
         bot._exit_eval_last_log = {}
         bot.execution = SimpleNamespace(
             fetch_ticker=MagicMock(return_value={"last": 1.02}),
-            place_hard_sl=MagicMock(return_value={"id": "new-sl"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("XPL/USDT", "sell", 1.0, "new-sl")
+            ),
             cancel_order=MagicMock(return_value={"id": "old-sl", "status": "canceled"}),
         )
         bot.exit_engine = SimpleNamespace(evaluate_exit=MagicMock(side_effect=_tighten))

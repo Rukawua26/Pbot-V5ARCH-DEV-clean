@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from config import Config
+from core.execution_safety import hard_sl_ack_looks_valid, sl_side_for_trade_side
 from core.execution_telemetry import append_execution_event
 from core.reconciliation import generate_child_client_order_id, generate_order_ids
 from core.symbol_utils import normalize_position_symbol
@@ -244,14 +245,27 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
         sl_coid = generate_child_client_order_id(entry_coid, "SL")
         trade["sl_client_order_id"] = sl_coid
 
+    sl_side_str = str(trade.get("side") or info.get("side") or "BUY")
+    hedge_position_side = (
+        ("LONG" if sl_side_str.upper() == "BUY" else "SHORT")
+        if bool(getattr(bot, "is_hedge_mode", False))
+        else None
+    )
     sl_order = bot.execution.place_hard_sl(
         symbol,
-        str(trade.get("side") or info.get("side") or "BUY"),
+        sl_side_str,
         amount,
         sl_price,
         client_order_id=sl_coid or None,
+        params={"positionSide": hedge_position_side} if hedge_position_side else None,
     )
-    if sl_order:
+    sl_ack_ok, sl_ack_reason = hard_sl_ack_looks_valid(
+        sl_order,
+        expected_symbol=symbol,
+        expected_sl_side=sl_side_for_trade_side(sl_side_str),
+        expected_amount=amount,
+    )
+    if sl_order and sl_ack_ok:
         trade["sl_exchange_order_id"] = sl_order.get("id")
         trade["hard_sl_attach_fail_count"] = 0
         trade["status"] = "OPEN"
@@ -259,7 +273,10 @@ def _ensure_hard_sl_attached(bot, symbol: str, trade: dict, info: dict):
             bot.brain.save_active_trade_state(str(trade.get("trade_key") or symbol), trade)
         bot.log(f"🛡️ HARD SL recuperado para {symbol}: {sl_order.get('id')}")
     else:
-        sl_error = str(getattr(bot.execution, "last_hard_sl_error", "") or "")
+        if sl_order is not None:
+            sl_error = sl_ack_reason or str(getattr(bot.execution, "last_hard_sl_error", "") or "")
+        else:
+            sl_error = str(getattr(bot.execution, "last_hard_sl_error", "") or "")
         if _is_immediate_trigger_rejection(sl_error):
             _emergency_market_close_unprotected(bot, symbol, trade, amount, sl_error)
             return True

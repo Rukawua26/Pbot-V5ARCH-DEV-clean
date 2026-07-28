@@ -597,7 +597,9 @@ class TestCloseTradeRealSuccessPath(unittest.TestCase):
                     stack.enter_context(cm)
                 close_trade(bot, "BTC/USDT", "MANUAL_CLOSE", 51000.0, exit_confidence=70.0)
 
-        bot.execution.close_position.assert_called_once_with("BTC/USDT", "BUY", 0.001)
+        bot.execution.close_position.assert_called_once_with(
+            "BTC/USDT", "BUY", 0.001, position_side=None
+        )
         bot.execution.close_due_to_degradation.assert_not_called()
         bot.execution.fetch_my_trades.assert_called_once_with("BTC/USDT", limit=2)
         self.assertNotIn("BTC/USDT", bot.active_trades)
@@ -620,7 +622,9 @@ class TestCloseTradeRealSuccessPath(unittest.TestCase):
                     stack.enter_context(cm)
                 close_trade(bot, "BTC/USDT", "CONF_DEGRADED_EXIT", 51000.0)
 
-        bot.execution.close_due_to_degradation.assert_called_once_with("BTC/USDT", "BUY", 0.001)
+        bot.execution.close_due_to_degradation.assert_called_once_with(
+            "BTC/USDT", "BUY", 0.001, position_side=None
+        )
         bot.execution.close_position.assert_not_called()
 
     def test_large_real_loss_sets_stagnation_and_circuit_breaker(self):

@@ -144,10 +144,22 @@ def close_trade(
                 pre_api_ts = time.perf_counter()
                 if "DEGRADED" in reason or "CONF_DEGRADED" in reason:
                     order = bot.execution.close_due_to_degradation(
-                        symbol, trade["side"], trade["amount"]
+                        symbol,
+                        trade["side"],
+                        trade["amount"],
+                        position_side=("LONG" if str(trade["side"]).upper() == "BUY" else "SHORT")
+                        if bool(getattr(bot, "is_hedge_mode", False))
+                        else None,
                     )
                 else:
-                    order = bot.execution.close_position(symbol, trade["side"], trade["amount"])
+                    order = bot.execution.close_position(
+                        symbol,
+                        trade["side"],
+                        trade["amount"],
+                        position_side=("LONG" if str(trade["side"]).upper() == "BUY" else "SHORT")
+                        if bool(getattr(bot, "is_hedge_mode", False))
+                        else None,
+                    )
                 post_api_ts = time.perf_counter()
 
                 if order:

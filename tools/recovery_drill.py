@@ -57,7 +57,7 @@ class DrillExecution:
     def fetch_ticker(self, _symbol):
         return {"last": 49950.0}
 
-    def place_hard_sl(self, symbol, side, amount, stop_price, client_order_id=None):
+    def place_hard_sl(self, symbol, side, amount, stop_price, client_order_id=None, params=None):
         self.place_hard_sl_calls.append(
             {
                 "symbol": symbol,
@@ -69,7 +69,16 @@ class DrillExecution:
         )
         if not self._hard_sl_ok:
             return None
-        return {"id": "drill-hard-sl-1", "clientOrderId": client_order_id, "status": "open"}
+        sl_side = "sell" if str(side).lower() == "buy" else "buy"
+        return {
+            "id": "drill-hard-sl-1",
+            "symbol": symbol,
+            "type": "STOP_MARKET",
+            "side": sl_side,
+            "amount": amount,
+            "status": "open",
+            "info": {"reduceOnly": True},
+        }
 
 
 class PositionsFailureExecution(DrillExecution):

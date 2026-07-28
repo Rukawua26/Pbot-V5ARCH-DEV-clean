@@ -67,6 +67,12 @@ def _emergency_market_close(
     }
 
     exit_side = "SELL" if str(side).upper() == "BUY" else "BUY"
+    hedge_position_side = (
+        ("LONG" if str(side).upper() == "BUY" else "SHORT")
+        if bool(getattr(bot, "is_hedge_mode", False))
+        else None
+    )
+    emergency_params = {"positionSide": hedge_position_side} if hedge_position_side else None
 
     def _close_result_confirmed(order_result) -> bool:
         if verify_flat:
@@ -87,7 +93,12 @@ def _emergency_market_close(
 
     for attempt in range(1, 4):
         try:
-            close_result = bot.execution.close_position(symbol, side, amount)
+            close_result = bot.execution.close_position(
+                symbol,
+                side,
+                amount,
+                position_side=hedge_position_side,
+            )
             if _close_result_confirmed(close_result):
                 close_ok = True
                 break
@@ -106,7 +117,7 @@ def _emergency_market_close(
             try:
                 bot.log(f"🧯 EMERGENCY_CLOSE intento MARKET {attempt}/2 en {symbol}")
                 market_result = bot.execution.create_reduce_only_market_order(
-                    symbol, exit_side, amount
+                    symbol, exit_side, amount, params=emergency_params
                 )
                 if _close_result_confirmed(market_result):
                     close_ok = True

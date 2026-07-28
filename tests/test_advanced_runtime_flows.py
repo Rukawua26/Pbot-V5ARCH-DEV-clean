@@ -10,6 +10,19 @@ from core.time_utils import parse_datetime_utc
 from core.trade_manager import execute_order
 
 
+def _valid_hard_sl_ack(symbol: str, sl_side: str, amount: float, order_id: str = "sl-1") -> dict:
+    """ACK estructuralmente válido para hard_sl_ack_looks_valid."""
+    return {
+        "id": order_id,
+        "symbol": symbol,
+        "type": "STOP_MARKET",
+        "side": sl_side.lower(),
+        "amount": amount,
+        "status": "open",
+        "info": {"reduceOnly": True},
+    }
+
+
 class AdvancedRuntimeFlowsTest(unittest.TestCase):
     @patch("core.trade_entry.shadow_logger.is_trading_halted", return_value=True)
     def test_execute_order_blocks_real_when_shadow_logger_halted(self, _mock_halted):
@@ -274,7 +287,9 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
                     "average": 100.5,
                 }
             ),
-            place_hard_sl=MagicMock(return_value={"id": "sl-1"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("SOL/USDT", "sell", 4.0, "sl-1")
+            ),
         )
 
         result = execute_order(

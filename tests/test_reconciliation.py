@@ -11,6 +11,19 @@ from core.reconciliation import (
 )
 
 
+def _valid_hard_sl_ack(symbol: str, sl_side: str, amount: float, order_id: str = "sl-1") -> dict:
+    """ACK estructuralmente válido para hard_sl_ack_looks_valid."""
+    return {
+        "id": order_id,
+        "symbol": symbol,
+        "type": "STOP_MARKET",
+        "side": sl_side.lower(),
+        "amount": amount,
+        "status": "open",
+        "info": {"reduceOnly": True},
+    }
+
+
 class ReconciliationTest(unittest.TestCase):
     def test_client_order_id_is_deterministic(self):
         a = generate_client_order_id("BTC/USDT", "BUY", 1712222222.123, "abc123")
@@ -119,7 +132,9 @@ class ReconciliationTest(unittest.TestCase):
                     "clientOrderId": "S_EXISTING",
                 }
             ],
-            place_hard_sl=MagicMock(return_value={"id": "duplicate-sl"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "duplicate-sl")
+            ),
             fetch_ticker=lambda s: {"last": 2950},
         )
         bot.get_current_balance = lambda: 100.0
@@ -157,7 +172,9 @@ class ReconciliationTest(unittest.TestCase):
                 }
             ],
             fetch_open_orders=lambda: [],
-            place_hard_sl=MagicMock(return_value={"id": "sl-confirmed"}),
+            place_hard_sl=MagicMock(
+                return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "sl-confirmed")
+            ),
             fetch_ticker=lambda s: {"last": 2950},
         )
         bot.get_current_balance = lambda: 100.0
@@ -717,7 +734,9 @@ class OrphanAdoptionTest(unittest.TestCase):
                     }
                 ],
                 fetch_open_orders=lambda: [],
-                place_hard_sl=MagicMock(return_value={"id": "sl-123"}),
+                place_hard_sl=MagicMock(
+                    return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "sl-123")
+                ),
                 fetch_ticker=lambda s: {"last": 2950},
             )
             bot.get_current_balance = lambda: 100.0
@@ -817,7 +836,9 @@ class OrphanAdoptionTest(unittest.TestCase):
                     }
                 ],
                 fetch_open_orders=lambda: [],
-                place_hard_sl=MagicMock(return_value={"id": "sl-123"}),
+                place_hard_sl=MagicMock(
+                    return_value=_valid_hard_sl_ack("ETH/USDT", "sell", 0.5, "sl-123")
+                ),
                 fetch_ticker=MagicMock(side_effect=RuntimeError("API error")),
             )
             bot.get_current_balance = lambda: 100.0
@@ -958,7 +979,12 @@ class RealBootstrapReconciliationFailureTest(unittest.TestCase):
             ),
             fetch_open_orders=MagicMock(return_value=[]),
             fetch_ticker=MagicMock(return_value={"last": 50050}),
-            place_hard_sl=MagicMock(side_effect=[{"id": "sl-buy"}, {"id": "sl-sell"}]),
+            place_hard_sl=MagicMock(
+                side_effect=[
+                    _valid_hard_sl_ack("BTC/USDT", "sell", 0.1, "sl-buy"),
+                    _valid_hard_sl_ack("BTC/USDT", "buy", 0.1, "sl-sell"),
+                ]
+            ),
         )
         bot = self._bot(execution)
 

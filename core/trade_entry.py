@@ -5,6 +5,7 @@ from typing import Any
 import core.trade_helpers as _trade_helpers
 from config import Config
 from core.cooldown_state import is_symbol_in_cooldown, set_symbol_cooldown
+from core.execution_safety import hard_sl_ack_looks_valid, sl_side_for_trade_side
 from core.execution_telemetry import append_execution_event
 from core.kanban_sync import async_crear_tarjeta
 from core.reconciliation import (
@@ -895,18 +896,33 @@ def execute_order(
                     )
 
                 bot.log(f"\U0001f6e1\ufe0f Colocando HARD SL en Binance: {symbol} @ {sl_val}")
+                hedge_position_side = (
+                    ("LONG" if str(side).upper() == "BUY" else "SHORT")
+                    if bool(getattr(bot, "is_hedge_mode", False))
+                    else None
+                )
                 sl_order = bot.execution.place_hard_sl(
                     symbol,
                     side,
                     filled_amount,
                     sl_val,
                     client_order_id=sl_client_order_id,
+                    params={"positionSide": hedge_position_side} if hedge_position_side else None,
                 )
 
-                if not sl_order:
-                    sl_error = str(getattr(bot.execution, "last_hard_sl_error", "") or "")
+                sl_ack_ok, sl_ack_reason = hard_sl_ack_looks_valid(
+                    sl_order,
+                    expected_symbol=symbol,
+                    expected_sl_side=sl_side_for_trade_side(side),
+                    expected_amount=filled_amount,
+                )
+                if not sl_order or not sl_ack_ok:
+                    sl_error = sl_ack_reason or str(
+                        getattr(bot.execution, "last_hard_sl_error", "") or ""
+                    )
                     bot.log(
-                        f"\u2622\ufe0f HARD_SL_ATTACH_FAILED {symbol}: entrada cerrada por fail-safe para evitar posición desnuda. error={sl_error[:180]}"
+                        f"\u2622\ufe0f HARD_SL_ATTACH_FAILED {symbol}: ACK inválido ({sl_error}). "
+                        f"entrada cerrada por fail-safe para evitar posición desnuda."
                     )
                     append_execution_event(
                         bot,
@@ -916,6 +932,7 @@ def execute_order(
                             "entry_client_order_id": entry_client_order_id,
                             "sl_client_order_id": sl_client_order_id,
                             "sl_error": sl_error[:180],
+                            "sl_ack_reason": sl_ack_reason[:120],
                         },
                     )
 
