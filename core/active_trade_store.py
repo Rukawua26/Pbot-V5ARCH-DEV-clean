@@ -1,6 +1,7 @@
 import json
 import sqlite3
 import time
+from contextlib import suppress
 from datetime import datetime
 
 
@@ -13,6 +14,7 @@ def save_active_trade_state(brain, symbol, state_data) -> bool:
         data_to_save["open_time"] = data_to_save["open_time"].isoformat()
 
     for attempt in range(3):
+        conn = None
         try:
             conn = brain._get_conn()
             c = conn.cursor()
@@ -34,6 +36,40 @@ def save_active_trade_state(brain, symbol, state_data) -> bool:
             return False
         except Exception as error:
             print(f"❌ Error guardando estado de trade activo: {error}")
+            return False
+    return False
+
+
+def settle_simulated_trade_wallet(brain, symbol, wallet_key, wallet_state) -> bool:
+    for attempt in range(3):
+        try:
+            conn = brain._get_conn()
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute(
+                "DELETE FROM active_trades_state WHERE symbol = ?",
+                (symbol,),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO system_meta (key, value) VALUES (?, ?)",
+                (wallet_key, json.dumps(wallet_state, ensure_ascii=False)),
+            )
+            conn.commit()
+            conn.close()
+            return True
+        except sqlite3.OperationalError as error:
+            with suppress(Exception):
+                conn.rollback()
+                conn.close()
+            if "locked" in str(error).lower() and attempt < 2:
+                time.sleep(0.05 * (2**attempt))
+                continue
+            print(f"❌ Error liquidando wallet simulado: {error}")
+            return False
+        except Exception as error:
+            with suppress(Exception):
+                conn.rollback()
+                conn.close()
+            print(f"❌ Error liquidando wallet simulado: {error}")
             return False
     return False
 

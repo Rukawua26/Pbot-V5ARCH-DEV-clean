@@ -538,7 +538,12 @@ def _apply_entry_filters_and_adjust_prob(
         )
 
     if filter_passed and bool(getattr(Config, "BULL_TREND_ENTRY_VETO_ENABLED", True)):
-        if btc_regime in {"BULL_TREND", "BULL_STRONG"}:
+        bull_regime = btc_regime in {"BULL_TREND", "BULL_STRONG"}
+        aligned_real_enabled = bool(getattr(Config, "BULL_TREND_ALIGNED_REAL_ENABLED", False))
+        block_bull_entry = audit_signal == "SELL" or (
+            not bool(getattr(Config, "PAPER_MODE", True)) and not aligned_real_enabled
+        )
+        if bull_regime and block_bull_entry:
             filter_passed = False
             filter_reason = f"BULL_TREND_ENTRY_VETO ({btc_regime})"
             bot.log(f"⛔ {symbol}: {filter_reason}")
@@ -648,8 +653,8 @@ def _apply_entry_filters_and_adjust_prob(
                 bot.log(
                     f"📈 {symbol}: macro boost SELL (BTC dominance {btc_dom:.1f}% > {dom_boost:.0f}%)"
                 )
-        except Exception:
-            None
+        except Exception as macro_error:
+            bot.log(f"⚠️ {symbol}: macro filter error (ignorado): {macro_error}")
 
     # [OI DELTA v118.3] Veto por senal falsa (short squeeze / long liquidation)
     # OI siempre se fetchea para el Context Vault; el filtro solo se aplica si está habilitado
@@ -849,6 +854,8 @@ def _apply_entry_filters_and_adjust_prob(
             "filter_reason": str(filter_reason),
             "prob_final": float(prob_final),
             "btc_regime": btc_regime,
+            "current_sentiment": str(getattr(bot, "current_sentiment", ("",))[0]),
+            "market_regime_source": str(getattr(bot, "market_regime_source", "UNKNOWN")),
             "regime_reason": regime_reason,
             "regime_weight": float(regime_weight),
             "markov_prob": ctx.get("markov_prob"),
@@ -900,6 +907,7 @@ def _plan_execution_mode(
     )
 
     breakout_shadow_override = False
+    regime_conflict_shadow_override = False
     if (
         bool(getattr(Config, "BREAKOUT_SEMI_ACTIVE_SHADOW", True))
         and audit_signal != "NEUTRAL"
@@ -920,11 +928,45 @@ def _plan_execution_mode(
         sentiment_label = str(bot.current_sentiment[0])
         is_bull = "ALCISTA" in sentiment_label
         is_bear = "BAJISTA" in sentiment_label
+        hmm_aligned_conflict = (
+            str(getattr(bot, "market_regime_source", "")).upper() == "HMM"
+            and str(ctx.get("markov_snapshot_mode") or "").lower() == "fresh"
+            and (
+                (audit_signal == "BUY" and btc_regime_exec in {"BULL_TREND", "BULL_STRONG"})
+                or (audit_signal == "SELL" and btc_regime_exec in {"BEAR_TREND", "BEAR_STRONG"})
+            )
+            and ((audit_signal == "BUY" and is_bear) or (audit_signal == "SELL" and is_bull))
+        )
+        regime_conflict_shadow_override = (
+            bool(getattr(Config, "PAPER_MODE", True))
+            and bool(getattr(Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", False))
+            and hmm_aligned_conflict
+        )
         extreme_breakout_ok = breakout_shadow_override and prob_final >= float(
             getattr(Config, "BREAKOUT_EXTREME_IA_PROB", 75.0)
         )
 
-        if audit_signal == "SELL" and is_bull and not extreme_breakout_ok:
+        if regime_conflict_shadow_override:
+            is_shadow_exec = True
+            ctx["regime_conflict_shadow_override"] = True
+            ctx["current_sentiment"] = sentiment_label
+            ctx["market_regime_source"] = str(getattr(bot, "market_regime_source", "UNKNOWN"))
+            bot.log(
+                f"🧪 REGIME_CONFLICT_SHADOW {symbol}: HMM={btc_regime_exec} "
+                f"sentiment={sentiment_label} side={audit_signal}"
+            )
+            append_execution_event(
+                bot,
+                "REGIME_CONFLICT_SHADOW_OVERRIDE",
+                {
+                    "symbol": symbol,
+                    "side": audit_signal,
+                    "btc_regime": btc_regime_exec,
+                    "sentiment": sentiment_label,
+                    "market_regime_source": str(getattr(bot, "market_regime_source", "UNKNOWN")),
+                },
+            )
+        elif audit_signal == "SELL" and is_bull and not extreme_breakout_ok:
             should_execute = False
             filter_passed = False
             filter_reason = "COHERENCIA: SELL bloqueado en régimen ALCISTA"
@@ -999,9 +1041,12 @@ def _plan_execution_mode(
         if audit_signal != "NEUTRAL" and filter_passed:
             hit_count = len(ctx.get("heuristic_hits", []))
             if bool(ctx.get("bootstrap_ready_real", False)):
-                is_shadow_exec = False
+                is_shadow_exec = bool(regime_conflict_shadow_override)
                 should_execute = True
-                audit_verdict = f"🛠️ BOOTSTRAP REAL ({hit_count}/5 reglas)"
+                if regime_conflict_shadow_override:
+                    audit_verdict = f"🧪 BOOTSTRAP SHADOW CONFLICT ({hit_count}/5 reglas)"
+                else:
+                    audit_verdict = f"🛠️ BOOTSTRAP REAL ({hit_count}/5 reglas)"
             elif bool(ctx.get("bootstrap_ready_shadow", False)):
                 is_shadow_exec = True
                 should_execute = True
@@ -1013,9 +1058,12 @@ def _plan_execution_mode(
 
     if not breakout_shadow_override and audit_signal != "NEUTRAL" and filter_passed:
         if prob_final >= REAL_THRESHOLD:
-            is_shadow_exec = False
+            is_shadow_exec = bool(regime_conflict_shadow_override)
             should_execute = True
-            bot.log(f"🔥 DISPARO REAL: {symbol} confianza {prob_final:.1f}%")
+            if regime_conflict_shadow_override:
+                bot.log(f"🧪 DISPARO SHADOW POR CONFLICTO: {symbol} confianza {prob_final:.1f}%")
+            else:
+                bot.log(f"🔥 DISPARO REAL: {symbol} confianza {prob_final:.1f}%")
         elif prob_final >= SHADOW_MIN_THRESHOLD:
             is_shadow_exec = True
             should_execute = True

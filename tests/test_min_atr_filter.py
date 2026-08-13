@@ -113,7 +113,7 @@ class TestMinAtrFilter(unittest.TestCase):
     @patch("core.signals.filters.Strategy.check_entry_filters")
     @patch("core.signals.filters._resolve_btc_regime_adjustment")
     @patch("core.signals.filters._apply_markov_regime_weight")
-    def test_bull_trend_entry_veto_blocks_when_enabled(
+    def test_bull_trend_entry_veto_blocks_counter_trend_sell_when_enabled(
         self, mock_markov, mock_regime, mock_strategy
     ):
         mock_strategy.return_value = (True, "OK", "BULL_TREND", {})
@@ -123,6 +123,51 @@ class TestMinAtrFilter(unittest.TestCase):
         with (
             patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", False),
             patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", True),
+            patch.object(Config, "PAPER_MODE", True),
+        ):
+            result = _apply_entry_filters_and_adjust_prob(
+                self._make_bot(), "BTC/USDT", "BTC/USDT", None, "SELL", 70.0, self._make_ctx(), 1.5
+            )
+
+        self.assertFalse(result[1])
+        self.assertIn("BULL_TREND_ENTRY_VETO", result[2])
+
+    @patch("core.signals.filters.Strategy.check_entry_filters")
+    @patch("core.signals.filters._resolve_btc_regime_adjustment")
+    @patch("core.signals.filters._apply_markov_regime_weight")
+    def test_bull_trend_entry_veto_allows_aligned_buy_when_enabled(
+        self, mock_markov, mock_regime, mock_strategy
+    ):
+        mock_strategy.return_value = (True, "OK", "BULL_TREND", {})
+        mock_regime.return_value = (1.0, "BULL_ALIGNED", False)
+        mock_markov.return_value = (1.0, "BULL_ALIGNED", False, True, "OK", "BULL_TREND")
+
+        with (
+            patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", False),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", True),
+        ):
+            result = _apply_entry_filters_and_adjust_prob(
+                self._make_bot(), "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, self._make_ctx(), 1.5
+            )
+
+        self.assertTrue(result[1])
+        self.assertNotIn("BULL_TREND_ENTRY_VETO", result[2])
+
+    @patch("core.signals.filters.Strategy.check_entry_filters")
+    @patch("core.signals.filters._resolve_btc_regime_adjustment")
+    @patch("core.signals.filters._apply_markov_regime_weight")
+    def test_bull_trend_aligned_buy_remains_blocked_in_real_before_promotion(
+        self, mock_markov, mock_regime, mock_strategy
+    ):
+        mock_strategy.return_value = (True, "OK", "BULL_TREND", {})
+        mock_regime.return_value = (1.0, "BULL_ALIGNED", False)
+        mock_markov.return_value = (1.0, "BULL_ALIGNED", False, True, "OK", "BULL_TREND")
+
+        with (
+            patch.object(Config, "MIN_ATR_PCT_FILTER_ENABLED", False),
+            patch.object(Config, "BULL_TREND_ENTRY_VETO_ENABLED", True),
+            patch.object(Config, "BULL_TREND_ALIGNED_REAL_ENABLED", False),
+            patch.object(Config, "PAPER_MODE", False),
         ):
             result = _apply_entry_filters_and_adjust_prob(
                 self._make_bot(), "BTC/USDT", "BTC/USDT", None, "BUY", 70.0, self._make_ctx(), 1.5

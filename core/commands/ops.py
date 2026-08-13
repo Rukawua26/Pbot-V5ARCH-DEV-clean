@@ -430,10 +430,22 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                 send_telegram_msg(f"ℹ️ {symbol}: no existe estado activo local para limpiar.")
                 return True
 
+            is_simulated = bool(state.get("is_shadow", False) or state.get("simulated_real", False))
+            if Config.PAPER_MODE and state.get("simulated_real") is False and not is_simulated:
+                bot.is_paused = True
+                bot.integrity_lock_active = True
+                bot.halt_system_active = True
+                send_telegram_msg(
+                    f"🛑 /force_clear rechazado en {symbol}: estado no simulado bajo PAPER. "
+                    "Requiere reconciliación REAL explícita."
+                )
+                return True
+
             entry_coid = str(state.get("entry_client_order_id") or "")
             order_found = False
             position_found = False
 
+            exchange_read_failed = False
             try:
                 for order in bot.execution.fetch_open_orders(symbol) or []:
                     if not isinstance(order, dict):
@@ -447,7 +459,7 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                         found = lookup(symbol, entry_coid)
                         order_found = isinstance(found, dict)
             except Exception:
-                order_found = False
+                exchange_read_failed = True
 
             try:
                 for pos in bot.execution.fetch_positions() or []:
@@ -460,7 +472,17 @@ def _handle_training_and_maintenance_commands(bot, text: str) -> bool:
                         position_found = True
                         break
             except Exception:
-                position_found = False
+                exchange_read_failed = True
+
+            if exchange_read_failed and not is_simulated:
+                bot.is_paused = True
+                bot.integrity_lock_active = True
+                bot.halt_system_active = True
+                send_telegram_msg(
+                    f"🛑 /force_clear cancelado en {symbol}: lectura Exchange ambigua. "
+                    "HALT activado; ejecuta reconciliación."
+                )
+                return True
 
             if order_found or position_found:
                 send_telegram_msg(

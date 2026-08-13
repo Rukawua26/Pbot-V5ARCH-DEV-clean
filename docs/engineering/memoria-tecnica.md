@@ -37,6 +37,39 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-08-13 - Recuperacion PAPER/SHADOW ante bloqueo total de entradas
+
+Diagnostico:
+- Las ultimas 721 alertas quedaron bloqueadas antes de `trade_entry`; no hubo
+  `ORDER_INTENT_CREATED`.
+- El veto BULL historico bloqueaba ambos lados y el desacuerdo entre HMM BULL y
+  sentimiento BAJISTA podia bloquear SELL por regimen y BUY por coherencia.
+- Timeouts/fetch errors se agrupaban como `DATA_INTEGRITY_FAIL` y
+  `update_signal_alert_status` seguia escribiendo la columna eliminada `trade_id`.
+
+Cambios:
+- `BULL_TREND_ENTRY_VETO` es direccional en PAPER: bloquea SELL contra tendencia y
+  permite BUY alineado. En REAL conserva el bloqueo hasta promocion explicita con
+  `BULL_TREND_ALIGNED_REAL_ENABLED=false` por default.
+- El override de conflicto HMM/sentimiento esta apagado por default y, si se activa,
+  exige PAPER, HMM fresco y direccion alineada; siempre fuerza SHADOW.
+- El contexto persiste sentimiento y fuente de regimen para futuros replays.
+- Triaje diferencia timeout, fetch error y data invalida; acota fetches tardios y
+  aplica espera cuando no quedan candidatos.
+- Errores de analisis/pipeline emiten `ANALYSIS_ERROR`; filtros macro ya no silencian
+  excepciones.
+- `tools/replay_signal_alerts_counterfactual.py` compara observed, bull-off,
+  bull-directional, coherence-off y combined usando SQLite read-only.
+- `signal_alerts.status` deja de referenciar `trade_id` eliminado.
+- Pins de seguridad: `aiohttp 3.14.3`, `cryptography 50.0.0` y `setuptools 83.0.0`.
+
+Reglas preventivas:
+- No promover BUY BULL alineado a REAL sin 50-100 cierres SHADOW y revision de edge.
+- No activar simultaneamente varios overrides de filtros.
+- Un timeout de `asyncio.to_thread` no cancela el thread: mantener capacidad acotada
+  y no lanzar trabajo nuevo mientras fetches tardios sigan activos.
+- Una señal contrafactual liberada no equivale a orden, fill ni trade rentable.
+
 ### 2026-07-13 - Fix: spread real alimenta RRR y veto experimental BULL_TREND
 
 Trigger: analisis post-fix mostro profit factor ~0.64, 95%+ de perdidas con MAE <=0.5% y cero eventos `RISK_REWARD_VETO`. Auditoria externa pidio verificar signo SELL, unidades de spread y origen del spread real.

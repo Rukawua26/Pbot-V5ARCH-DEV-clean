@@ -1,8 +1,14 @@
+import json
+import sqlite3
+import tempfile
 import threading
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+from core.active_trade_store import settle_simulated_trade_wallet
+from core.bot_wallet_sync import sync_wallet
 from core.execution_adapters import ShadowExecutionAdapter
 from core.trade_exit import close_trade
 from core.trade_helpers import (
@@ -10,6 +16,8 @@ from core.trade_helpers import (
     _calculate_trade_pnl,
     _release_simulated_margin,
     _reserve_simulated_margin,
+    restore_simulated_available_balance,
+    restore_simulated_wallet_state,
 )
 
 
@@ -17,6 +25,7 @@ class _Brain:
     def __init__(self):
         self.logged = []
         self.deleted = []
+        self.metadata = {}
 
     def save_active_trade_state(self, symbol, trade):
         return True
@@ -43,6 +52,18 @@ class _Brain:
     def get_recent_exit_confidence_stagnation(self, limit=10):
         return None
 
+    def get_metadata_json(self, key, default=None):
+        return self.metadata.get(key, default)
+
+    def set_metadata_json(self, key, value):
+        self.metadata[key] = value
+        return True
+
+    def settle_simulated_trade_wallet(self, symbol, wallet_key, wallet_state):
+        self.metadata[wallet_key] = wallet_state
+        self.deleted.append(symbol)
+        return True
+
 
 class _LiveExecution:
     def __init__(self):
@@ -51,13 +72,109 @@ class _LiveExecution:
 
 
 class ShadowWalletRuntimeTest(unittest.TestCase):
+    def test_atomic_settlement_updates_wallet_and_removes_active_state(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            db_path = Path(tmp_dir) / "wallet.db"
+            conn = sqlite3.connect(db_path)
+            conn.execute(
+                "CREATE TABLE active_trades_state (symbol TEXT PRIMARY KEY, state_data TEXT)"
+            )
+            conn.execute("CREATE TABLE system_meta (key TEXT PRIMARY KEY, value TEXT)")
+            conn.execute(
+                "INSERT INTO active_trades_state (symbol, state_data) VALUES (?, ?)",
+                ("BTC/USDT", "{}"),
+            )
+            conn.commit()
+            conn.close()
+
+            brain = SimpleNamespace(_get_conn=lambda: sqlite3.connect(db_path))
+            self.assertTrue(
+                settle_simulated_trade_wallet(
+                    brain,
+                    "BTC/USDT",
+                    "simulated_wallet_state_v1",
+                    {"balance": 997.46, "daily_initial_balance": 1000.0},
+                )
+            )
+
+            conn = sqlite3.connect(db_path)
+            active_count = conn.execute("SELECT COUNT(*) FROM active_trades_state").fetchone()[0]
+            wallet_raw = conn.execute(
+                "SELECT value FROM system_meta WHERE key = ?",
+                ("simulated_wallet_state_v1",),
+            ).fetchone()[0]
+            conn.close()
+            self.assertEqual(active_count, 0)
+            self.assertEqual(json.loads(wallet_raw)["balance"], 997.46)
+
+    def test_persisted_equity_is_restored_before_active_margin(self):
+        brain = _Brain()
+        bot = SimpleNamespace(
+            brain=brain,
+            balance=0.0,
+            daily_initial_balance=0.0,
+            active_trades={
+                "BTC/USDT": {
+                    "is_shadow": True,
+                    "margin_used": 35.0,
+                    "margin_released": False,
+                }
+            },
+        )
+        brain.metadata["simulated_wallet_state_v1"] = {
+            "balance": 997.46,
+            "daily_initial_balance": 1000.0,
+        }
+
+        self.assertTrue(restore_simulated_wallet_state(bot))
+
+        self.assertEqual(bot.balance, 997.46)
+        self.assertEqual(bot.daily_initial_balance, 1000.0)
+        self.assertEqual(bot.available_balance, 962.46)
+
+    def test_invalid_persisted_wallet_is_rejected(self):
+        brain = _Brain()
+        brain.metadata["simulated_wallet_state_v1"] = {"balance": "nan"}
+        bot = SimpleNamespace(brain=brain, active_trades={})
+
+        with self.assertRaisesRegex(RuntimeError, "SIMULATED_WALLET_STATE_INVALID"):
+            restore_simulated_wallet_state(bot)
+
+    def test_restored_shadow_margin_rebuilds_available_balance(self):
+        bot = SimpleNamespace(
+            balance=1000.0,
+            available_balance=1000.0,
+            active_trades={
+                "BTC/USDT": {
+                    "is_shadow": True,
+                    "margin_used": 35.0,
+                    "margin_released": False,
+                }
+            },
+        )
+
+        available = restore_simulated_available_balance(bot)
+
+        self.assertEqual(available, 965.0)
+        self.assertEqual(bot.available_balance, 965.0)
+
+    @patch("core.bot_wallet_sync.Config.PAPER_MODE", True)
+    def test_wallet_sync_skips_exchange_positions_in_paper(self):
+        execution = SimpleNamespace(fetch_positions=MagicMock())
+        bot = SimpleNamespace(execution=execution)
+
+        sync_wallet(bot)
+
+        execution.fetch_positions.assert_not_called()
+
     def test_margin_reserve_and_release_are_idempotent(self):
         bot = SimpleNamespace(
             balance=20.0,
             available_balance=20.0,
             balance_lock=threading.Lock(),
+            brain=_Brain(),
         )
-        trade = {"is_shadow": True, "margin_used": 2.0}
+        trade = {"trade_key": "BTC/USDT", "is_shadow": True, "margin_used": 2.0}
 
         ok, reason = _reserve_simulated_margin(bot, trade)
         self.assertTrue(ok, reason)
@@ -68,6 +185,104 @@ class ShadowWalletRuntimeTest(unittest.TestCase):
         self.assertFalse(_release_simulated_margin(bot, trade, 0.75))
         self.assertAlmostEqual(bot.balance, 20.75)
         self.assertAlmostEqual(bot.available_balance, 20.75)
+        self.assertEqual(bot.brain.metadata["simulated_wallet_state_v1"]["balance"], 20.75)
+
+    def test_failed_atomic_settlement_rolls_back_simulated_wallet(self):
+        brain = _Brain()
+        brain.settle_simulated_trade_wallet = MagicMock(return_value=False)
+        bot = SimpleNamespace(
+            balance=20.0,
+            available_balance=18.0,
+            daily_initial_balance=20.0,
+            balance_lock=threading.Lock(),
+            db_lock=threading.RLock(),
+            brain=brain,
+        )
+        trade = {
+            "trade_key": "BTC/USDT",
+            "is_shadow": True,
+            "margin_used": 2.0,
+            "margin_released": False,
+        }
+
+        with self.assertRaisesRegex(RuntimeError, "SIMULATED_WALLET_SETTLEMENT_FAILED"):
+            _release_simulated_margin(bot, trade, -0.5)
+
+        self.assertEqual(bot.balance, 20.0)
+        self.assertEqual(bot.available_balance, 18.0)
+        self.assertFalse(trade["margin_released"])
+
+    def test_concurrent_settlement_failure_does_not_rollback_success(self):
+        brain = _Brain()
+        brain.settle_simulated_trade_wallet = MagicMock(
+            side_effect=lambda symbol, *_args: symbol == "BTC/USDT"
+        )
+        bot = SimpleNamespace(
+            balance=20.0,
+            available_balance=16.0,
+            daily_initial_balance=20.0,
+            balance_lock=threading.Lock(),
+            db_lock=threading.RLock(),
+            brain=brain,
+        )
+        success_trade = {
+            "trade_key": "BTC/USDT",
+            "is_shadow": True,
+            "margin_used": 2.0,
+            "margin_released": False,
+        }
+        failed_trade = {
+            "trade_key": "ETH/USDT",
+            "is_shadow": True,
+            "margin_used": 2.0,
+            "margin_released": False,
+        }
+        errors = []
+
+        def release(trade, pnl):
+            try:
+                _release_simulated_margin(bot, trade, pnl)
+            except RuntimeError as error:
+                errors.append(str(error))
+
+        first = threading.Thread(target=release, args=(success_trade, 1.0))
+        second = threading.Thread(target=release, args=(failed_trade, -0.5))
+        first.start()
+        second.start()
+        first.join()
+        second.join()
+
+        self.assertEqual(errors, ["SIMULATED_WALLET_SETTLEMENT_FAILED"])
+        self.assertEqual(bot.balance, 21.0)
+        self.assertEqual(bot.available_balance, 19.0)
+        self.assertTrue(success_trade["margin_released"])
+        self.assertFalse(failed_trade["margin_released"])
+
+    @patch("core.trade_exit.Config.PAPER_MODE", True)
+    def test_paper_close_quarantines_persisted_real_state(self):
+        trade = {
+            "trade_key": "BTC/USDT",
+            "symbol": "BTC/USDT",
+            "side": "BUY",
+            "is_shadow": False,
+            "simulated_real": False,
+            "status": "OPEN",
+        }
+        bot = SimpleNamespace(
+            active_trades={"BTC/USDT": trade},
+            lock=threading.RLock(),
+            log=MagicMock(),
+            is_paused=False,
+            integrity_lock_active=False,
+            halt_system_active=False,
+        )
+
+        close_trade(bot, "BTC/USDT", "TEST", 100.0)
+
+        self.assertIn("BTC/USDT", bot.active_trades)
+        self.assertFalse(trade["closing_in_progress"])
+        self.assertEqual(trade["status"], "OPEN")
+        self.assertTrue(bot.halt_system_active)
 
     def test_reserve_blocks_when_available_balance_is_insufficient(self):
         bot = SimpleNamespace(

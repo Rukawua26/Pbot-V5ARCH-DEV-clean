@@ -25,6 +25,82 @@ def _valid_hard_sl_ack(symbol: str, sl_side: str, amount: float, order_id: str =
 
 
 class ReconciliationTest(unittest.TestCase):
+    @patch("core.reconciliation.Config.PAPER_MODE", True)
+    @patch("core.reconciliation.Config.PAPER_INITIAL_BALANCE", 1000.0)
+    def test_paper_bootstrap_reconciliation_skips_exchange_and_restores_margin(self):
+        execution = SimpleNamespace(fetch_positions=MagicMock(), supports_real_positions=False)
+        bot = SimpleNamespace(
+            lock=RLock(),
+            balance_lock=RLock(),
+            execution=execution,
+            balance=1000.0,
+            available_balance=1000.0,
+            daily_initial_balance=1000.0,
+            active_trades={
+                "BTC/USDT": {
+                    "is_shadow": True,
+                    "margin_used": 35.0,
+                    "margin_released": False,
+                }
+            },
+            halt_system_active=False,
+            integrity_lock_active=True,
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        execution.fetch_positions.assert_not_called()
+        self.assertEqual(bot.available_balance, 965.0)
+        self.assertFalse(bot.integrity_lock_active)
+
+    @patch("core.reconciliation.Config.PAPER_MODE", True)
+    def test_paper_bootstrap_halts_on_persisted_real_trade(self):
+        execution = SimpleNamespace(fetch_positions=MagicMock(), supports_real_positions=False)
+        brain = SimpleNamespace(save_error_snapshot=MagicMock())
+        bot = SimpleNamespace(
+            execution=execution,
+            active_trades={
+                "BTC/USDT": {
+                    "symbol": "BTC/USDT",
+                    "is_shadow": False,
+                    "simulated_real": False,
+                }
+            },
+            db_lock=RLock(),
+            brain=brain,
+            log=MagicMock(),
+            is_paused=False,
+            integrity_lock_active=False,
+            halt_system_active=False,
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        execution.fetch_positions.assert_not_called()
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
+        brain.save_error_snapshot.assert_called_once()
+
+    @patch("core.reconciliation.Config.PAPER_MODE", True)
+    @patch("core.reconciliation.Config.PAPER_INITIAL_BALANCE", 1000.0)
+    def test_paper_bootstrap_preserves_restored_zero_equity(self):
+        bot = SimpleNamespace(
+            execution=SimpleNamespace(supports_real_positions=False),
+            active_trades={},
+            balance=0.0,
+            available_balance=0.0,
+            daily_initial_balance=1000.0,
+            _simulated_wallet_initialized=True,
+            halt_system_active=False,
+            integrity_lock_active=False,
+        )
+
+        reconcile_bootstrap_state(bot)
+
+        self.assertEqual(bot.balance, 0.0)
+        self.assertEqual(bot.available_balance, 0.0)
+
     def test_client_order_id_is_deterministic(self):
         a = generate_client_order_id("BTC/USDT", "BUY", 1712222222.123, "abc123")
         b = generate_client_order_id("BTC/USDT", "BUY", 1712222222.123, "abc123")

@@ -25,8 +25,19 @@ class _FakeExecutionService:
     def fetch_funding_rate(self, _symbol):
         return {"fundingRate": 0.0001}
 
+    def fetch_open_interest(self, symbol):
+        return {"symbol": symbol, "openInterestAmount": 123.0}
+
 
 class ExecutionAdapterContractTest(unittest.TestCase):
+    def test_shadow_adapter_delegates_public_open_interest(self):
+        live = _FakeExecutionService("k", "s")
+        adapter = ShadowExecutionAdapter(live)
+
+        result = adapter.fetch_open_interest("BTC/USDT")
+
+        self.assertEqual(result["openInterestAmount"], 123.0)
+
     def test_factory_builds_shadow_adapter(self):
         config = SimpleNamespace(
             BINANCE_API_KEY="k",

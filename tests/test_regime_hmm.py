@@ -1007,6 +1007,56 @@ class RegimePreVetoTests(unittest.TestCase):
         analyze_mock.assert_called_once()
         self.assertEqual(analyze_mock.call_args.kwargs["market_regime"], "BULL_TREND")
 
+    def test_fast_coherence_conflict_allows_fresh_hmm_buy_only_in_paper_override(self):
+        bot = self._build_bot("BULL_TREND")
+        bot.market_regime_source = "HMM"
+        bot.current_sentiment = ("🔴 TENDENCIA BAJISTA", "red")
+        bot.hmm_markov_snapshot = {
+            "ts": datetime.now(UTC).isoformat(),
+            "is_ready": True,
+            "state": "BULL_TREND",
+        }
+        df = self._build_df()
+        expected = ("BUY", "NONE", 100.0, 10.0, {}, {})
+
+        with (
+            patch.object(signal_analyze.Config, "PAPER_MODE", True),
+            patch.object(signal_analyze.Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", True),
+            patch.object(signal_analyze.Strategy, "analyze", return_value=expected),
+        ):
+            result = signal_analyze._analyze_symbol_candidate(
+                bot, "TEST/USDT", "TEST/USDT", df, df, elapsed=12
+            )
+
+        self.assertEqual(result, expected)
+        self.assertTrue(
+            any("FAST_CONFLICT_SHADOW_ALLOWED" in call.args[0] for call in bot.log.call_args_list)
+        )
+
+    def test_fast_coherence_conflict_remains_blocked_when_override_disabled(self):
+        bot = self._build_bot("BULL_TREND")
+        bot.market_regime_source = "HMM"
+        bot.current_sentiment = ("🔴 TENDENCIA BAJISTA", "red")
+        bot.hmm_markov_snapshot = {
+            "ts": datetime.now(UTC).isoformat(),
+            "is_ready": True,
+            "state": "BULL_TREND",
+        }
+        df = self._build_df()
+        expected = ("BUY", "NONE", 100.0, 10.0, {}, {})
+
+        with (
+            patch.object(signal_analyze.Config, "PAPER_MODE", True),
+            patch.object(signal_analyze.Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", False),
+            patch.object(signal_analyze.Strategy, "analyze", return_value=expected),
+        ):
+            result = signal_analyze._analyze_symbol_candidate(
+                bot, "TEST/USDT", "TEST/USDT", df, df, elapsed=12
+            )
+
+        self.assertIsNone(result)
+        self.assertTrue(any("FAST_VETO" in call.args[0] for call in bot.log.call_args_list))
+
 
 class HMMOrchestratorWeightsTests(unittest.TestCase):
     def test_orchestrator_uses_hmm_directional_regimes_directly(self):

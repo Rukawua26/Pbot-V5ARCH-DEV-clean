@@ -3,16 +3,17 @@ import logging
 import traceback
 
 from config import Config
-
-logger = logging.getLogger(__name__)
 from core.config.operational import OperationalConfig
 from core.execution_safety import hard_sl_ack_looks_valid, sl_side_for_trade_side
 from core.execution_telemetry import append_execution_event
 from core.symbol_utils import normalize_position_symbol
 from core.time_utils import parse_datetime_utc, utc_now, utc_now_iso
+from core.trade_helpers import restore_simulated_available_balance
 from core.trade_keys import make_trade_key, normalize_trade_side
 from core.trade_state import TradeStatus
 from tools.notifier import send_telegram_msg
+
+logger = logging.getLogger(__name__)
 
 PENDING_SEND_STALE_SECONDS = 30
 
@@ -256,6 +257,40 @@ def _halt_unadoptable_real_orphan(bot, symbol: str, reason: str, details: dict |
 
 def reconcile_bootstrap_state(bot):
     """Sincroniza estado DB <-> Exchange al arrancar para evitar huérfanos/ghosts."""
+    if Config.PAPER_MODE:
+        non_simulated = [
+            str(state.get("symbol") or trade_key)
+            for trade_key, state in (getattr(bot, "active_trades", {}) or {}).items()
+            if isinstance(state, dict)
+            and not state.get("is_shadow", False)
+            and state.get("simulated_real") is False
+        ]
+        if non_simulated:
+            bot.is_paused = True
+            bot.integrity_lock_active = True
+            bot.halt_system_active = True
+            reason = "PERSISTED_REAL_STATE_IN_PAPER"
+            details = {"symbols": non_simulated}
+            with bot.db_lock:
+                bot.brain.save_error_snapshot("SYSTEM", reason, details)
+            append_execution_event(bot, f"{reason}_HALT", details)
+            bot.log(
+                "🛑 Estado REAL persistido detectado al arrancar PAPER; "
+                "se requiere reconciliación REAL explícita."
+            )
+            return
+    if Config.PAPER_MODE and not getattr(bot.execution, "supports_real_positions", True):
+        if not bool(getattr(bot, "_simulated_wallet_initialized", False)) and not float(
+            getattr(bot, "balance", 0.0) or 0.0
+        ):
+            with bot.balance_lock:
+                bot.balance = Config.PAPER_INITIAL_BALANCE
+        restore_simulated_available_balance(bot)
+        if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
+            bot.daily_initial_balance = Config.PAPER_INITIAL_BALANCE
+        if not bool(getattr(bot, "halt_system_active", False)):
+            bot.integrity_lock_active = False
+        return
     try:
         with bot.lock:
             db_snapshot = dict(bot.active_trades)
@@ -738,19 +773,6 @@ def reconcile_bootstrap_state(bot):
                 if trade_key in bot.active_trades:
                     del bot.active_trades[trade_key]
             lost += 1
-
-        # En PAPER_MODE el balance es virtual; no se compara contra custodia real.
-        if Config.PAPER_MODE:
-            if not float(getattr(bot, "balance", 0.0) or 0.0):
-                with bot.balance_lock:
-                    bot.balance = Config.PAPER_INITIAL_BALANCE
-            if not float(getattr(bot, "available_balance", 0.0) or 0.0):
-                bot.available_balance = Config.PAPER_INITIAL_BALANCE
-            if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
-                bot.daily_initial_balance = Config.PAPER_INITIAL_BALANCE
-            if not bool(getattr(bot, "halt_system_active", False)):
-                bot.integrity_lock_active = False
-            return
 
         # Integrity lock por discrepancia de balance
         try:

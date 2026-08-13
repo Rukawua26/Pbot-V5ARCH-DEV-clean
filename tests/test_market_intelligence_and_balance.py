@@ -447,6 +447,50 @@ class MarketIntelligencePipelineTests(unittest.TestCase):
         bot.acquire_targets.assert_not_called()
         bot._run_cycle_wait_and_api_log.assert_called_once()
 
+    @patch.object(bot_main_loop.Config, "BREAKOUT_WATCH_ENABLED", False)
+    @patch.object(bot_main_loop.Config, "ML_HEALTH_VETO_ENABLED", False)
+    def test_main_loop_waits_when_all_triage_candidates_are_quarantined(self):
+        bot = SimpleNamespace(
+            is_running=True,
+            init_complete=SimpleNamespace(wait=MagicMock()),
+            ws_manager=None,
+            _guardian_loop=MagicMock(),
+            _refresh_symbol_controls_if_due=MagicMock(),
+            _run_crash_predictor_cycle=MagicMock(return_value=False),
+            check_weekly_schedule=MagicMock(),
+            check_weekly_maintenance_utc=MagicMock(),
+            daily_initial_balance=1000.0,
+            balance=1000.0,
+            brain=SimpleNamespace(get_daily_real_pnl=MagicMock(return_value=(0.0, 0.0))),
+            check_safety_and_goals=MagicMock(),
+            last_radar_update=0,
+            _run_market_refresh_cycle=MagicMock(),
+            _run_triage_cycle=MagicMock(
+                return_value=([{"symbol": "BTC/USDT"}], {"BTC/USDT": {"last": 65000.0}})
+            ),
+            last_pm_check=time.time(),
+            _perform_post_mortem=MagicMock(),
+            _run_periodic_housekeeping=MagicMock(side_effect=lambda now, a, b, c: (a, b, c)),
+            _run_btc_panic_cycle=MagicMock(),
+            ml_healthy=True,
+            pairs_to_scan=["BTC/USDT"],
+            _run_market_context_cycle=MagicMock(return_value=0.0),
+            _prepare_top_triage=MagicMock(return_value=[]),
+            _fetch_triage_data_parallel=MagicMock(),
+            _run_cycle_wait_and_api_log=MagicMock(),
+            log=MagicMock(),
+        )
+
+        def stop_after_wait():
+            bot.is_running = False
+
+        bot._run_cycle_wait_and_api_log.side_effect = stop_after_wait
+
+        bot_main_loop.run_main_logic(bot)
+
+        bot._run_cycle_wait_and_api_log.assert_called_once()
+        bot._fetch_triage_data_parallel.assert_not_called()
+
     @patch.object(market_intelligence.Config, "TRIAGE_SPREAD_MAX", 0.002)
     def test_get_active_market_snapshot_removes_stale_or_wide_spread_pairs(self):
         tickers = {
@@ -521,6 +565,34 @@ class BalanceOpsPressureTests(unittest.TestCase):
         self.assertEqual(bot.balance, 1_000.0)
         self.assertEqual(bot.available_balance, 1_000.0)
         self.assertEqual(bot.daily_initial_balance, 1_000.0)
+
+    @patch.object(bot_balance_ops.Config, "PAPER_MODE", True)
+    def test_start_silent_sync_preserves_initialized_zero_available_balance(self):
+        bot = SimpleNamespace(
+            is_running=True,
+            balance=1_000.0,
+            available_balance=0.0,
+            daily_initial_balance=1_000.0,
+            _simulated_wallet_initialized=True,
+            active_trades={
+                "BTC/USDT": {
+                    "is_shadow": True,
+                    "margin_used": 1_000.0,
+                    "margin_released": False,
+                }
+            },
+            lock=threading.RLock(),
+            balance_lock=threading.RLock(),
+            log=MagicMock(),
+        )
+
+        def _stop_after_first_sleep(_seconds):
+            bot.is_running = False
+
+        with patch.object(bot_balance_ops.time, "sleep", side_effect=_stop_after_first_sleep):
+            bot_balance_ops.start_silent_sync(bot)
+
+        self.assertEqual(bot.available_balance, 0.0)
 
 
 class RegimePipelineTests(unittest.TestCase):

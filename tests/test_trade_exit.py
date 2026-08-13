@@ -275,6 +275,7 @@ class TestCloseTradePaperPath(unittest.TestCase):
             "closing_in_progress": False,
             "status": "OPEN",
             "is_shadow": False,
+            "simulated_real": True,
             "market_snapshot": {},
             "entry_confidence": 75.0,
             "mae_price": 50000.0,

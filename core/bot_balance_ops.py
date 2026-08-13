@@ -1,6 +1,7 @@
 import time
 
 from config import Config
+from core.trade_helpers import persist_simulated_wallet_state, restore_simulated_available_balance
 
 
 def start_silent_sync(bot):
@@ -9,16 +10,18 @@ def start_silent_sync(bot):
         try:
             balance_lock = getattr(bot, "balance_lock", None)
             if Config.PAPER_MODE:
-                if not float(getattr(bot, "balance", 0.0) or 0.0):
+                if not bool(getattr(bot, "_simulated_wallet_initialized", False)):
                     if balance_lock:
                         with balance_lock:
-                            bot.balance = Config.PAPER_INITIAL_BALANCE
+                            if not float(getattr(bot, "balance", 0.0) or 0.0):
+                                bot.balance = Config.PAPER_INITIAL_BALANCE
                     else:
-                        bot.balance = Config.PAPER_INITIAL_BALANCE
-                if not float(getattr(bot, "available_balance", 0.0) or 0.0):
-                    bot.available_balance = Config.PAPER_INITIAL_BALANCE
-                if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
-                    bot.daily_initial_balance = Config.PAPER_INITIAL_BALANCE
+                        if not float(getattr(bot, "balance", 0.0) or 0.0):
+                            bot.balance = Config.PAPER_INITIAL_BALANCE
+                    if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
+                        bot.daily_initial_balance = Config.PAPER_INITIAL_BALANCE
+                    restore_simulated_available_balance(bot)
+                    persist_simulated_wallet_state(bot)
                 time.sleep(3600)
                 continue
 
@@ -71,6 +74,8 @@ def handle_reset_pnl(bot):
         else:
             bot.balance = current_balance
             bot.daily_initial_balance = bot.balance
+        if Config.PAPER_MODE:
+            persist_simulated_wallet_state(bot)
 
         with bot.lock:
             # --- FIX: RESET COMPLETO DE ESTADO ---

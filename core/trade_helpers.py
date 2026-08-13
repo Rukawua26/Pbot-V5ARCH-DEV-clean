@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import math
 import time
 from contextlib import nullcontext
 from typing import Any
@@ -12,6 +13,8 @@ from core.symbol_utils import normalize_position_symbol
 from core.trade_state import open_trade_statuses
 from tools.learning import shadow_logger
 from tools.notifier import send_telegram_msg
+
+SIMULATED_WALLET_META_KEY = "simulated_wallet_state_v1"
 
 
 def _module_available(module_name: str) -> bool:
@@ -299,6 +302,73 @@ def _calculate_margin_used(notional_usd: float, leverage: int | float) -> float:
     return float(notional_usd or 0.0) / max(1, lev)
 
 
+def restore_simulated_available_balance(bot) -> float:
+    balance = float(getattr(bot, "balance", 0.0) or 0.0)
+    reserved_margin = 0.0
+    for trade in (getattr(bot, "active_trades", {}) or {}).values():
+        if not isinstance(trade, dict):
+            continue
+        if not (trade.get("is_shadow", False) or trade.get("simulated_real", False)):
+            continue
+        if trade.get("margin_released", False):
+            continue
+        reserved_margin += max(0.0, float(trade.get("margin_used") or 0.0))
+    available = max(0.0, balance - reserved_margin)
+    bot.available_balance = available
+    bot._simulated_wallet_initialized = True
+    return available
+
+
+def restore_simulated_wallet_state(bot) -> bool:
+    brain = getattr(bot, "brain", None)
+    getter = getattr(brain, "get_metadata_json_strict", None)
+    if not callable(getter):
+        getter = getattr(brain, "get_metadata_json", None)
+    if not callable(getter):
+        return False
+    state = getter(SIMULATED_WALLET_META_KEY, default=None)
+    if state is None:
+        return False
+    if not isinstance(state, dict):
+        raise RuntimeError("SIMULATED_WALLET_STATE_INVALID: expected object")
+    try:
+        balance = float(state["balance"])
+        daily_initial_balance = float(state["daily_initial_balance"])
+    except (KeyError, TypeError, ValueError):
+        raise RuntimeError("SIMULATED_WALLET_STATE_INVALID: missing numeric fields") from None
+    if not math.isfinite(balance) or balance < 0.0:
+        raise RuntimeError("SIMULATED_WALLET_STATE_INVALID: invalid balance")
+    if not math.isfinite(daily_initial_balance) or daily_initial_balance < 0.0:
+        raise RuntimeError("SIMULATED_WALLET_STATE_INVALID: invalid daily baseline")
+    bot.balance = balance
+    bot.daily_initial_balance = daily_initial_balance
+    restore_simulated_available_balance(bot)
+    return True
+
+
+def persist_simulated_wallet_state(bot) -> bool:
+    setter = getattr(getattr(bot, "brain", None), "set_metadata_json", None)
+    if not callable(setter):
+        return True
+    state = {
+        "balance": float(getattr(bot, "balance", 0.0) or 0.0),
+        "daily_initial_balance": float(getattr(bot, "daily_initial_balance", 0.0) or 0.0),
+    }
+    db_lock = getattr(bot, "db_lock", None)
+    ctx = db_lock if db_lock is not None else nullcontext()
+    try:
+        with ctx:
+            persisted = setter(SIMULATED_WALLET_META_KEY, state)
+        if persisted is False:
+            raise RuntimeError("metadata write returned false")
+        return True
+    except Exception as error:
+        logger = getattr(bot, "log", None)
+        if callable(logger):
+            logger(f"⚠️ Error persistiendo wallet simulado: {error}")
+        return False
+
+
 def _calculate_trade_pnl(
     *,
     side: str,
@@ -368,17 +438,42 @@ def _release_simulated_margin(bot, trade: dict[str, Any], pnl_usd: float) -> boo
         return False
     if trade.get("margin_released", False):
         return False
-    margin_used = float(trade.get("margin_used") or 0.0)
     balance_lock = getattr(bot, "balance_lock", None)
     ctx = balance_lock if balance_lock is not None else nullcontext()
     with ctx:
+        if trade.get("margin_released", False):
+            return False
+        margin_used = float(trade.get("margin_used") or 0.0)
+        old_balance = float(getattr(bot, "balance", 0.0) or 0.0)
+        old_available = float(getattr(bot, "available_balance", 0.0) or 0.0)
         bot.balance = float(getattr(bot, "balance", 0.0) or 0.0) + float(pnl_usd or 0.0)
         bot.available_balance = (
             float(getattr(bot, "available_balance", 0.0) or 0.0)
             + margin_used
             + float(pnl_usd or 0.0)
         )
-    trade["margin_released"] = True
+        trade["margin_released"] = True
+        wallet_state = {
+            "balance": float(bot.balance),
+            "daily_initial_balance": float(getattr(bot, "daily_initial_balance", 0.0) or 0.0),
+        }
+        trade_key = str(trade.get("trade_key") or "")
+        settler = getattr(getattr(bot, "brain", None), "settle_simulated_trade_wallet", None)
+        if trade_key and callable(settler):
+            db_lock = getattr(bot, "db_lock", None)
+            db_ctx = db_lock if db_lock is not None else nullcontext()
+            try:
+                with db_ctx:
+                    persisted = bool(settler(trade_key, SIMULATED_WALLET_META_KEY, wallet_state))
+            except Exception:
+                persisted = False
+        else:
+            persisted = persist_simulated_wallet_state(bot)
+        if not persisted:
+            bot.balance = old_balance
+            bot.available_balance = old_available
+            trade["margin_released"] = False
+            raise RuntimeError("SIMULATED_WALLET_SETTLEMENT_FAILED")
     return True
 
 

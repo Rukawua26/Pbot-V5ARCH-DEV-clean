@@ -8,6 +8,8 @@ from concurrent.futures import ThreadPoolExecutor
 class ShadowExecutionAdapter:
     """Adapter de ejecución shadow-live con latencia/rechazo/fill parcial simulados."""
 
+    supports_real_positions = False
+
     def __init__(
         self,
         live_execution,
@@ -79,6 +81,9 @@ class ShadowExecutionAdapter:
 
     def fetch_funding_rate(self, symbol: str):
         return self._live.fetch_funding_rate(symbol)
+
+    def fetch_open_interest(self, symbol: str):
+        return self._live.fetch_open_interest(symbol)
 
     def fetch_positions(self):
         raise NotImplementedError(

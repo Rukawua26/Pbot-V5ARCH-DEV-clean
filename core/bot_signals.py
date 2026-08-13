@@ -11,6 +11,7 @@ from core.market_breadth import calculate_market_breadth
 from core.trade_keys import has_trade
 
 _ANALYSIS_MISSING = object()
+_ANALYSIS_ERROR = object()
 
 
 def _passes_cheap_pre_filters(
@@ -40,6 +41,11 @@ def _passes_cheap_pre_filters(
 
     if not res_data or not res_data.get("data"):
         elapsed = (res_data or {}).get("elapsed")
+        fetch_error = str((res_data or {}).get("error") or "").upper()
+        if fetch_error == "TIMEOUT":
+            return False, "TRIAGE_TIMEOUT", "⏱️ TIMEOUT", elapsed
+        if fetch_error:
+            return False, f"TRIAGE_{fetch_error}", "❌ FETCH ERROR", elapsed
         return False, "DATA_INTEGRITY_FAIL", "⏱️ TIMEOUT", elapsed
 
     df_main, _df_4h = res_data["data"]
@@ -125,7 +131,16 @@ def _precompute_signal_analysis(bot, top_triage, results):
                 analysis_by_symbol[symbol_raw] = future.result()
             except Exception as error:
                 bot.log(f"⚠️ Error análisis paralelo {symbol_raw}: {error}")
-                analysis_by_symbol[symbol_raw] = None
+                append_execution_event(
+                    bot,
+                    "ANALYSIS_ERROR",
+                    {
+                        "symbol": symbol_raw.split(":")[0],
+                        "stage": "parallel",
+                        "error": str(error)[:180],
+                    },
+                )
+                analysis_by_symbol[symbol_raw] = _ANALYSIS_ERROR
     return analysis_by_symbol
 
 
@@ -167,7 +182,29 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
 
         analysis = precomputed_analysis.get(symbol_raw, _ANALYSIS_MISSING)
         if analysis is _ANALYSIS_MISSING:
-            analysis = bot._analyze_symbol_candidate(symbol_raw, symbol, df_main, df_4h, elapsed)
+            try:
+                analysis = bot._analyze_symbol_candidate(
+                    symbol_raw, symbol, df_main, df_4h, elapsed
+                )
+            except Exception as error:
+                bot.log(f"⚠️ Error análisis secuencial {symbol_raw}: {error}")
+                append_execution_event(
+                    bot,
+                    "ANALYSIS_ERROR",
+                    {"symbol": symbol, "stage": "sequential", "error": str(error)[:180]},
+                )
+                analysis = _ANALYSIS_ERROR
+        if analysis is _ANALYSIS_ERROR:
+            bot.update_radar(
+                symbol_raw,
+                {"signal": "WAIT", "mode": "NONE"},
+                0.0,
+                "❌",
+                "❌ ANALYSIS ERROR",
+                {"tier": "IRON", "filter_reason": "ANALYSIS_ERROR"},
+                response_ms=elapsed,
+            )
+            continue
         if analysis is None:
             continue
 
@@ -371,6 +408,11 @@ def run_signal_scan_cycle(bot, top_triage, results, signal_stats, pnl_real_hoy):
 
             error_str = str(e)
             bot.log(f"❌ ERROR en {symbol}: {error_str} | {traceback.format_exc(limit=3)}")
+            append_execution_event(
+                bot,
+                "ANALYSIS_ERROR",
+                {"symbol": symbol, "stage": "pipeline", "error": error_str[:180]},
+            )
 
             # Reportar el crash en el radar.
             slock = getattr(bot, "scanner_lock", None)

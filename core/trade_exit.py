@@ -126,8 +126,28 @@ def close_trade(
     if not trade:
         return
     trade_key = str(trade.get("trade_key") or resolved_trade_key or real_symbol)
+    trade["trade_key"] = trade_key
     symbol = str(trade.get("symbol") or real_symbol)
     side = str(trade.get("side") or desired_side or "")
+
+    if (
+        Config.PAPER_MODE
+        and not (trade.get("is_shadow", False) or trade.get("simulated_real", False))
+        and trade.get("simulated_real") is False
+    ):
+        with bot.lock:
+            trade["closing_in_progress"] = False
+            trade["status"] = TradeStatus.OPEN.value
+        bot.is_paused = True
+        bot.integrity_lock_active = True
+        bot.halt_system_active = True
+        bot.log(f"🛑 PAPER_REAL_STATE_QUARANTINED {symbol}: cierre local rechazado.")
+        append_execution_event(
+            bot,
+            "PAPER_REAL_STATE_QUARANTINED_HALT",
+            {"symbol": symbol, "trade_key": trade_key},
+        )
+        return
 
     with bot.db_lock:
         bot.brain.save_active_trade_state(trade_key, trade)
@@ -416,7 +436,8 @@ def close_trade(
                 del bot.active_trades[trade_key]
 
         with bot.db_lock:
-            bot.brain.delete_active_trade_state(trade_key)
+            if not trade.get("margin_released", False):
+                bot.brain.delete_active_trade_state(trade_key)
 
         # --- INTEGRACIÓN KANBAN ---
         # Solo movemos a Historial si el trade era REAL/PAPER (no SHADOW)
@@ -652,10 +673,17 @@ def close_trade(
         is_stuck_or_unconfirmed = any(
             x in error_str for x in ["STUCK", "OPEN_UNCONFIRMED", "EXIT_STATE="]
         )
+        simulated_settled = bool(
+            (trade.get("is_shadow", False) or trade.get("simulated_real", False))
+            and trade.get("margin_released", False)
+        )
 
         with bot.lock:
             current = bot.active_trades.get(trade_key)
-            if current:
+            if current and simulated_settled:
+                del bot.active_trades[trade_key]
+                current = None
+            elif current:
                 current["closing_in_progress"] = False
                 if is_stuck_or_unconfirmed and not (
                     trade.get("is_shadow", False) or Config.PAPER_MODE

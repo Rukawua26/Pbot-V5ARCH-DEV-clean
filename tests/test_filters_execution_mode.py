@@ -132,6 +132,117 @@ class TestPlanExecutionMode(unittest.TestCase):
         self.assertFalse(fp)
         self.assertIn("COHERENCIA", fr)
 
+    def test_fresh_hmm_conflict_allows_bootstrap_only_as_shadow_in_paper(self):
+        bot = _make_bot(
+            _get_market_regime=MagicMock(return_value="BULL_TREND"),
+            market_regime_source="HMM",
+            current_sentiment=["🔴 TENDENCIA BAJISTA", -1.0],
+            bootstrap_heuristic_mode=True,
+        )
+        with (
+            patch.object(Config, "PAPER_MODE", True),
+            patch.object(Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", True),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True),
+        ):
+            ok, shadow, verdict, fp, fr = _plan_execution_mode(
+                bot,
+                "BTC/USDT",
+                "BUY",
+                88.0,
+                "OK",
+                True,
+                "",
+                _ctx(
+                    markov_snapshot_mode="fresh",
+                    heuristic_hits=[1, 2, 3, 4, 5],
+                    bootstrap_ready_real=True,
+                    bootstrap_ready_shadow=True,
+                ),
+            )
+
+        self.assertTrue(ok)
+        self.assertTrue(shadow)
+        self.assertTrue(fp)
+        self.assertIn("SHADOW CONFLICT", verdict)
+
+    def test_hmm_conflict_remains_blocked_in_real(self):
+        bot = _make_bot(
+            _get_market_regime=MagicMock(return_value="BULL_TREND"),
+            market_regime_source="HMM",
+            current_sentiment=["🔴 TENDENCIA BAJISTA", -1.0],
+        )
+        with (
+            patch.object(Config, "PAPER_MODE", False),
+            patch.object(Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", True),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True),
+        ):
+            ok, shadow, verdict, fp, fr = _plan_execution_mode(
+                bot,
+                "BTC/USDT",
+                "BUY",
+                88.0,
+                "OK",
+                True,
+                "",
+                _ctx(markov_snapshot_mode="fresh"),
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(fp)
+        self.assertIn("COHERENCIA", fr)
+
+    def test_stale_hmm_conflict_remains_blocked_in_paper(self):
+        bot = _make_bot(
+            _get_market_regime=MagicMock(return_value="BULL_TREND"),
+            market_regime_source="HMM",
+            current_sentiment=["🔴 TENDENCIA BAJISTA", -1.0],
+        )
+        with (
+            patch.object(Config, "PAPER_MODE", True),
+            patch.object(Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", True),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True),
+        ):
+            ok, shadow, verdict, fp, fr = _plan_execution_mode(
+                bot,
+                "BTC/USDT",
+                "BUY",
+                88.0,
+                "OK",
+                True,
+                "",
+                _ctx(markov_snapshot_mode="stale_penalty_only"),
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(fp)
+        self.assertIn("COHERENCIA", fr)
+
+    def test_hmm_conflict_override_disabled_by_default_behavior(self):
+        bot = _make_bot(
+            _get_market_regime=MagicMock(return_value="BULL_TREND"),
+            market_regime_source="HMM",
+            current_sentiment=["🔴 TENDENCIA BAJISTA", -1.0],
+        )
+        with (
+            patch.object(Config, "PAPER_MODE", True),
+            patch.object(Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", False),
+            patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", True),
+        ):
+            ok, shadow, verdict, fp, fr = _plan_execution_mode(
+                bot,
+                "BTC/USDT",
+                "BUY",
+                88.0,
+                "OK",
+                True,
+                "",
+                _ctx(markov_snapshot_mode="fresh"),
+            )
+
+        self.assertFalse(ok)
+        self.assertFalse(fp)
+        self.assertIn("COHERENCIA", fr)
+
     def test_bootstrap_heuristic_mode_real(self):
         bot = _make_bot(bootstrap_heuristic_mode=True)
         with patch.object(Config, "DIRECTIONAL_COHERENCE_FILTER", False):

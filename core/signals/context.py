@@ -72,6 +72,8 @@ def _build_symbol_context(bot, symbol_raw, symbol, df_main, price, ind, audit_si
         "tier": ind.get("tier", "IRON"),
         "spread": ind.get("spread", 0.0),
         "vol_rel": float(vol_rel),
+        "current_sentiment": str(getattr(bot, "current_sentiment", ("",))[0]),
+        "market_regime_source": str(getattr(bot, "market_regime_source", "UNKNOWN")),
     }
 
     for key in (

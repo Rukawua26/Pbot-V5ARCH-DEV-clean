@@ -219,6 +219,9 @@ class AdvancedRuntimeFlowsTest(unittest.TestCase):
         self.assertTrue(str(result).startswith("ERROR:"))
         self.assertIn("BTC/USDT", saved_states)
         self.assertEqual(saved_states["BTC/USDT"].get("status"), "PENDING_SEND")
+        self.assertTrue(bot.is_paused)
+        self.assertTrue(bot.integrity_lock_active)
+        self.assertTrue(bot.halt_system_active)
 
         stale = parse_datetime_utc(saved_states["BTC/USDT"]["intent_created_at_utc"]) - timedelta(
             seconds=180

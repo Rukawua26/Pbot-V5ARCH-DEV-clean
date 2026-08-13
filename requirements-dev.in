@@ -3,6 +3,7 @@
 # Testing & Security
 coverage
 pip-audit
+setuptools>=83.0.0
 
 # Static analysis
 ruff

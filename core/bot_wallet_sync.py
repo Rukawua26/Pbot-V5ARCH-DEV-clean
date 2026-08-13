@@ -466,6 +466,8 @@ def _manage_partial_fill_trade(bot, symbol: str, trade: dict, info: dict):
 
 
 def sync_wallet(bot):
+    if bool(getattr(Config, "PAPER_MODE", True)):
+        return
     try:
         # Usamos fetch_positions para obtener datos precisos y unificados
         # [FIX] Race Condition: Snapshot de active_trades antes de la llamada de red

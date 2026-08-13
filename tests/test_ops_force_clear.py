@@ -92,6 +92,7 @@ class OpsForceClearTest(unittest.TestCase):
                 "BTC/USDT": {
                     "symbol": "BTC/USDT",
                     "status": "PENDING_SEND",
+                    "simulated_real": True,
                     "entry_client_order_id": "sai-v118-abc",
                 }
             },
@@ -136,6 +137,33 @@ class OpsForceClearTest(unittest.TestCase):
         self.assertIn("BTC/USDT", bot.active_trades)
         bot.brain.delete_active_trade_state.assert_not_called()
         mocked_tg.assert_called()
+
+    @patch("core.commands.ops.Config.PAPER_MODE", True)
+    @patch("core.commands.ops.send_telegram_msg")
+    def test_force_clear_quarantines_non_simulated_state_in_paper(self, mocked_tg):
+        bot = SimpleNamespace(
+            lock=RLock(),
+            db_lock=RLock(),
+            active_trades={
+                "BTC/USDT": {
+                    "symbol": "BTC/USDT",
+                    "is_shadow": False,
+                    "simulated_real": False,
+                }
+            },
+            execution=SimpleNamespace(fetch_positions=MagicMock()),
+            brain=SimpleNamespace(delete_active_trade_state=MagicMock()),
+            is_paused=False,
+            integrity_lock_active=False,
+            halt_system_active=False,
+        )
+
+        self.assertTrue(_handle_training_and_maintenance_commands(bot, "/force_clear BTC/USDT"))
+
+        self.assertIn("BTC/USDT", bot.active_trades)
+        self.assertTrue(bot.halt_system_active)
+        bot.brain.delete_active_trade_state.assert_not_called()
+        mocked_tg.assert_called_once()
 
 
 if __name__ == "__main__":

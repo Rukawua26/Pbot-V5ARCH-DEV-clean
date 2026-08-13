@@ -76,6 +76,28 @@ def _get_fast_coherence_veto_reason(bot, df_main, signal: str | None = None):
     return None
 
 
+def _allow_fast_regime_conflict_shadow(bot, market_regime: str, signal: str) -> bool:
+    if not bool(getattr(Config, "PAPER_MODE", True)):
+        return False
+    if not bool(getattr(Config, "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", False)):
+        return False
+    if str(getattr(bot, "market_regime_source", "")).upper() != "HMM":
+        return False
+
+    snapshot = getattr(bot, "hmm_markov_snapshot", None)
+    if not isinstance(snapshot, dict) or not snapshot.get("is_ready"):
+        return False
+    max_age = float(getattr(Config, "MARKOV_SNAPSHOT_MAX_AGE_SECONDS", 2 * 60 * 60))
+    if _snapshot_age_seconds(snapshot) > max_age:
+        return False
+
+    regime = str(market_regime or "").upper()
+    side = str(signal or "").upper()
+    return (side == "BUY" and regime in {"BULL_TREND", "BULL_STRONG"}) or (
+        side == "SELL" and regime in {"BEAR_TREND", "BEAR_STRONG"}
+    )
+
+
 def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
     try:
         if df_main is None or df_4h is None or df_main.empty:
@@ -181,7 +203,10 @@ def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
 
         audit_signal = str(res[0] if isinstance(res, (list, tuple)) and len(res) > 0 else "")
         fast_veto_reason = _get_fast_coherence_veto_reason(bot, df_main, audit_signal)
-        if fast_veto_reason:
+        allow_conflict_shadow = fast_veto_reason and _allow_fast_regime_conflict_shadow(
+            bot, market_regime, audit_signal
+        )
+        if fast_veto_reason and not allow_conflict_shadow:
             bot.log(f"⛔ FAST_VETO {symbol}: {fast_veto_reason}")
             bot.update_radar(
                 symbol,
@@ -193,6 +218,11 @@ def _analyze_symbol_candidate(bot, symbol_raw, symbol, df_main, df_4h, elapsed):
                 response_ms=elapsed,
             )
             return None
+        if allow_conflict_shadow:
+            bot.log(
+                f"🧪 FAST_CONFLICT_SHADOW_ALLOWED {symbol}: regime={market_regime} "
+                f"side={audit_signal}"
+            )
 
         return res
 

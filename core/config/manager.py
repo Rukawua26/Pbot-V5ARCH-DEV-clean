@@ -58,6 +58,7 @@ class Config(OperationalConfig, StrategyConfig):
     MIN_ATR_PCT = _env_float("MIN_ATR_PCT", 0.006)
     MIN_ATR_PCT_FILTER_ENABLED = _env_bool("MIN_ATR_PCT_FILTER_ENABLED", True)
     BULL_TREND_ENTRY_VETO_ENABLED = _env_bool("BULL_TREND_ENTRY_VETO_ENABLED", True)
+    BULL_TREND_ALIGNED_REAL_ENABLED = _env_bool("BULL_TREND_ALIGNED_REAL_ENABLED", False)
     HMM_RANGE_LEARNING_OVERRIDE_ENABLED = _env_bool("HMM_RANGE_LEARNING_OVERRIDE_ENABLED", False)
 
     # --- Cap de correlacion por direccion (Fase 1: Torniquete) ---
@@ -155,6 +156,9 @@ class Config(OperationalConfig, StrategyConfig):
     BREAKOUT_SEMI_ACTIVE_SHADOW = _env_bool("BREAKOUT_SEMI_ACTIVE_SHADOW", True)
     BREAKOUT_EXTREME_IA_PROB = _env_float("BREAKOUT_EXTREME_IA_PROB", 75.0)
     DIRECTIONAL_COHERENCE_FILTER = _env_bool("DIRECTIONAL_COHERENCE_FILTER", True)
+    REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED = _env_bool(
+        "REGIME_CONFLICT_SHADOW_OVERRIDE_ENABLED", False
+    )
 
     # --- Open Interest Delta Filter (v118.3) ---
     OI_FILTER_ENABLED = _env_bool("OI_FILTER_ENABLED", True)

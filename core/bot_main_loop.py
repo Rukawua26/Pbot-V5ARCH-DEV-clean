@@ -161,6 +161,8 @@ def run_main_logic(bot):
 
             top_triage = bot._prepare_top_triage(triage_snapshot)
             if not top_triage:
+                bot.log("⚠️ Sin candidatos válidos tras cuarentena. Esperando siguiente ciclo...")
+                bot._run_cycle_wait_and_api_log()
                 continue
 
             results = bot._fetch_triage_data_parallel(top_triage)

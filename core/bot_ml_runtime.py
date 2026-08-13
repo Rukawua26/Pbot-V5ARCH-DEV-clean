@@ -10,8 +10,8 @@ def init_ml_monitoring(bot, ml_monitor_available):
     try:
         import numpy as np
 
+        from core.strategy.consensus_nn import AgentConsensusNN
         from tools.ml_monitor import AlertManager, ModelPerformanceTracker
-        from tools.strategy import AgentConsensusNN
 
         neural_nn = AgentConsensusNN()
         if neural_nn.is_trained:

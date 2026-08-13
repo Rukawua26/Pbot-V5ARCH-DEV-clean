@@ -17,6 +17,7 @@ from core.active_trade_store import (
     delete_active_trade_state as run_delete_active_trade_state,
     load_active_trade_states as run_load_active_trade_states,
     save_active_trade_state as run_save_active_trade_state,
+    settle_simulated_trade_wallet as run_settle_simulated_trade_wallet,
 )
 from core.learning_paths import DEFAULT_DB_PATH
 from core.model_loader import safe_pickle_load
@@ -50,6 +51,7 @@ RAG_OPTIMIZE_THRESHOLD_MS = 100.0  # Gatillo para vectorización NumPy/FAISS
 
 def _utc_now_naive():
     return datetime.now(UTC).replace(tzinfo=None)
+
 
 # [v118] Ruta de la DB con soporte para inyección por ENV (Docker/OCI).
 _DB_PATH = DEFAULT_DB_PATH
@@ -278,9 +280,7 @@ class Brain:
         """)
         # Inicializar agentes si no existen (v118: 13 Agentes)
         for agent in ["T", "V", "J", "G", "C", "L", "F", "S", "O", "R", "M", "D", "E"]:
-            c.execute(
-                "INSERT OR IGNORE INTO agent_reputation (agent_id) VALUES (?)", (agent,)
-            )
+            c.execute("INSERT OR IGNORE INTO agent_reputation (agent_id) VALUES (?)", (agent,))
 
         # FASE 7: Autopsia Contextual (Reputación por Contexto)
         c.execute("""
@@ -367,10 +367,7 @@ class Brain:
             "CREATE INDEX IF NOT EXISTS idx_tcs_context_hash "
             "ON trade_context_snapshots(context_hash)"
         )
-        c.execute(
-            "CREATE INDEX IF NOT EXISTS idx_tcs_symbol "
-            "ON trade_context_snapshots(symbol)"
-        )
+        c.execute("CREATE INDEX IF NOT EXISTS idx_tcs_symbol ON trade_context_snapshots(symbol)")
 
         c.execute("""
             CREATE TABLE IF NOT EXISTS error_snapshots (
@@ -535,9 +532,7 @@ class Brain:
         # [FIX] Sanitizar snapshot para evitar error de serialización JSON (DataFrames)
         clean_snap = {}
         if isinstance(snapshot, dict):
-            clean_snap = {
-                k: v for k, v in snapshot.items() if not isinstance(v, pd.DataFrame)
-            }
+            clean_snap = {k: v for k, v in snapshot.items() if not isinstance(v, pd.DataFrame)}
         else:
             clean_snap = snapshot
 
@@ -622,9 +617,7 @@ class Brain:
             print(f"⚠️ Error guardando signal_alert: {e}")
             return None
 
-    def update_signal_alert_status(
-        self, entry_client_order_id, status, trade_id=None, symbol=None
-    ):
+    def update_signal_alert_status(self, entry_client_order_id, status, trade_id=None, symbol=None):
         try:
             conn = self._get_conn()
             c = conn.cursor()
@@ -632,23 +625,23 @@ class Brain:
                 c.execute(
                     """
                     UPDATE signal_alerts
-                    SET status = ?, trade_id = COALESCE(?, trade_id)
+                    SET status = ?
                     WHERE entry_client_order_id = ?
                     """,
-                    (str(status or "UNKNOWN"), trade_id, entry_client_order_id),
+                    (str(status or "UNKNOWN"), entry_client_order_id),
                 )
             elif symbol:
                 c.execute(
                     """
                     UPDATE signal_alerts
-                    SET status = ?, trade_id = COALESCE(?, trade_id)
+                    SET status = ?
                     WHERE id = (
                         SELECT id FROM signal_alerts
                         WHERE symbol = ?
                         ORDER BY id DESC LIMIT 1
                     )
                     """,
-                    (str(status or "UNKNOWN"), trade_id, symbol),
+                    (str(status or "UNKNOWN"), symbol),
                 )
             updated = c.rowcount
             conn.commit()
@@ -675,9 +668,7 @@ class Brain:
                 ctx_summary = "N/A"
                 try:
                     snap = json.loads(r["market_snapshot"])
-                    ctx_summary = (
-                        f"RSI:{snap.get('rsi', 0):.1f} | Trend:{snap.get('trend', '?')}"
-                    )
+                    ctx_summary = f"RSI:{snap.get('rsi', 0):.1f} | Trend:{snap.get('trend', '?')}"
                 except (json.JSONDecodeError, KeyError, TypeError):
                     ctx_summary = "N/A"  # Datos corruptos, usar N/A
                 results.append(
@@ -702,17 +693,11 @@ class Brain:
             total = c.fetchone()[0]
             conn.close()
 
-            xp = min(
-                (total / 10000) * 100, 100
-            )  # Meta de 10,000 experiencias (Nivel Legendario)
+            xp = min((total / 10000) * 100, 100)  # Meta de 10,000 experiencias (Nivel Legendario)
             rank = (
                 "🐣 Novato"
                 if xp < 10
-                else (
-                    "⚔️ Guerrero"
-                    if xp < 40
-                    else ("🧠 Maestro" if xp < 80 else "🏆 LEGENDARIO")
-                )
+                else ("⚔️ Guerrero" if xp < 40 else ("🧠 Maestro" if xp < 80 else "🏆 LEGENDARIO"))
             )
 
             return {"xp_percent": round(xp, 1), "rank": rank, "total": total}
@@ -730,9 +715,7 @@ class Brain:
             try:
                 bot.ghost_model = safe_pickle_load(model_path)
                 self.pending_model_update = False
-                bot.log(
-                    "✅ [HOT-SWAP] Modelo Ghost recargado exitosamente en ventana segura."
-                )
+                bot.log("✅ [HOT-SWAP] Modelo Ghost recargado exitosamente en ventana segura.")
                 return True
             except Exception as e:
                 bot.log(f"❌ Error en Hot-Swap de modelo: {e}")
@@ -873,9 +856,7 @@ class Brain:
             veto_mae = mae_ratio > 2.0 and avg_mae > 0
             if veto_mae:
                 is_elite_candidate = False
-                veto_reason = (
-                    f"MAE_RATIO={mae_ratio:.1f}x (MAE={avg_mae}%, PnL={avg_pnl}%)"
-                )
+                veto_reason = f"MAE_RATIO={mae_ratio:.1f}x (MAE={avg_mae}%, PnL={avg_pnl}%)"
             else:
                 is_elite_candidate = wr >= 60 and avg_pnl > 0 and trades_count >= 20
                 veto_reason = None
@@ -926,9 +907,7 @@ class Brain:
                 )
             elif not is_elite and was_elite:
                 # Salió de elite
-                reason = (
-                    "BAJO_RENDIMIENTO" if wr < 50 or avg_pnl < 0 else "SIN_ROBUSTEZ"
-                )
+                reason = "BAJO_RENDIMIENTO" if wr < 50 or avg_pnl < 0 else "SIN_ROBUSTEZ"
                 c.execute(
                     "INSERT INTO elite_audit_log (timestamp, symbol, action, reason, metrics) VALUES (?, ?, ?, ?, ?)",
                     (
@@ -1079,9 +1058,7 @@ class Brain:
         try:
             conn = self._get_conn()
             c = conn.cursor()
-            c.execute(
-                "SELECT * FROM elite_patterns ORDER BY win_rate DESC, total_trades DESC"
-            )
+            c.execute("SELECT * FROM elite_patterns ORDER BY win_rate DESC, total_trades DESC")
             rows = c.fetchall()
             conn.close()
             return [dict(row) for row in rows]
@@ -1198,9 +1175,7 @@ class Brain:
             conn.close()
 
             if deleted > 0:
-                print(
-                    f"🧹 Limpiados {deleted} patrones experimentales mayores a {days} días"
-                )
+                print(f"🧹 Limpiados {deleted} patrones experimentales mayores a {days} días")
             return deleted
         except Exception as e:
             print(f"⚠️ Error limpiando patrones: {e}")
@@ -1272,9 +1247,7 @@ class Brain:
                 ]
             }
 
-    def update_agent_reputation(
-        self, agent_votes, pnl_percent, context_type="ALCISTA_VOLATIL"
-    ):
+    def update_agent_reputation(self, agent_votes, pnl_percent, context_type="ALCISTA_VOLATIL"):
         """
         [v109 SMART] Ajusta la confianza que el bot tiene en cada experto.
         Lógica: Win y voto > 70 (+1) | Loss y voto > 70 (-2 penaliza doble).
@@ -1513,9 +1486,7 @@ class Brain:
             if mutated:
                 new_sl = max(0.2, min(4.0, new_sl))
                 new_tp = max(0.5, min(8.0, new_tp))
-                self.update_genetic_params(
-                    symbol, new_sl, new_tp, fitness, mutation_type=m_type
-                )
+                self.update_genetic_params(symbol, new_sl, new_tp, fitness, mutation_type=m_type)
                 return True
         except Exception as e:
             print(f"⚠️ Genetic Error: {e}")
@@ -1525,13 +1496,9 @@ class Brain:
         try:
             conn = self._get_conn()
             c = conn.cursor()
-            c.execute(
-                "SELECT count(*) FROM trades WHERE is_shadow = 0 AND pnl_percent != -99.0"
-            )
+            c.execute("SELECT count(*) FROM trades WHERE is_shadow = 0 AND pnl_percent != -99.0")
             row_real = c.fetchone()
-            c.execute(
-                "SELECT count(*) FROM trades WHERE is_shadow = 1 AND pnl_percent != -99.0"
-            )
+            c.execute("SELECT count(*) FROM trades WHERE is_shadow = 1 AND pnl_percent != -99.0")
             row_shadow = c.fetchone()
 
             # --- CALCULO DE WIN RATE DE SOMBRA RECIENTE (v105.5.1) ---
@@ -1597,6 +1564,9 @@ class Brain:
 
     def load_active_trade_states(self):
         return run_load_active_trade_states(self)
+
+    def settle_simulated_trade_wallet(self, symbol, wallet_key, wallet_state):
+        return run_settle_simulated_trade_wallet(self, symbol, wallet_key, wallet_state)
 
     def delete_active_trade_state(self, symbol):
         return run_delete_active_trade_state(self, symbol)
@@ -1923,9 +1893,7 @@ class Brain:
         except Exception:
             return []
 
-    def auto_blacklist_poor_performers(
-        self, min_trades=5, max_loss_pct=-5.0, max_wr=40.0
-    ):
+    def auto_blacklist_poor_performers(self, min_trades=5, max_loss_pct=-5.0, max_wr=40.0):
         """
         [v118] Auto-blacklist símbolos con mal rendimiento.
          - Símbolos con menos de X% de WR en los últimos Y trades
@@ -1984,9 +1952,7 @@ class Brain:
         try:
             conn = self._get_conn()
             c = conn.cursor()
-            c.execute(
-                "SELECT value FROM system_meta WHERE key = 'last_train_timestamp'"
-            )
+            c.execute("SELECT value FROM system_meta WHERE key = 'last_train_timestamp'")
             row = c.fetchone()
             conn.close()
             if row and row["value"]:
@@ -2074,6 +2040,16 @@ class Brain:
         except Exception:
             return default
 
+    def get_metadata_json_strict(self, key, default=None):
+        conn = self._get_conn()
+        try:
+            row = conn.execute("SELECT value FROM system_meta WHERE key = ?", (key,)).fetchone()
+            if not row or not row["value"]:
+                return default
+            return json.loads(row["value"])
+        finally:
+            conn.close()
+
     def set_metadata_json(self, key, value):
         try:
             conn = self._get_conn()
@@ -2087,8 +2063,10 @@ class Brain:
             )
             conn.commit()
             conn.close()
+            return True
         except Exception as e:
             print(f"❌ Error actualizando metadata JSON {key}: {e}")
+            return False
 
     def get_daily_real_pnl(self, current_balance=1.0):
         """Calcula el rendimiento real en base al capital total ($)"""
@@ -2104,9 +2082,7 @@ class Brain:
             conn.close()
 
             usd_hoy = float(usd_res) if usd_res else 0.0
-            percent_real = (
-                (usd_hoy / current_balance * 100) if current_balance > 0 else 0.0
-            )
+            percent_real = (usd_hoy / current_balance * 100) if current_balance > 0 else 0.0
             return percent_real, usd_hoy
         except Exception as e:
             print(f"❌ Error obteniendo PnL diario: {e}")
@@ -2428,9 +2404,7 @@ class Brain:
 
             limite = (datetime.now() - timedelta(days=days_to_keep)).isoformat()
             # FASE 4: Backup con fecha
-            backup_name = (
-                f"history/trades_backup_{datetime.now().strftime('%Y%m%d')}.db"
-            )
+            backup_name = f"history/trades_backup_{datetime.now().strftime('%Y%m%d')}.db"
             os.makedirs("history", exist_ok=True)
 
             conn = self._get_conn()
@@ -2492,9 +2466,7 @@ class Brain:
                 c.execute("DELETE FROM shadow_telemetry WHERE timestamp < ?", (cutoff,))
                 result["shadow_deleted"] = c.rowcount if c.rowcount >= 0 else 0
 
-            c.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='signal_alerts'"
-            )
+            c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='signal_alerts'")
             has_signal_alerts = c.fetchone() is not None
 
             if has_signal_alerts:
@@ -2710,11 +2682,7 @@ class Brain:
             total = len(rows)
             wr = (wins / total) * 100
 
-            last_snap = (
-                json.loads(rows[0]["market_snapshot"])
-                if rows[0]["market_snapshot"]
-                else {}
-            )
+            last_snap = json.loads(rows[0]["market_snapshot"]) if rows[0]["market_snapshot"] else {}
             trend = last_snap.get("trend", "NEUTRAL")
             context = f"RSI: {last_snap.get('rsi', 0):.0f} | ADX: {last_snap.get('adx', 0):.0f}"
 
@@ -2854,9 +2822,7 @@ class Brain:
             optimal = []
             for row in rows:
                 wr = (row[2] / row[1] * 100) if row[1] > 0 else 0
-                optimal.append(
-                    {"hour": row[0], "wr": wr, "trades": row[1], "avg_pnl": row[3]}
-                )
+                optimal.append({"hour": row[0], "wr": wr, "trades": row[1], "avg_pnl": row[3]})
 
             return optimal[:4]  # Top 4 horas
         except Exception:
@@ -2948,13 +2914,18 @@ class Brain:
     # ============================================================
 
     def save_trade_context_snapshot(
-        self, symbol: str, side: str, context_json: dict,
-        entry_timestamp: str, is_shadow: bool = True,
+        self,
+        symbol: str,
+        side: str,
+        context_json: dict,
+        entry_timestamp: str,
+        is_shadow: bool = True,
     ) -> int | None:
         try:
             clean = {
-                k: v for k, v in context_json.items()
-                if not hasattr(v, 'shape') and not isinstance(v, pd.DataFrame)
+                k: v
+                for k, v in context_json.items()
+                if not hasattr(v, "shape") and not isinstance(v, pd.DataFrame)
             }
             json_str = json.dumps(clean, default=str)
 
@@ -2967,8 +2938,11 @@ class Brain:
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    symbol, side, int(bool(is_shadow)),
-                    entry_timestamp, json_str,
+                    symbol,
+                    side,
+                    int(bool(is_shadow)),
+                    entry_timestamp,
+                    json_str,
                     self._compute_context_hash(clean),
                 ),
             )
@@ -2981,8 +2955,11 @@ class Brain:
             return None
 
     def update_trade_context_result(
-        self, trade_id: int, pnl_percent: float,
-        exit_timestamp: str, is_winner: int = 0,
+        self,
+        trade_id: int,
+        pnl_percent: float,
+        exit_timestamp: str,
+        is_winner: int = 0,
     ) -> bool:
         try:
             conn = self._get_conn()
@@ -3015,6 +2992,7 @@ class Brain:
     @staticmethod
     def _compute_context_hash(context: dict) -> str:
         import hashlib
+
         flat = []
         for k in sorted(context.keys()):
             v = context[k]
@@ -3068,7 +3046,9 @@ class Brain:
         return dot / (norm_a * norm_b)
 
     def find_similar_contexts(
-        self, context: dict, limit: int = 10,
+        self,
+        context: dict,
+        limit: int = 10,
     ) -> list[dict]:
         try:
             start_t = time.perf_counter()
@@ -3103,14 +3083,16 @@ class Brain:
                 stored_vec = self._extract_similarity_vector(stored)
                 if not stored_vec:
                     continue
-                rows_meta.append({
-                    "id": row["id"],
-                    "symbol": row["symbol"],
-                    "side": row["side"],
-                    "pnl_percent": row["pnl_percent"],
-                    "is_winner": row["is_winner"],
-                    "entry_timestamp": row["entry_timestamp"],
-                })
+                rows_meta.append(
+                    {
+                        "id": row["id"],
+                        "symbol": row["symbol"],
+                        "side": row["side"],
+                        "pnl_percent": row["pnl_percent"],
+                        "is_winner": row["is_winner"],
+                        "entry_timestamp": row["entry_timestamp"],
+                    }
+                )
                 stored_vectors.append(stored_vec)
             conn.close()
 
@@ -3139,7 +3121,9 @@ class Brain:
 
             # Registro estructurado de decisión operativa
             if elapsed_ms > RAG_LATENCY_WARN_MS:
-                print(f"⚠️ [PERF_ADVISORY] RAG lento: {elapsed_ms:.2f}ms para {len(scored)} snapshots.")
+                print(
+                    f"⚠️ [PERF_ADVISORY] RAG lento: {elapsed_ms:.2f}ms para {len(scored)} snapshots."
+                )
             elif elapsed_ms > RAG_LATENCY_OK_MS:
                 if random.random() < 0.05:  # Log ocasional para baselines
                     print(f"⏱️ [PERF_BASE] RAG latency: {elapsed_ms:.2f}ms | Count: {len(scored)}")

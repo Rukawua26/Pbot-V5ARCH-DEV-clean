@@ -2,6 +2,11 @@ import ccxt
 import requests
 
 from config import Config
+from core.trade_helpers import (
+    persist_simulated_wallet_state,
+    restore_simulated_available_balance,
+    restore_simulated_wallet_state,
+)
 
 
 def _build_exchange(session):
@@ -123,17 +128,22 @@ def connect_to_binance(bot):
                 raise
 
         if Config.PAPER_MODE:
-            if not float(getattr(bot, "balance", 0.0) or 0.0):
+            wallet_restored = restore_simulated_wallet_state(bot)
+            if not wallet_restored and not float(getattr(bot, "balance", 0.0) or 0.0):
                 balance_lock = getattr(bot, "balance_lock", None)
                 if balance_lock:
                     with balance_lock:
                         bot.balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
                 else:
                     bot.balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
-            if not float(getattr(bot, "available_balance", 0.0) or 0.0):
-                bot.available_balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
+            if not wallet_restored:
+                restore_simulated_available_balance(bot)
             if not float(getattr(bot, "daily_initial_balance", 0.0) or 0.0):
                 bot.daily_initial_balance = float(getattr(Config, "PAPER_INITIAL_BALANCE", 1000.0))
+            if callable(
+                getattr(getattr(bot, "brain", None), "set_metadata_json", None)
+            ) and not persist_simulated_wallet_state(bot):
+                raise RuntimeError("SIMULATED_WALLET_PERSISTENCE_FAILED")
             if Config.BINANCE_API_KEY and Config.BINANCE_API_SECRET:
                 try:
                     _call_auth_read_with_time_resync(
@@ -148,9 +158,7 @@ def connect_to_binance(bot):
             else:
                 bot.log("ℹ️ PAPER_MODE: sin API keys, usando solo endpoints públicos.")
             bot.is_hedge_mode = False
-            bot.log(
-                f"🧾 PAPER capital virtual inicializado en ${float(getattr(Config, 'PAPER_INITIAL_BALANCE', 1000.0)):.2f}"
-            )
+            bot.log(f"🧾 PAPER capital virtual inicializado en ${float(bot.balance):.2f}")
         else:
             # Verificación explícita de permisos
             try:

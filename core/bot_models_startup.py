@@ -128,11 +128,11 @@ def init_models_and_startup_tasks(bot, export_dataset_fn, backup_database_fn, tf
 
     try:
         conn = bot.brain._get_conn()
-        conn.execute(
+        cursor = conn.execute(
             "UPDATE signal_alerts SET features_json = json_set(features_json, '$.features_version', 'v3_clean') "
             "WHERE json_extract(features_json, '$.features_version') = 'v2_raw_plus_model'"
         )
-        migrated = conn.rowcount
+        migrated = cursor.rowcount
         conn.commit()
         conn.close()
         if migrated > 0:

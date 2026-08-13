@@ -1,7 +1,7 @@
 import unittest
 from threading import RLock
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
@@ -50,6 +50,7 @@ class BotSignalScanCycleTest(unittest.TestCase):
             any("VETO LATENCIA" in str(call.args[0]) for call in bot.log.call_args_list)
         )
         bot.update_radar.assert_called_once()
+        self.assertEqual(bot.update_radar.call_args.args[5]["filter_reason"], "TRIAGE_TIMEOUT")
 
     def test_cheap_prefilter_blocks_symbol_before_analysis(self):
         bot = self._scan_bot(
@@ -113,6 +114,53 @@ class BotSignalScanCycleTest(unittest.TestCase):
             any("VETO LATENCIA" in str(call.args[0]) for call in bot.log.call_args_list)
         )
         bot.update_radar.assert_called_once()
+
+    def test_analysis_exception_is_recorded_and_does_not_abort_cycle(self):
+        bot = self._scan_bot(
+            _analyze_symbol_candidate=MagicMock(side_effect=RuntimeError("analysis failed"))
+        )
+
+        with patch("core.bot_signals.append_execution_event") as append_event:
+            run_signal_scan_cycle(
+                bot,
+                [{"symbol": "BTC/USDT"}],
+                self._valid_results(),
+                self._signal_stats(),
+                pnl_real_hoy=0.0,
+            )
+
+        append_event.assert_any_call(
+            bot,
+            "ANALYSIS_ERROR",
+            {"symbol": "BTC/USDT", "stage": "sequential", "error": "analysis failed"},
+        )
+        self.assertEqual(bot.update_radar.call_args.args[5]["filter_reason"], "ANALYSIS_ERROR")
+
+    def test_pipeline_exception_is_recorded(self):
+        bot = self._scan_bot(
+            _analyze_symbol_candidate=MagicMock(
+                return_value=("BUY", "SHADOW", 100.0, 80.0, {"rsi": {"val": 55}}, {})
+            ),
+            _update_signal_diagnostics=MagicMock(),
+            _build_symbol_context=MagicMock(side_effect=RuntimeError("context failed")),
+            scanner_history=[],
+            scanner_lock=None,
+        )
+
+        with patch("core.bot_signals.append_execution_event") as append_event:
+            run_signal_scan_cycle(
+                bot,
+                [{"symbol": "BTC/USDT"}],
+                self._valid_results(),
+                self._signal_stats(),
+                pnl_real_hoy=0.0,
+            )
+
+        append_event.assert_any_call(
+            bot,
+            "ANALYSIS_ERROR",
+            {"symbol": "BTC/USDT", "stage": "pipeline", "error": "context failed"},
+        )
 
     def test_triary_spread_is_propagated_to_execution_context(self):
         captured = {}

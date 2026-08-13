@@ -645,6 +645,7 @@ def execute_order(
         "entry": price,
         "amount": amount,
         "is_shadow": is_shadow,
+        "simulated_real": bool(Config.PAPER_MODE and not is_shadow),
         "status": TradeStatus.PENDING_SEND.value,
         "signal_ts": signal_ts,
         "entry_client_order_id": entry_client_order_id,
@@ -804,6 +805,7 @@ def execute_order(
 
         margin_used = _calculate_margin_used(final_usd, current_leverage)
         simulated_margin_state = {
+            "trade_key": trade_key,
             "is_shadow": bool(is_shadow),
             "simulated_real": bool(Config.PAPER_MODE and not is_shadow),
             "margin_used": margin_used,
@@ -1212,9 +1214,11 @@ def execute_order(
     except Exception as e:
         if simulated_margin_state is not None:
             _release_simulated_margin(bot, simulated_margin_state, 0.0)
+            if is_shadow or Config.PAPER_MODE:
+                _drop_pending_intent()
         # CRITICAL: If we got to this point with a REAL order that may have filled,
         # we must HALT to prevent inconsistent state.
-        if not is_shadow and order is not None:
+        if not is_shadow and not Config.PAPER_MODE:
             bot.is_paused = True
             bot.integrity_lock_active = True
             setattr(bot, "halt_system_active", True)
@@ -1225,11 +1229,12 @@ def execute_order(
                     {
                         "error": str(e)[:200],
                         "order": str(order)[:200],
+                        "order_ack_received": order is not None,
                         "side": str(side),
                     },
                 )
             send_telegram_msg(
-                f"🛑 *EXEC_EXCEPTION_POST_FILL_HALT*\n{symbol} falló tras orden aceptada/consumo de margen. HALT activado.",
+                f"🛑 *EXEC_EXCEPTION_POST_FILL_HALT*\n{symbol} quedó con estado de entrada ambiguo. HALT activado.",
                 Priority.CRITICAL,
             )
             append_execution_event(

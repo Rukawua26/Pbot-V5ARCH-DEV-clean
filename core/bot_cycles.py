@@ -1,5 +1,6 @@
 import asyncio
 import concurrent.futures
+import math
 import os
 import time
 
@@ -102,6 +103,15 @@ def _resolve_triage_worker_count(top_triage_count: int) -> int:
     configured_cap = int(getattr(Config, "TRIAGE_MAX_WORKERS", dynamic_default) or dynamic_default)
     safe_cap = max(1, min(32, configured_cap))
     return max(1, min(top_triage_count, safe_cap))
+
+
+def _consume_late_task_exception(task) -> None:
+    if task.cancelled():
+        return
+    try:
+        task.exception()
+    except (asyncio.CancelledError, Exception):
+        return
 
 
 def run_market_refresh_cycle(bot):
@@ -254,14 +264,38 @@ async def _fetch_triage_data_async(bot, top_triage):
     timeout_s = float(getattr(Config, "TRIAGE_TIMEOUT_SECONDS", 4)) + 1.0
     max_workers = _resolve_triage_worker_count(len(top_triage))
     semaphore = asyncio.Semaphore(max_workers)
+    inflight = getattr(bot, "_triage_fetch_tasks", None)
+    if not isinstance(inflight, dict):
+        inflight = {}
+        bot._triage_fetch_tasks = inflight
+
+    for symbol, task in list(inflight.items()):
+        if not task.done():
+            continue
+        try:
+            task.result()
+        except (asyncio.CancelledError, Exception) as error:
+            bot.log(f"⚠️ Fetch tardío finalizó con error para {symbol}: {error}")
+        inflight.pop(symbol, None)
 
     async def _fetch_one(item):
         symbol_raw = item.get("symbol_raw", item["symbol"])
         sym_map = item["symbol"]
         async with semaphore:
+            existing = inflight.get(sym_map)
+            if existing is not None and not existing.done():
+                return sym_map, None, "IN_FLIGHT"
+            if len(inflight) >= max_workers:
+                return sym_map, None, "CAPACITY"
+            task = asyncio.create_task(
+                asyncio.to_thread(bot._fetch_pair_data, symbol_raw),
+                name=f"triage-fetch:{sym_map}",
+            )
+            task.add_done_callback(_consume_late_task_exception)
+            inflight[sym_map] = task
             try:
                 result = await asyncio.wait_for(
-                    asyncio.to_thread(bot._fetch_pair_data, symbol_raw),
+                    asyncio.shield(task),
                     timeout=timeout_s,
                 )
                 await asyncio.sleep(0)
@@ -270,12 +304,15 @@ async def _fetch_triage_data_async(bot, top_triage):
                 return sym_map, None, "TIMEOUT"
             except Exception as error:
                 return sym_map, None, error
+            finally:
+                if task.done():
+                    inflight.pop(sym_map, None)
 
     fetched = await asyncio.gather(*[_fetch_one(item) for item in top_triage])
 
     timeout_count = 0
-    for sym_map, result, error in fetched:
-        if error is None and result is not None:
+    for sym_map, result, fetch_error in fetched:
+        if fetch_error is None and result is not None:
             try:
                 _, data, elapsed = result
                 results[sym_map] = {"data": data, "elapsed": elapsed}
@@ -291,9 +328,9 @@ async def _fetch_triage_data_async(bot, top_triage):
                     {"tier": "IRON"},
                     response_ms=-1,
                 )
-        elif error == "TIMEOUT":
+        elif fetch_error in {"TIMEOUT", "IN_FLIGHT", "CAPACITY"}:
             timeout_count += 1
-            results[sym_map] = {"data": None, "elapsed": -1, "error": "TIMEOUT"}
+            results[sym_map] = {"data": None, "elapsed": -1, "error": str(fetch_error)}
             bot.update_radar(
                 sym_map,
                 {"signal": "WAIT", "mode": "NONE"},
@@ -304,7 +341,7 @@ async def _fetch_triage_data_async(bot, top_triage):
                 response_ms=-1,
             )
         else:
-            bot.log(f"⚠️ Error async en fetch para {sym_map}: {error}")
+            bot.log(f"⚠️ Error async en fetch para {sym_map}: {fetch_error}")
             results[sym_map] = {"data": None, "elapsed": -1, "error": "FETCH_ERROR"}
             bot.update_radar(
                 sym_map,
@@ -326,42 +363,28 @@ async def _fetch_triage_data_async(bot, top_triage):
 
 def fetch_triage_data_parallel(bot, top_triage):
     if getattr(bot, "main_loop", None) is not None and bot.main_loop.is_running():
+        timeout_s = float(getattr(Config, "TRIAGE_TIMEOUT_SECONDS", 4)) + 1.0
+        max_workers = _resolve_triage_worker_count(len(top_triage))
+        worker_waves = max(1, math.ceil(len(top_triage) / max_workers))
         future = asyncio.run_coroutine_threadsafe(
             _fetch_triage_data_async(bot, top_triage),
             bot.main_loop,
         )
-        return future.result(timeout=float(getattr(Config, "TRIAGE_TIMEOUT_SECONDS", 4)) + 3.0)
-
-    # Fallback defensivo si el loop global no estuviera listo.
-    results = {}
-    max_workers = _resolve_triage_worker_count(len(top_triage))
-    with concurrent.futures.ThreadPoolExecutor(
-        max_workers=max_workers,
-        thread_name_prefix="triage-fetch",
-    ) as executor:
-        future_to_sym = {
-            executor.submit(bot._fetch_pair_data, item.get("symbol_raw", item["symbol"])): item[
-                "symbol"
-            ]
-            for item in top_triage
-        }
-        done, not_done = concurrent.futures.wait(
-            future_to_sym,
-            timeout=Config.TRIAGE_TIMEOUT_SECONDS + 1,
-            return_when=concurrent.futures.ALL_COMPLETED,
-        )
-        for future in done:
-            sym_map = future_to_sym[future]
-            try:
-                _, data, elapsed = future.result()
-                results[sym_map] = {"data": data, "elapsed": elapsed}
-            except Exception:
-                results[sym_map] = {"data": None, "elapsed": -1, "error": "TASK_ERROR"}
-        for future in not_done:
-            sym_map = future_to_sym[future]
+        try:
+            return future.result(timeout=(timeout_s * worker_waves) + 2.0)
+        except concurrent.futures.TimeoutError:
             future.cancel()
-            results[sym_map] = {"data": None, "elapsed": -1, "error": "TIMEOUT"}
-    return results
+            bot.log("⏱️ TRIAJE OUTER TIMEOUT: ciclo async cancelado; fetches tardíos acotados.")
+            return {
+                item["symbol"]: {"data": None, "elapsed": -1, "error": "OUTER_TIMEOUT"}
+                for item in top_triage
+            }
+
+    bot.log("⚠️ TRIAJE LOOP UNAVAILABLE: ciclo omitido hasta restaurar main_loop.")
+    return {
+        item["symbol"]: {"data": None, "elapsed": -1, "error": "LOOP_UNAVAILABLE"}
+        for item in top_triage
+    }
 
 
 def finalize_scan_cycle(bot, signal_stats):
