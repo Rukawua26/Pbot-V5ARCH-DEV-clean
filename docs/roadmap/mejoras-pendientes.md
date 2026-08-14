@@ -411,9 +411,9 @@ Prioridad recomendada:
 3. Dashboard/operacion local.
 4. Auto-Replication solo si la evidencia lo justifica.
 
-### 9. Dashboard Votos / Consenso — Mejora visual y explicabilidad
+### 9. Dashboard Votos / Consenso — IMPLEMENTADO Y CERRADO
 
-Estado: implementado localmente, pendiente de commit/cierre.
+Estado: implementado, validado y commiteado.
 
 Objetivo: que la pestana `Votos / Consenso` explique de forma inmediata que quiso hacer el bot, por que entro/no entro, que regimen favorecia y que modelo estaba activo.
 
@@ -458,11 +458,16 @@ Validacion local ya ejecutada:
 - `ruff format --check tests/test_dashboard_ipc.py` OK.
 - `git diff --check` OK.
 
-Pendiente opcional:
+Evidencia de cierre:
 
-1. Commit de la mejora visual junto con este roadmap.
-2. Captura visual post-cambio para comparar antes/despues.
-3. Si el usuario lo desea, agregar tooltip detallado por punto del grafico con `symbol`, `side`, `status`, `reason` y `prob_final`.
+1. Commits `966beb7`, `6ec61df` y `2eba461` contienen la mejora de explicabilidad y su cierre operativo.
+2. `dashboard/static/index.html` contiene la pestana y componentes de votos/consenso.
+3. El repositorio quedo limpio y sincronizado con `origin/master` tras la validacion.
+
+Mejoras futuras opcionales, fuera del alcance cerrado:
+
+1. Captura visual comparativa antes/despues.
+2. Tooltip detallado por punto del grafico con `symbol`, `side`, `status`, `reason` y `prob_final`.
 
 ### 10. Plan de Reparacion de Edge — EN PROGRESO
 
@@ -486,3 +491,63 @@ Resultado Fase 1 (2026-07-13): se entreno Ghost offline con dataset curado (279 
 Actualizacion Fase 2 quick fix (2026-07-13): se reparo propagacion de `spread` real al RRR validator y se activo veto configurable de entradas en `BULL_TREND/BULL_STRONG`. Observar 50-100 trades post-reinicio antes de reentrenar Ghost.
 
 Actualizacion Fase 2 RANGE (2026-07-13): `HMM_RANGE_LEARNING_OVERRIDE_ENABLED=false` debe dejar `RANGE` como veto duro tambien en SHADOW. El primer intento fue anulado por Markov (`range_veto=False` en `hmm_state == "RANGE"`); corregido para que el hard veto domine salvo override explicito. Reabrir solo si el flujo operativo queda insuficiente.
+
+### 11. Plan de Saneamiento y Simplificacion de Codigo — PENDIENTE
+
+Estado: plan aprobado y documentado. No iniciar cambios de codigo hasta una autorizacion posterior explicita.
+
+Objetivo: revisar en detalle cada bloque y modulo para mejorar buenas practicas, mantener el mismo comportamiento con menos codigo y eliminar codigo muerto confirmado sin debilitar la seguridad runtime.
+
+Restricciones:
+
+1. Los cambios deben preservar comportamiento; no mezclar saneamiento con fixes funcionales ni nuevas features.
+2. Un cambio pequeno y verificable por commit.
+3. Antes de eliminar codigo, demostrar que no tiene callers, imports, referencias dinamicas, contratos legacy ni cobertura necesaria.
+4. No eliminar `config.py`, `core/bot_facade.py` ni otras fronteras de compatibilidad sin un plan de migracion explicito.
+5. No simplificar validaciones, manejo de errores, HALT, reconciliacion ni proteccion HARD SL.
+6. Para runtime critico, mantener separacion estricta entre `PAPER`, `SHADOW` y `REAL`, con el exchange como fuente de verdad.
+
+Flujo de auditoria por modulo:
+
+1. Ejecutar primero una revision read-only y crear un mapa rankeado de hallazgos.
+2. Revisar imports sin uso, codigo inalcanzable, helpers o constantes duplicados, archivos huerfanos, bloques comentados, funciones extensas y ownership ambiguo.
+3. Para cada candidato, registrar archivo/linea, severidad, evidencia de no uso, cambio minimo propuesto y validacion requerida.
+4. Agregar o confirmar tests de comportamiento antes de simplificar flujos grandes o sensibles.
+5. Aplicar solo limpiezas confirmadas, una por vez, y validar antes de continuar.
+
+Orden por riesgo:
+
+1. Bajo riesgo: `core/analytics/`, `core/providers/`, helpers de rutas, tiempo, simbolos y utilidades puras.
+2. Riesgo medio: `core/signals/`, `core/strategy/`, `core/risk/`, `core/commands/` y operaciones auxiliares `core/bot_*_ops.py`.
+3. Runtime critico: `core/trade_entry.py`, `core/trade_exit.py`, `core/bot_guardian.py`, `core/reconciliation.py`, `core/execution_service.py`, `core/bot_wallet_sync.py` y `core/execution_adapters.py`.
+
+Watchlist preventiva:
+
+1. `core/trade_entry.py::execute_order`: conservar sizing, similarity boost, reconciliacion de fills y cobertura HARD SL.
+2. `core/bot_guardian.py::run_guardian_loop`: conservar semantica de TP1, exits ambiguos y HALT.
+3. `core/trade_exit.py::close_trade`: conservar fail-safe ante cierre REAL ambiguo.
+4. `core/reconciliation.py::reconcile_bootstrap_state`: conservar al exchange como autoridad.
+5. Cambios en contratos publicos o bootstrap requieren `tools/regression_contracts.py` y `scripts/smoke_modular_imports.sh`.
+
+Validacion minima por lote:
+
+1. `compileall`, Ruff lint y Ruff format.
+2. `tools/check_no_silent_pass.py`.
+3. Smoke de imports modulares.
+4. Suite unitaria completa.
+5. Para runtime critico: tests enfocados, contratos de regresion, chaos matrix y recovery drill.
+
+Criterio de cierre por modulo:
+
+1. Codigo muerto eliminado solo con evidencia verificable.
+2. Sin imports inutilizados, duplicaciones evitables ni `pass` silenciosos.
+3. Menos codigo o complejidad sin cambios de comportamiento.
+4. Tests y gates aplicables en verde.
+5. Hallazgos y decisiones documentados para evitar refactors amplios u oportunistas.
+
+Entregables futuros:
+
+1. Mapa rankeado de hallazgos por archivo y riesgo.
+2. Cola de limpiezas pequenas y ordenadas.
+3. Commits independientes con evidencia de validacion.
+4. Informe final de codigo eliminado, complejidad reducida y riesgos residuales.

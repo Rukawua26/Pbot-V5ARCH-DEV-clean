@@ -16,7 +16,7 @@
 [![Versión](https://img.shields.io/badge/Bot-v118.7--PRO_%7C_Runtime_Clean-2563eb?style=flat-square)](https://github.com/Rukawua26/Pbot-V5ARCH-DEV-clean)
 [![Modos](https://img.shields.io/badge/Modos-PAPER_%7C_REAL_%7C_SHADOW-0ea5e9?style=flat-square)]()
 [![HMM](https://img.shields.io/badge/HMM-Markov_Intelligence-f97316?style=flat-square)]()
-[![Tests](https://img.shields.io/badge/Tests-1089_ok_%7C_2_skipped-22c55e?style=flat-square)]()
+[![Tests](https://img.shields.io/badge/Tests-1259_ok_%7C_2_skipped-22c55e?style=flat-square)]()
 [![Shadow](https://img.shields.io/badge/Shadow_Capacity-20_trades-9333ea?style=flat-square)]()
 [![Deploy](https://img.shields.io/badge/Deploy-systemd_%7C_Docker-111827?style=flat-square)]()
 [![Risk](https://img.shields.io/badge/Risk_Engine-v118.7-ef4444?style=flat-square)]()
@@ -36,13 +36,13 @@ Combina regímenes de mercado via **HMM Markov**, filtros multi-temporalidad, mo
 
 | Check | Estado |
 |---|---|
-| `unittest discover` | ✅ `1089 tests OK` · `2 skipped` |
+| `unittest discover` | ✅ `1259 tests OK` · `2 skipped` |
 | `ruff` | ✅ Sin errores en archivos tocados |
-| `compileall main.py core tools` | ✅ OK |
+| `compileall main.py core` | ✅ OK |
 | `check_no_silent_pass.py` | ✅ OK |
 | `mypy --explicit-package-bases core` | ✅ OK |
 | `pip-audit --strict` | ✅ Sin vulnerabilidades conocidas |
-| `coverage report --fail-under=75` | ✅ 76% |
+| `coverage report --fail-under=75` | ✅ **78%** |
 | `docker build -t sniper-ai .` | ✅ OK |
 | Runtime safety | ✅ HARD SL, locks, reconciliación y deploy hardening revisados |
 | Portable packaging | ✅ Windows `.zip` y Linux `.tar.gz` vía GitHub Releases por tag `v*` |
@@ -69,7 +69,60 @@ Distribución portable multiplataforma estilo RustDesk:
 | Seguridad | `ALLOW_REAL_TRADING=false` por defecto; REAL no se activa desde wizard |
 | Persistencia | DB, logs, modelos y backups fuera del directorio temporal de PyInstaller |
 | Packaging | PyInstaller `onedir`, `console=True`, dashboard estático incluido |
-| Releases | Workflow `.github/workflows/release.yml` genera Windows `.zip` y Linux `.tar.gz` al pushear tags `v*` |
+| Releases | Workflow `.github/workflows/release.yml` genera Windows `.zip` y Linux `.tar.gz` al pushear tags `v*`
+
+### 🛡️ Phase 24 — Runtime Safety Hardening + Safe-Fill (Julio–Ago 2026)
+Endurecimiento crítico del runtime tras validación de fills REAL, validación de ACK HARD SL y protección contra estados ambiguos:
+
+| Cambio | Descripción |
+|---|---|
+| `execute_order` fail-safe | Reconciliación inmediata contra `fetch_positions()`; cero con exposición → HALT; fills parciales terminales → protección + HALT; ACK sin order ID → HALT (`ENTRY_ORDER_ID_UNVERIFIED`) |
+| Validación HARD SL | `hard_sl_ack_looks_valid` exige: `id` activo, estado `open`/`new`, tipo `STOP_MARKET`, `reduceOnly=true`, cantidad con tolerancia relativa; rechaza status terminal/bool/nonfinite |
+| `_fetch_exchange_position_amount` | Rechaza snapshots malformados y cantidades contradictorias (`contracts` vs `positionAmt` con o sin `side`) → `None` (unknown) |
+| Persistencia REAL | Falla de persistencia final activa `is_paused`, `integrity_lock_active` y `halt_system_active` |
+| `close_trade` fail-safe | En bloque `except` de cierre REAL asume `close_failed = True` (fail-safe) y solo revierte a `False` si el exchange confirma posición plana |
+| CI hardening | Pin `actions/setup-python@v5` a SHA `a26af69be951a213d495a4c3e4e4022e16d87065`; errores mypy resueltos con narrowing `raw_info`; tests herméticos (`tests/test_dashboard_ipc.py`, `tests/test_min_atr_filter.py`) |
+
+<div align="center">
+<img src="docs/README/architecture.svg" alt="Arquitectura del runtime" width="600"/>
+</div>
+
+<div align="center">
+<img src="docs/README/safe_fill_flow.svg" alt="Flujo de llenado seguro REAL" width="600"/>
+</div>
+
+<div align="center">
+<img src="docs/README/reconciliation_guardian.svg" alt="Flujo reconciliación + guardia HARD SL" width="600"/>
+</div>
+
+### Capturas del dashboard
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_runtime.png" alt="Dashboard runtime principal" width="550"/>
+</div>
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_intelligence.png" alt="Dashboard pestaña Intelligence" width="550"/>
+</div>
+
+---
+
+### 📊 Diagramas de flujo validados
+
+- **Arquitectura global**: visión completa de módulos y flujos de datos críticos.
+- **Flujo de llenado seguro**: pasos fail-safe desde fill hasta reconciliación y HALT.
+- **Guardia HARD SL + reconciliación**: detección de estados ambiguos y activación de HALT.
+
+---
+
+### 📈 Resultados tras endurecimiento
+
+- **1259 tests OK** · **78% coverage** · **Docker build OK**.
+- **Gates de CI**: Ruff, format, compileall, `check_no_silent_pass`, smoke imports, suite completa, chaos matrix, recovery drill.
+- **Riesgo residual**: estados `REAL` ambiguos ahora fuerzan `HALT` + reconciliación antes de continuar, sin degradación silenciosa.
+- **Validado en**: PAPER y SHADOW con flags `FVG_TRACKER_ENABLED`, `GLOBAL_MARKET_PROVIDER_ENABLED`, `SHADOW_VALIDATION_ENABLED`.
+
+--- |
 
 ### 🧱 Phase 22 — FVG Tracker + Idempotencia de Salidas + Readiness (Junio 2026)
 Endurecimiento incremental sin activar nuevas decisiones de trading por defecto:
@@ -81,7 +134,7 @@ Endurecimiento incremental sin activar nuevas decisiones de trading por defecto:
 | Coverage crítico | `trade_exit` 78%, `ghost_agent` 83%, `orchestrator` 95%, `shocks` 89%, `consensus_nn` 79% |
 | Dependencias | `msgpack` actualizado por `pip-audit` |
 | Pending Improvements Readiness | Script `tools/pending_improvements_readiness.py` + runbook `paper-shadow-observation.md` |
-| Validación | 1003 tests OK · 76% coverage · chaos/recovery/Docker OK · readiness OK |
+| Validación | 1259 tests OK · 78% coverage · chaos/recovery/Docker OK · readiness OK |
 
 ### 🛡️ Phase 21 — Runtime Safety + CI Closure (Junio 2026)
 Sweep de seguridad y validación completa antes de publicar en GitHub:
@@ -422,6 +475,7 @@ PENDING_SEND → PENDING_EXCHANGE_OPEN → ENTRY_FILLED_AWAITING_POSITION_SYNC �
 | 20 | Intelligence Layer + Dashboard consultivo | ✅ |
 | 21 | Runtime Safety + CI Closure: audit, coverage y Docker OK | ✅ |
 | 22 | FVG tracker read-only + idempotencia de salidas + coverage crítico | ✅ |
+| 24 | Runtime safety hardening + safe-fill: fills REAL fail-safe, validación ACK HARD SL, protección estados ambiguos, close_trade fail-safe, CI pin/mypy/hermetic tests | ✅ |
 
 ---
 
@@ -554,7 +608,7 @@ SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m coverage run -m unittest d
 docker build -t sniper-ai .
 ```
 
-**Estado verificado:** `1003` tests OK · `2` skipped · `76%` coverage · `pip-audit` limpio · Docker build OK · readiness OK.
+**Estado verificado:** `1259` tests OK · `2` skipped · `78%` coverage · `pip-audit` limpio · Docker build OK · readiness OK.
 
 
 **Coverage ratchet:** gate actual `fail-under=75`; siguiente objetivo `80%` priorizando `bot_guardian`, `bot_cycles`, `bot_io_loops`, `bot_runtime_monitor` y `data_service`.
@@ -604,7 +658,7 @@ Pbot-V5ARCH-DEV/
 │   │   └── thresholds.py       # 30+ umbrales tipados
 │   ├── signals/                # Filtros y ejecución de señales
 │   └── strategy/               # Agentes MT · SR · G
-├── tests/                      # 1003 tests unittest
+├── tests/                      # 1259 tests unittest
 ├── tools/                      # Herramientas de análisis y validación (incl. readiness)
 ├── deploy/systemd/legacy/      # Unidades systemd históricas
 ├── docs/runbooks/              # Guías operativas
