@@ -47,7 +47,8 @@ def hard_sl_ack_looks_valid(
         return False, "HARD_SL_ACK_MISSING_SIDE"
     if ack_side != expected_sl_side.lower():
         return False, f"HARD_SL_ACK_SIDE_MISMATCH:{ack_side}:{expected_sl_side}"
-    info = sl_order.get("info") if isinstance(sl_order.get("info"), dict) else {}
+    raw_info = sl_order.get("info")
+    info = raw_info if isinstance(raw_info, dict) else {}
     order_type = str(sl_order.get("type") or info.get("type") or "").lower()
     if order_type.replace("-", "_") not in {"stop_market", "stopmarket"}:
         return False, f"HARD_SL_ACK_INVALID_TYPE:{order_type or 'missing'}"

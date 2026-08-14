@@ -127,7 +127,8 @@ def _fetch_exchange_position_amount(bot, symbol: str, side: str) -> float | None
         if normalize_position_symbol(raw_symbol) != normalized_symbol:
             continue
 
-        info = position.get("info") if isinstance(position.get("info"), dict) else {}
+        raw_info = position.get("info")
+        info = raw_info if isinstance(raw_info, dict) else {}
         contracts = _optional_float_allow_negative(position.get("contracts"))
         signed_info_amount = _optional_float_allow_negative(info.get("positionAmt"))
         if contracts is not None and contracts < 0:
