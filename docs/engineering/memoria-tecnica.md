@@ -37,6 +37,47 @@ Fuente versionada para cambios criticos, decisiones de diseno, invariantes y reg
 
 ## Cambios Criticos Registrados
 
+### 2026-08-13 - Loop optimizado y telemetria de slippage adverso
+
+Cambios:
+- El loop dedicado del bot usa `uvloop` cuando esta disponible y vuelve a `asyncio`
+  si el import o la construccion del loop fallan.
+- Los fills REAL registran slippage adverso direccional contra el precio solicitado;
+  si Binance no entrega `average`, el VWAP se deriva de `cost / filled`.
+- El evento `ENTRY_SLIPPAGE_BREACH` es solo observacional: no modifica la orden,
+  el estado del trade ni el flujo de colocacion del `HARD SL`.
+- Sizing queda cubierto con propiedades Hypothesis y auditoria mutmut manual, fuera
+  del gate CI.
+
+Reglas preventivas:
+- Un acelerador opcional no puede impedir el arranque si `asyncio` sigue disponible.
+- No clasificar fills favorables como slippage adverso.
+- No usar el precio limite IOC como fill: solo `average` o `cost / filled` son
+  fuentes autoritativas del precio ejecutado.
+- Si un fill REAL no tiene precio verificable, adjuntar primero el `HARD SL`, persistir
+  `ENTRY_FILLED_AWAITING_POSITION_SYNC` sin precio inventado y activar `HALT`.
+- Si falla esa persistencia de recovery, mantener `HALT` y emitir
+  `ENTRY_FILL_PRICE_STATE_PERSIST_FAILED_HALT` como incidente distinto.
+- Si `filled` falta, es invalido o vale cero, consultar inmediatamente posiciones;
+  nunca asumir que se lleno el monto solicitado ni descartar el intento sin confirmar
+  posicion plana. Si aparece exposicion, proteger esa cantidad y mantener `HALT`.
+- Un estado terminal `canceled`, `expired` o `rejected` puede contener fill parcial:
+  toda cantidad positiva se protege con `HARD SL` antes de reconciliar el estado.
+- Si el ACK o la exposicion siguen ambiguos, persistir `ENTRY_ACK_UNKNOWN` con
+  `amount=None` y `requested_amount` separado, y activar `HALT`.
+- Si `filled` supera el monto solicitado, proteger la cantidad reportada con `HARD SL`
+  y mantener `HALT` hasta reconciliar el sobrellenado.
+- Si una entrada REAL protegida no puede persistir su estado activo final, activar
+  `HALT` ademas del integrity lock; no continuar solo con estado en memoria.
+- Un snapshot de posiciones solo confirma exposicion plana si es una lista valida;
+  payloads malformados o cantidades/direcciones contradictorias entre campos CCXT
+  y `positionAmt` se tratan como desconocidos.
+- Un ACK de `HARD SL` solo cuenta como proteccion si tiene ID, tipo stop-market,
+  estado activo, lado/simbolo/cantidad coherentes con tolerancia relativa y
+  `reduceOnly=true`; campos omitidos no acreditan proteccion.
+- Un fill positivo sin ID de orden se protege primero, pero permanece en `HALT`
+  hasta reconciliar la identidad de la orden con el exchange.
+
 ### 2026-08-13 - Recuperacion PAPER/SHADOW ante bloqueo total de entradas
 
 Diagnostico:

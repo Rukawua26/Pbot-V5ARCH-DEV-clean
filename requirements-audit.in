@@ -1,0 +1,5 @@
+-c requirements.lock
+-c requirements-dev.lock
+
+# Manual mutation testing (not installed by CI)
+mutmut

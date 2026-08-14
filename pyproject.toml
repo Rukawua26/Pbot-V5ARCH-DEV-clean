@@ -16,6 +16,13 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 
+[tool.mutmut]
+source_paths = ["core"]
+only_mutate = ["core/risk_engine.py"]
+also_copy = ["config.py", "mutmut_risk_stubs.py"]
+pytest_add_cli_args = ["-p", "mutmut_risk_stubs"]
+pytest_add_cli_args_test_selection = ["tests/test_risk_engine_coverage.py", "tests/test_risk_sizing_properties.py"]
+
 [tool.coverage.run]
 source = ["core"]
 omit = [

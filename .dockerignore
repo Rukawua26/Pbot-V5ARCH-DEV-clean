@@ -8,6 +8,9 @@ data/
 data_storage/
 backups/
 logs/
+reports/
+docs/reports/
+audit_report.json
 models/
 *.db
 *.db-wal
@@ -19,6 +22,9 @@ __pycache__
 .ipynb_checkpoints
 tests/
 *.log
+*.log.*
+mutants/
+.hypothesis/
 .coverage
 .mypy_cache/
 .sniperai.lock

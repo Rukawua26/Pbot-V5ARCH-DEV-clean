@@ -36,3 +36,4 @@ websocket-client
 
 # Optimization
 optuna
+uvloop; sys_platform != "win32"

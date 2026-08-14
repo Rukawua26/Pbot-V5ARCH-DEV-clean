@@ -2,6 +2,7 @@
 
 # Testing & Security
 coverage
+hypothesis
 pip-audit
 setuptools>=83.0.0
 

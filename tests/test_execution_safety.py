@@ -113,6 +113,59 @@ class HardSlAckValidationTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertEqual(reason, "HARD_SL_ACK_NOT_REDUCE_ONLY")
 
+    def test_missing_or_false_string_reduce_only_fails(self):
+        for reduce_only in (None, "false"):
+            with self.subTest(reduce_only=reduce_only):
+                ack = _valid_ack()
+                if reduce_only is None:
+                    del ack["info"]["reduceOnly"]
+                else:
+                    ack["info"]["reduceOnly"] = reduce_only
+                ok, reason = hard_sl_ack_looks_valid(
+                    ack,
+                    expected_symbol="BTC/USDT",
+                    expected_sl_side="sell",
+                    expected_amount=0.5,
+                )
+                self.assertFalse(ok)
+                self.assertEqual(reason, "HARD_SL_ACK_NOT_REDUCE_ONLY")
+
+    def test_terminal_status_fails(self):
+        ack = _valid_ack()
+        ack["status"] = "rejected"
+        ok, reason = hard_sl_ack_looks_valid(
+            ack,
+            expected_symbol="BTC/USDT",
+            expected_sl_side="sell",
+            expected_amount=0.5,
+        )
+        self.assertFalse(ok)
+        self.assertIn("NOT_ACTIVE", reason)
+
+    def test_missing_status_fails(self):
+        ack = _valid_ack()
+        del ack["status"]
+        ok, reason = hard_sl_ack_looks_valid(
+            ack,
+            expected_symbol="BTC/USDT",
+            expected_sl_side="sell",
+            expected_amount=0.5,
+        )
+        self.assertFalse(ok)
+        self.assertIn("NOT_ACTIVE", reason)
+
+    def test_wrong_order_type_fails(self):
+        ack = _valid_ack()
+        ack["type"] = "limit"
+        ok, reason = hard_sl_ack_looks_valid(
+            ack,
+            expected_symbol="BTC/USDT",
+            expected_sl_side="sell",
+            expected_amount=0.5,
+        )
+        self.assertFalse(ok)
+        self.assertIn("INVALID_TYPE", reason)
+
     def test_amount_deviation_beyond_tolerance_fails(self):
         ack = _valid_ack(amount=0.8)
         ok, reason = hard_sl_ack_looks_valid(
@@ -134,19 +187,28 @@ class HardSlAckValidationTest(unittest.TestCase):
         )
         self.assertTrue(ok)
 
-    def test_missing_amount_does_not_fail(self):
-        """ACK sin amount/filled no debe bloquearse; el exchange puede no
-        devolverlo para órdenes STOP pendientes. El invariante es no aceptar
-        evidencia contraria, no exigir presencia de campos opcionales."""
+    def test_missing_amount_fails(self):
         ack = _valid_ack()
         del ack["amount"]
-        ok, _ = hard_sl_ack_looks_valid(
+        ok, reason = hard_sl_ack_looks_valid(
             ack,
             expected_symbol="BTC/USDT",
             expected_sl_side="sell",
             expected_amount=0.5,
         )
-        self.assertTrue(ok)
+        self.assertFalse(ok)
+        self.assertEqual(reason, "HARD_SL_ACK_AMOUNT_UNPARSEABLE")
+
+    def test_small_amount_undercoverage_fails_relative_tolerance(self):
+        ack = _valid_ack(amount=0.00091)
+        ok, reason = hard_sl_ack_looks_valid(
+            ack,
+            expected_symbol="BTC/USDT",
+            expected_sl_side="sell",
+            expected_amount=0.001,
+        )
+        self.assertFalse(ok)
+        self.assertIn("AMOUNT_MISMATCH", reason)
 
     def test_unparseable_amount_fails(self):
         ack = _valid_ack()
@@ -159,6 +221,21 @@ class HardSlAckValidationTest(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "HARD_SL_ACK_AMOUNT_UNPARSEABLE")
+
+    def test_boolean_amount_fails(self):
+        for amount in (True, False):
+            with self.subTest(amount=amount):
+                ack = _valid_ack()
+                ack["amount"] = amount
+                ack["filled"] = 1.0
+                ok, reason = hard_sl_ack_looks_valid(
+                    ack,
+                    expected_symbol="BTC/USDT",
+                    expected_sl_side="sell",
+                    expected_amount=1.0,
+                )
+                self.assertFalse(ok)
+                self.assertEqual(reason, "HARD_SL_ACK_AMOUNT_UNPARSEABLE")
 
 
 class SlSideMappingTest(unittest.TestCase):

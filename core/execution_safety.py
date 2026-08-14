@@ -5,15 +5,14 @@ El exchange es la fuente de verdad para exposición real, pero la respuesta de
 verificar deja una posición registrada como protegida cuando no lo está.
 
 Estas funciones validan el ACK devuelto por `place_hard_sl` contra el contexto
-esperado (símbolo, lado, cantidad). No validan `status=='open'` porque Binance
-puede tardar en propagar el estado; en cambio, descartan ACKs claramente
-inválidos (campos faltantes, lado opuesto al esperado, símbolo distinto, o
-identificadores nulos). Ante ambigüedad, el caller debe aplicar fail-safe/HALT
-siguiendo el invariante "ante estado live ambiguo, preferir HALT".
+esperado (símbolo, lado, cantidad y estado activo). Ante ambigüedad, el caller
+debe aplicar fail-safe/HALT siguiendo el invariante "ante estado live ambiguo,
+preferir HALT".
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -35,6 +34,9 @@ def hard_sl_ack_looks_valid(
     order_id = sl_order.get("id")
     if not order_id:
         return False, "HARD_SL_ACK_MISSING_ID"
+    status = str(sl_order.get("status") or "").lower()
+    if status not in {"open", "new"}:
+        return False, f"HARD_SL_ACK_NOT_ACTIVE:{status or 'missing'}"
     if not sl_order.get("symbol"):
         return False, "HARD_SL_ACK_MISSING_SYMBOL"
     ack_symbol = str(sl_order.get("symbol"))
@@ -45,19 +47,33 @@ def hard_sl_ack_looks_valid(
         return False, "HARD_SL_ACK_MISSING_SIDE"
     if ack_side != expected_sl_side.lower():
         return False, f"HARD_SL_ACK_SIDE_MISMATCH:{ack_side}:{expected_sl_side}"
-    info = sl_order.get("info") or {}
-    reduce_only_field = info.get("reduceOnly")
-    if reduce_only_field is False:
+    info = sl_order.get("info") if isinstance(sl_order.get("info"), dict) else {}
+    order_type = str(sl_order.get("type") or info.get("type") or "").lower()
+    if order_type.replace("-", "_") not in {"stop_market", "stopmarket"}:
+        return False, f"HARD_SL_ACK_INVALID_TYPE:{order_type or 'missing'}"
+    reduce_only_field = sl_order.get("reduceOnly", info.get("reduceOnly"))
+    reduce_only = reduce_only_field is True or (
+        isinstance(reduce_only_field, str) and reduce_only_field.lower() == "true"
+    )
+    if not reduce_only:
         return False, "HARD_SL_ACK_NOT_REDUCE_ONLY"
-    ack_amount = sl_order.get("amount") or sl_order.get("filled")
-    if ack_amount is not None:
-        try:
-            diff = abs(float(ack_amount) - float(expected_amount))
-            base = max(abs(float(expected_amount)), 1.0)
-            if diff / base > tolerance:
-                return False, f"HARD_SL_ACK_AMOUNT_MISMATCH:{ack_amount}:{expected_amount}"
-        except (TypeError, ValueError):
+    ack_amount = sl_order.get("amount")
+    if ack_amount is None:
+        ack_amount = sl_order.get("filled")
+    if ack_amount is None or isinstance(ack_amount, bool):
+        return False, "HARD_SL_ACK_AMOUNT_UNPARSEABLE"
+    try:
+        parsed_amount = float(ack_amount)
+        parsed_expected = float(expected_amount)
+        if not math.isfinite(parsed_amount) or parsed_amount <= 0:
             return False, "HARD_SL_ACK_AMOUNT_UNPARSEABLE"
+        if not math.isfinite(parsed_expected) or parsed_expected <= 0:
+            return False, "HARD_SL_EXPECTED_AMOUNT_INVALID"
+        diff = abs(parsed_amount - parsed_expected)
+        if diff / abs(parsed_expected) > tolerance:
+            return False, f"HARD_SL_ACK_AMOUNT_MISMATCH:{ack_amount}:{expected_amount}"
+    except (TypeError, ValueError):
+        return False, "HARD_SL_ACK_AMOUNT_UNPARSEABLE"
     return True, ""
 
 

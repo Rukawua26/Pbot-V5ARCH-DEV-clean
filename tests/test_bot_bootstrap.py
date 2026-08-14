@@ -6,6 +6,39 @@ from core import bot_app
 
 
 class BotBootstrapTest(unittest.TestCase):
+    @patch("core.bot_app.asyncio.new_event_loop")
+    @patch("core.bot_app.uvloop", None)
+    def test_new_runtime_event_loop_falls_back_to_asyncio(self, mocked_new_loop):
+        expected_loop = object()
+        mocked_new_loop.return_value = expected_loop
+
+        self.assertIs(bot_app._new_runtime_event_loop(), expected_loop)
+        mocked_new_loop.assert_called_once_with()
+
+    def test_new_runtime_event_loop_prefers_uvloop(self):
+        expected_loop = object()
+        mocked_uvloop = MagicMock()
+        mocked_uvloop.new_event_loop.return_value = expected_loop
+
+        with patch("core.bot_app.uvloop", mocked_uvloop):
+            self.assertIs(bot_app._new_runtime_event_loop(), expected_loop)
+
+        mocked_uvloop.new_event_loop.assert_called_once_with()
+
+    @patch("core.bot_app.asyncio.new_event_loop")
+    def test_new_runtime_event_loop_falls_back_when_uvloop_construction_fails(
+        self, mocked_new_loop
+    ):
+        expected_loop = object()
+        mocked_new_loop.return_value = expected_loop
+        mocked_uvloop = MagicMock()
+        mocked_uvloop.new_event_loop.side_effect = RuntimeError("unsupported")
+
+        with patch("core.bot_app.uvloop", mocked_uvloop):
+            self.assertIs(bot_app._new_runtime_event_loop(), expected_loop)
+
+        mocked_new_loop.assert_called_once_with()
+
     def test_bind_main_loop_starts_running_loop_thread(self):
         bot = bot_app.Bot.__new__(bot_app.Bot)
         bot.main_loop = None

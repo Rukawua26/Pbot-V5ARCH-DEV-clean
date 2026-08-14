@@ -32,7 +32,7 @@ Use environment variables and local secret stores.
 
 ## Hardening Guidelines
 
-- Keep branch protection enabled on `main`.
+- Keep branch protection enabled on the default production branch (`master` currently).
 - Require PR review for production-facing changes.
 - Avoid force pushes to protected branches.
 - Validate risk limits after config changes.

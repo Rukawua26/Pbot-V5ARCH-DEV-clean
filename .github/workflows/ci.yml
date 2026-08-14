@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master, main]
   push:
-    branches: [main, freeze/**]
+    branches: [master, main, freeze/**]
 
 permissions:
   contents: read
@@ -81,7 +81,7 @@ jobs:
               if line and not line.startswith((' ', '#')) and '==' in line
           }
           print(f"locked_packages={len(packages)}")
-          for package in {'ccxt', 'pandas', 'pandas-ta', 'ta'}:
+          for package in {'ccxt', 'pandas', 'pandas-ta', 'ta', 'uvloop'}:
               assert package in packages, f"missing locked dependency: {package}"
           dev_lock = Path('requirements-dev.lock').read_text().splitlines()
           dev_packages = {
@@ -89,7 +89,7 @@ jobs:
               for line in dev_lock
               if line and not line.startswith((' ', '#')) and '==' in line
           }
-          for package in {'coverage', 'pip-audit', 'ruff', 'mypy'}:
+          for package in {'coverage', 'hypothesis', 'pip-audit', 'ruff', 'mypy'}:
               assert package in dev_packages, f"missing dev locked dependency: {package}"
           PY
 

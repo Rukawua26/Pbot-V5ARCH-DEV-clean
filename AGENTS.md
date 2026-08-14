@@ -51,6 +51,8 @@
 - Suite unitaria: `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python -m unittest discover -s tests -p "test_*.py"`.
 - Si cambias bootstrap/imports modulares: `PYTHON_BIN=./.venv/bin/python bash scripts/smoke_modular_imports.sh`.
 - Si cambias contratos de `main.py`, `Bot` o `BotFacade`: `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/python tools/regression_contracts.py`.
+- Instalar auditoria manual: `./.venv/bin/python -m pip install -r requirements-audit.lock`.
+- Auditoria manual de mutacion del Risk Engine: `SNIPER_DISABLE_FILE_TELEMETRY=1 ./.venv/bin/mutmut run`; revisar con `./.venv/bin/mutmut results`. No usar como gate de CI.
 
 ## Validación CI
 

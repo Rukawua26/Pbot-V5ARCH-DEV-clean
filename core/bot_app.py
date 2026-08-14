@@ -14,6 +14,11 @@ import warnings
 from functools import lru_cache
 from logging.handlers import RotatingFileHandler
 
+try:
+    import uvloop
+except Exception:
+    uvloop = None  # type: ignore[assignment]
+
 warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
 
 try:
@@ -154,6 +159,15 @@ def _module_available(module_name: str) -> bool:
         return False
 
 
+def _new_runtime_event_loop():
+    if uvloop is not None:
+        try:
+            return uvloop.new_event_loop()
+        except Exception as error:
+            logger.warning(f"uvloop no disponible en runtime; usando asyncio: {error}")
+    return asyncio.new_event_loop()
+
+
 logger = logging.getLogger("SniperAI")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -224,7 +238,7 @@ class Bot:
         ):
             return
 
-        loop = asyncio.new_event_loop()
+        loop = _new_runtime_event_loop()
         self.main_loop = loop
 
         def _run_loop_forever():

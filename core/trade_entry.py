@@ -1,3 +1,4 @@
+import math
 import time
 from datetime import timedelta
 from typing import Any
@@ -52,6 +53,122 @@ def _validate_entry_preconditions(bot, symbol: str, is_shadow: bool) -> str | No
 
 def _exchange_position_is_flat(bot, symbol: str) -> bool:
     return _helper_exchange_position_is_flat(bot, symbol)
+
+
+def _calculate_adverse_slippage_pct(side: str, requested_price: float, fill_price: float) -> float:
+    try:
+        requested = float(requested_price)
+        filled = float(fill_price)
+    except (TypeError, ValueError):
+        return 0.0
+    if requested <= 0:
+        return 0.0
+
+    price_delta = filled - requested
+    adverse_delta = price_delta if str(side).upper() == "BUY" else -price_delta
+    return max(0.0, adverse_delta / requested * 100.0)
+
+
+def _optional_positive_finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) and parsed > 0 else None
+
+
+def _optional_non_negative_finite_float(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) and parsed >= 0 else None
+
+
+def _resolve_average_fill_price(order: dict, filled_amount: float) -> float | None:
+    average = _optional_positive_finite_float(order.get("average"))
+    if average is not None:
+        return average
+
+    cost = _optional_positive_finite_float(order.get("cost"))
+    if cost is not None and filled_amount > 0:
+        derived_average = _optional_positive_finite_float(cost / filled_amount)
+        if derived_average is not None:
+            return derived_average
+
+    return None
+
+
+def _fetch_exchange_position_amount(bot, symbol: str, side: str) -> float | None:
+    fetch_positions = getattr(getattr(bot, "execution", None), "fetch_positions", None)
+    if not callable(fetch_positions):
+        return None
+
+    try:
+        positions = fetch_positions()
+    except Exception:
+        return None
+    if not isinstance(positions, list):
+        return None
+
+    normalized_symbol = normalize_position_symbol(symbol)
+    expected_side = str(side).upper()
+    total_amount = 0.0
+    for position in positions:
+        if not isinstance(position, dict):
+            return None
+        raw_symbol = position.get("symbol")
+        if not raw_symbol:
+            return None
+        if normalize_position_symbol(raw_symbol) != normalized_symbol:
+            continue
+
+        info = position.get("info") if isinstance(position.get("info"), dict) else {}
+        contracts = _optional_float_allow_negative(position.get("contracts"))
+        signed_info_amount = _optional_float_allow_negative(info.get("positionAmt"))
+        if contracts is not None and contracts < 0:
+            return None
+        if (
+            contracts is not None
+            and signed_info_amount is not None
+            and not math.isclose(
+                abs(contracts), abs(signed_info_amount), rel_tol=1e-8, abs_tol=1e-12
+            )
+        ):
+            return None
+        raw_side = str(position.get("side") or "").lower()
+        if raw_side in {"long", "short"}:
+            position_side = "BUY" if raw_side == "long" else "SELL"
+            if contracts is None and signed_info_amount is None:
+                return None
+            amount = abs(contracts if contracts is not None else signed_info_amount or 0.0)
+            if signed_info_amount and (signed_info_amount > 0) != (position_side == "BUY"):
+                return None
+        elif signed_info_amount is not None:
+            if signed_info_amount == 0:
+                continue
+            position_side = "BUY" if signed_info_amount > 0 else "SELL"
+            amount = abs(signed_info_amount)
+        else:
+            return None
+        if position_side == expected_side:
+            total_amount += amount
+
+    return total_amount
+
+
+def _optional_float_allow_negative(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if math.isfinite(parsed) else None
 
 
 def _evaluate_risk_reward_filter(
@@ -790,7 +907,7 @@ def execute_order(
         requested_amount = float(amount)
         filled_amount = float(amount)
         remaining_amount = 0.0
-        avg_fill_price = float(price)
+        avg_fill_price: float | None = float(price)
         min_tp = max(
             Config.MIN_TP_NET_PERCENT,
             (spread_cost + fees) * Config.MIN_TP_SPREAD_MULTIPLIER,
@@ -843,17 +960,60 @@ def execute_order(
                 client_order_id=entry_client_order_id,
             )
 
-            if order and order.get("status") in ["closed", "open", "filled"]:
-                bot.log(f"✅ EJECUCIÓN EXITOSA: {symbol} ID: {order['id']}")
-                requested_amount = float(amount)
-                filled_amount = float(order.get("filled", requested_amount) or 0.0)
-                remaining_amount = max(0.0, requested_amount - filled_amount)
-                avg_fill_price = float(order.get("average") or order.get("price") or price)
-                if filled_amount <= 0:
-                    bot.log(f"❌ FALLO DE EJECUCIÓN: {symbol} sin fills confirmados")
+            order = order if isinstance(order, dict) else {}
+            order_status = str(order.get("status") or "").lower()
+            requested_amount = float(amount)
+            filled_amount_candidate = _optional_non_negative_finite_float(order.get("filled"))
+            fill_amount_reconciled = False
+            position_amount = None
+            if filled_amount_candidate is None or filled_amount_candidate <= 0:
+                position_amount = _fetch_exchange_position_amount(bot, symbol, side)
+                if position_amount is not None and position_amount > 0:
+                    filled_amount_candidate = position_amount
+                    fill_amount_reconciled = True
+                elif position_amount == 0 and order_status in {
+                    "closed",
+                    "filled",
+                    "canceled",
+                    "cancelled",
+                    "expired",
+                    "rejected",
+                }:
+                    bot.log(f"❌ FALLO DE EJECUCIÓN: {symbol} sin fill y posición plana confirmada")
                     _safe_update_signal_alert_status(bot, entry_client_order_id, "REJECTED")
                     _drop_pending_intent()
                     return "EXECUTION_NO_FILL"
+                else:
+                    filled_amount_candidate = None
+
+            if filled_amount_candidate is not None and filled_amount_candidate > 0:
+                bot.log(f"✅ EJECUCIÓN CON EXPOSICIÓN: {symbol} ID: {order.get('id', 'N/A')}")
+                requested_amount = float(amount)
+                filled_amount = float(filled_amount_candidate)
+                remaining_amount = max(0.0, requested_amount - filled_amount)
+                fill_amount_mismatch = filled_amount > requested_amount + max(
+                    1e-12, requested_amount * 1e-8
+                )
+                fill_status_requires_reconciliation = order_status not in {
+                    "closed",
+                    "filled",
+                    "open",
+                }
+                entry_order_id_requires_reconciliation = not bool(order.get("id"))
+                fill_amount_requires_reconciliation = (
+                    fill_amount_reconciled
+                    or fill_amount_mismatch
+                    or fill_status_requires_reconciliation
+                    or entry_order_id_requires_reconciliation
+                )
+                avg_fill_price = _resolve_average_fill_price(order, filled_amount)
+
+                adverse_slippage_pct = (
+                    _calculate_adverse_slippage_pct(side, float(price), avg_fill_price)
+                    if avg_fill_price is not None
+                    else 0.0
+                )
+                max_slippage_pct = max(0.0, float(Config.MAX_SLIPPAGE)) * 100.0
 
                 append_execution_event(
                     bot,
@@ -867,7 +1027,11 @@ def execute_order(
                         "remaining_amount": remaining_amount,
                         "requested_price": float(price),
                         "avg_fill_price": avg_fill_price,
-                        "slippage_simulated": avg_fill_price - float(price),
+                        "slippage_simulated": (
+                            avg_fill_price - float(price) if avg_fill_price is not None else None
+                        ),
+                        "adverse_slippage_pct": adverse_slippage_pct,
+                        "max_slippage_pct": max_slippage_pct,
                         "status": str(order.get("status") or ""),
                     },
                 )
@@ -976,6 +1140,165 @@ def execute_order(
                         "sl_price": float(sl_val),
                     },
                 )
+                if avg_fill_price is None or fill_amount_requires_reconciliation:
+                    pending_state.update(
+                        {
+                            "entry": avg_fill_price,
+                            "requested_entry": float(price),
+                            "amount": filled_amount,
+                            "requested_amount": requested_amount,
+                            "remaining_amount": remaining_amount,
+                            "entry_exchange_order_id": order.get("id"),
+                            "sl_exchange_order_id": sl_order.get("id"),
+                            "status": TradeStatus.ENTRY_FILLED_AWAITING_POSITION_SYNC.value,
+                            "entry_price_unverified": avg_fill_price is None,
+                            "fill_amount_mismatch": fill_amount_mismatch,
+                            "fill_amount_reconciled_from_position": fill_amount_reconciled,
+                            "entry_order_status_requires_reconciliation": (
+                                fill_status_requires_reconciliation
+                            ),
+                            "entry_order_id_requires_reconciliation": (
+                                entry_order_id_requires_reconciliation
+                            ),
+                            "intent_last_check_at_utc": utc_now_iso(),
+                        }
+                    )
+                    with bot.lock:
+                        bot.active_trades[trade_key] = pending_state
+                    with bot.db_lock:
+                        protected_state_persisted = bot.brain.save_active_trade_state(
+                            trade_key, pending_state
+                        )
+                    bot.is_paused = True
+                    bot.integrity_lock_active = True
+                    setattr(bot, "halt_system_active", True)
+                    if not protected_state_persisted:
+                        persist_event = (
+                            "ENTRY_FILL_AMOUNT_STATE_PERSIST_FAILED_HALT"
+                            if fill_amount_requires_reconciliation
+                            else "ENTRY_FILL_PRICE_STATE_PERSIST_FAILED_HALT"
+                        )
+                        append_execution_event(
+                            bot,
+                            persist_event,
+                            {
+                                "symbol": symbol,
+                                "side": side,
+                                "entry_client_order_id": entry_client_order_id,
+                                "exchange_order_id": order.get("id"),
+                                "filled_amount": filled_amount,
+                                "sl_exchange_order_id": sl_order.get("id"),
+                            },
+                        )
+                        _safe_update_signal_alert_status(
+                            bot, entry_client_order_id, "RECOVERY_STATE_PERSIST_FAILED"
+                        )
+                        return (
+                            "ENTRY_FILL_AMOUNT_STATE_PERSIST_FAILED"
+                            if fill_amount_requires_reconciliation
+                            else "ENTRY_FILL_PRICE_STATE_PERSIST_FAILED"
+                        )
+                    if fill_amount_mismatch:
+                        append_execution_event(
+                            bot,
+                            "ENTRY_FILL_AMOUNT_MISMATCH_HALT",
+                            {
+                                "symbol": symbol,
+                                "side": side,
+                                "entry_client_order_id": entry_client_order_id,
+                                "exchange_order_id": order.get("id"),
+                                "requested_amount": requested_amount,
+                                "filled_amount": filled_amount,
+                                "sl_exchange_order_id": sl_order.get("id"),
+                            },
+                        )
+                        _safe_update_signal_alert_status(
+                            bot, entry_client_order_id, "RECONCILIATION_REQUIRED"
+                        )
+                        return "ENTRY_FILL_AMOUNT_MISMATCH"
+                    if fill_amount_reconciled:
+                        append_execution_event(
+                            bot,
+                            "ENTRY_FILL_AMOUNT_RECONCILED_HALT",
+                            {
+                                "symbol": symbol,
+                                "side": side,
+                                "entry_client_order_id": entry_client_order_id,
+                                "exchange_order_id": order.get("id"),
+                                "requested_amount": requested_amount,
+                                "reconciled_amount": filled_amount,
+                                "sl_exchange_order_id": sl_order.get("id"),
+                            },
+                        )
+                        _safe_update_signal_alert_status(
+                            bot, entry_client_order_id, "RECONCILIATION_REQUIRED"
+                        )
+                        return "ENTRY_FILL_AMOUNT_RECONCILED"
+                    if fill_status_requires_reconciliation:
+                        append_execution_event(
+                            bot,
+                            "ENTRY_ORDER_STATUS_RECONCILIATION_HALT",
+                            {
+                                "symbol": symbol,
+                                "side": side,
+                                "entry_client_order_id": entry_client_order_id,
+                                "exchange_order_id": order.get("id"),
+                                "order_status": order_status,
+                                "filled_amount": filled_amount,
+                                "sl_exchange_order_id": sl_order.get("id"),
+                            },
+                        )
+                        _safe_update_signal_alert_status(
+                            bot, entry_client_order_id, "RECONCILIATION_REQUIRED"
+                        )
+                        return "ENTRY_ORDER_STATUS_RECONCILIATION_REQUIRED"
+                    if entry_order_id_requires_reconciliation:
+                        append_execution_event(
+                            bot,
+                            "ENTRY_ORDER_ID_UNVERIFIED_HALT",
+                            {
+                                "symbol": symbol,
+                                "side": side,
+                                "entry_client_order_id": entry_client_order_id,
+                                "order_status": order_status,
+                                "filled_amount": filled_amount,
+                                "sl_exchange_order_id": sl_order.get("id"),
+                            },
+                        )
+                        _safe_update_signal_alert_status(
+                            bot, entry_client_order_id, "RECONCILIATION_REQUIRED"
+                        )
+                        return "ENTRY_ORDER_ID_UNVERIFIED"
+                    append_execution_event(
+                        bot,
+                        "ENTRY_FILL_PRICE_UNVERIFIED_HALT",
+                        {
+                            "symbol": symbol,
+                            "side": side,
+                            "entry_client_order_id": entry_client_order_id,
+                            "exchange_order_id": order.get("id"),
+                            "filled_amount": filled_amount,
+                            "sl_exchange_order_id": sl_order.get("id"),
+                        },
+                    )
+                    _safe_update_signal_alert_status(
+                        bot, entry_client_order_id, "RECONCILIATION_REQUIRED"
+                    )
+                    return "ENTRY_FILL_PRICE_UNVERIFIED"
+                if adverse_slippage_pct > max_slippage_pct:
+                    append_execution_event(
+                        bot,
+                        "ENTRY_SLIPPAGE_BREACH",
+                        {
+                            "symbol": symbol,
+                            "side": side,
+                            "entry_client_order_id": entry_client_order_id,
+                            "requested_price": float(price),
+                            "avg_fill_price": avg_fill_price,
+                            "adverse_slippage_pct": adverse_slippage_pct,
+                            "max_slippage_pct": max_slippage_pct,
+                        },
+                    )
 
                 margin_used = float(final_usd) / max(float(current_leverage), 1)
                 try:
@@ -1000,49 +1323,69 @@ def execute_order(
                 except Exception as entry_side_effect_err:
                     bot.log(f"⚠️ Entry side effect error (non-fatal): {entry_side_effect_err}")
             else:
-                bot.log(f"❌ FALLO DE EJECUCIÓN: {symbol}")
+                bot.log(f"🛑 ACK DE ENTRADA AMBIGUO: {symbol}")
                 reject_reason = str(
                     getattr(bot.execution, "last_entry_reject_error", "") or "EXECUTION_FAILED"
                 )[:220]
-                append_execution_event(
-                    bot,
-                    "ENTRY_ORDER_REJECTED",
+                pending_state.update(
                     {
-                        "symbol": symbol,
-                        "entry_client_order_id": entry_client_order_id,
-                        "reason": reject_reason,
-                    },
-                )
-                _safe_update_signal_alert_status(bot, entry_client_order_id, "REJECTED")
-
-                pending_state["status"] = TradeStatus.ENTRY_ACK_UNKNOWN.value
-                pending_state["entry_reject_reason"] = reject_reason
-                pending_state["intent_last_check_at_utc"] = utc_now_iso()
-                pending_state["intent_check_attempts"] = (
-                    int(pending_state.get("intent_check_attempts", 0) or 0) + 1
+                        "amount": None,
+                        "requested_amount": requested_amount,
+                        "entry_exchange_order_id": order.get("id"),
+                        "status": TradeStatus.ENTRY_ACK_UNKNOWN.value,
+                        "filled_amount_unverified": True,
+                        "entry_reject_reason": reject_reason,
+                        "intent_last_check_at_utc": utc_now_iso(),
+                        "intent_check_attempts": int(
+                            pending_state.get("intent_check_attempts", 0) or 0
+                        )
+                        + 1,
+                    }
                 )
                 with bot.lock:
                     bot.active_trades[trade_key] = pending_state
+                bot.is_paused = True
+                bot.integrity_lock_active = True
+                setattr(bot, "halt_system_active", True)
                 with bot.db_lock:
-                    bot.brain.save_active_trade_state(trade_key, pending_state)
+                    amount_state_persisted = bot.brain.save_active_trade_state(
+                        trade_key, pending_state
+                    )
                 append_execution_event(
                     bot,
-                    "ENTRY_ACK_UNKNOWN_PERSISTED",
+                    "ENTRY_FILL_AMOUNT_UNVERIFIED_HALT",
                     {
                         "symbol": symbol,
+                        "side": side,
                         "entry_client_order_id": entry_client_order_id,
+                        "exchange_order_id": order.get("id"),
+                        "status": order_status,
                         "reason": reject_reason,
+                        "state_persisted": bool(amount_state_persisted),
                     },
                 )
-                if not Config.PAPER_MODE:
-                    bot.is_paused = True
-                    bot.integrity_lock_active = True
-                    setattr(bot, "halt_system_active", True)
-                    with bot.db_lock:
-                        bot.brain.save_active_trade_state(trade_key, pending_state)
-                    return "ENTRY_ACK_UNKNOWN"
-                _drop_pending_intent()
-                return "EXECUTION_FAILED"
+                if amount_state_persisted:
+                    append_execution_event(
+                        bot,
+                        "ENTRY_ACK_UNKNOWN_PERSISTED",
+                        {
+                            "symbol": symbol,
+                            "entry_client_order_id": entry_client_order_id,
+                            "reason": reject_reason,
+                        },
+                    )
+                _safe_update_signal_alert_status(
+                    bot,
+                    entry_client_order_id,
+                    "RECONCILIATION_REQUIRED"
+                    if amount_state_persisted
+                    else "RECOVERY_STATE_PERSIST_FAILED",
+                )
+                return (
+                    "ENTRY_FILL_AMOUNT_UNVERIFIED"
+                    if amount_state_persisted
+                    else "ENTRY_FILL_AMOUNT_STATE_PERSIST_FAILED"
+                )
         elif not is_shadow and Config.PAPER_MODE:
             bot.log(f"\U0001f4dd PAPER TRADE (Simulado): {side} {symbol} (${final_usd:.2f})")
             append_execution_event(
@@ -1106,12 +1449,18 @@ def execute_order(
 
             base_confidence = float((context or {}).get("prob_final", 75.0))
             adjusted_confidence = max(0.0, min(100.0, base_confidence + similarity_boost))
+            if is_shadow:
+                verified_entry_price = float(price)
+            else:
+                if avg_fill_price is None:
+                    raise RuntimeError("REAL_ENTRY_PRICE_UNVERIFIED_REACHED_OPEN_STATE")
+                verified_entry_price = avg_fill_price
 
             trade_state = {
                 "trade_key": trade_key,
                 "symbol": symbol,
                 "side": side,
-                "entry": float(avg_fill_price if not is_shadow else price),
+                "entry": float(verified_entry_price),
                 "pnl": 0.0,
                 "amount": float(filled_amount if not is_shadow else amount),
                 "requested_amount": float(requested_amount if not is_shadow else amount),
@@ -1165,6 +1514,9 @@ def execute_order(
                 if not persisted:
                     _release_simulated_margin(bot, trade_state, 0.0)
                     bot.integrity_lock_active = True
+                    if not is_shadow and not Config.PAPER_MODE:
+                        bot.is_paused = True
+                        setattr(bot, "halt_system_active", True)
                     bot.log(
                         f"\U0001f6d1 PERSISTENCE_GUARD {symbol}: orden aceptada pero estado activo no persistió. Integrity lock activado."
                     )
