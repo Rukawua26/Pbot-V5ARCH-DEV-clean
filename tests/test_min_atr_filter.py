@@ -21,6 +21,7 @@ class TestMinAtrFilter(unittest.TestCase):
         bot.brain.get_stats_by_trend.return_value = {}
         bot._get_market_regime.return_value = "BULL_TREND"
         bot._get_shock_distance_pct.return_value = (1.0, 0.0)
+        bot.breakout_agent.evaluate_breakout.return_value = (False, None)
         bot.data_service = MagicMock()
         bot.data_service.sanitize_context.return_value = {}
         return bot

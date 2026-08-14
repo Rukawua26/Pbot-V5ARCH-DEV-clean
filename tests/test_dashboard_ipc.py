@@ -17,6 +17,8 @@ from core import cmd_consumer, state_snapshot
 from tools.dashboard import api_server
 from tools.intelligence.storage import ensure_intelligence_tables, save_advisory_snapshot
 
+DASHBOARD_HTML = Path(__file__).resolve().parents[1] / "dashboard" / "static" / "index.html"
+
 
 class _DummyBot:
     def __init__(self):
@@ -324,9 +326,7 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertEqual(result["advisories"], 1)
 
     def test_dashboard_static_includes_intelligence_tab(self):
-        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
-            encoding="utf-8"
-        )
+        html = DASHBOARD_HTML.read_text(encoding="utf-8")
         self.assertIn('data-tab="intelligence"', html)
         self.assertIn('id="intel-advisories"', html)
         self.assertIn('id="intel-postmortem"', html)
@@ -334,9 +334,7 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn("openTradePostmortem", html)
 
     def test_dashboard_static_includes_consensus_tab(self):
-        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
-            encoding="utf-8"
-        )
+        html = DASHBOARD_HTML.read_text(encoding="utf-8")
 
         self.assertIn('data-tab="consensus"', html)
         self.assertIn('id="consensusChart"', html)
@@ -350,27 +348,21 @@ class DashboardIpcTest(unittest.TestCase):
         self.assertIn("consensusChartInstance.update('none')", html)
 
     def test_dashboard_static_uses_local_cookie_auth_without_startup_prompt(self):
-        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
-            encoding="utf-8"
-        )
+        html = DASHBOARD_HTML.read_text(encoding="utf-8")
 
         self.assertIn("function hasApiKey() { return true; }", html)
         self.assertIn("setApiKey(false);", html)
         self.assertIn("🔐 LOCAL", html)
 
     def test_dashboard_radar_uses_viewport_height(self):
-        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
-            encoding="utf-8"
-        )
+        html = DASHBOARD_HTML.read_text(encoding="utf-8")
 
         self.assertIn(".radar-table-wrap", html)
         self.assertIn("calc(100dvh - 205px)", html)
         self.assertIn('class="tbl-wrap radar-table-wrap"', html)
 
     def test_dashboard_radar_has_summary_filters_and_compact_reasons(self):
-        html = Path("/home/miguel/Pbot-V5ARCH-DEV-main/dashboard/static/index.html").read_text(
-            encoding="utf-8"
-        )
+        html = DASHBOARD_HTML.read_text(encoding="utf-8")
 
         self.assertIn('id="radar-summary"', html)
         self.assertIn('data-radar-filter="near"', html)
