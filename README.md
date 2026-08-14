@@ -83,35 +83,39 @@ Endurecimiento crítico del runtime tras validación de fills REAL, validación 
 | `close_trade` fail-safe | En bloque `except` de cierre REAL asume `close_failed = True` (fail-safe) y solo revierte a `False` si el exchange confirma posición plana |
 | CI hardening | Pin `actions/setup-python@v5` a SHA `a26af69be951a213d495a4c3e4e4022e16d87065`; errores mypy resueltos con narrowing `raw_info`; tests herméticos (`tests/test_dashboard_ipc.py`, `tests/test_min_atr_filter.py`) |
 
-<div align="center">
-<img src="docs/README/architecture.svg" alt="Arquitectura del runtime" width="600"/>
-</div>
-
-<div align="center">
-<img src="docs/README/safe_fill_flow.svg" alt="Flujo de llenado seguro REAL" width="600"/>
-</div>
-
-<div align="center">
-<img src="docs/README/reconciliation_guardian.svg" alt="Flujo reconciliación + guardia HARD SL" width="600"/>
-</div>
-
-### Capturas del dashboard
-
-<div align="center">
-<img src="docs/README/sniper_dashboard_runtime.png" alt="Dashboard runtime principal" width="550"/>
-</div>
-
-<div align="center">
-<img src="docs/README/sniper_dashboard_intelligence.png" alt="Dashboard pestaña Intelligence" width="550"/>
-</div>
-
 ---
 
-### 📊 Diagramas de flujo validados
+### 🖼️ Capturas del dashboard
 
-- **Arquitectura global**: visión completa de módulos y flujos de datos críticos.
-- **Flujo de llenado seguro**: pasos fail-safe desde fill hasta reconciliación y HALT.
-- **Guardia HARD SL + reconciliación**: detección de estados ambiguos y activación de HALT.
+<div align="center">
+<img src="docs/README/sniper_dashboard_runtime.png" alt="Vista runtime principal" width="520"/>
+<p><em>Vista runtime principal: modo, posiciones abiertas, sentiment, radar y logs en vivo.</em></p>
+</div>
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_consensus.png" alt="Votos / Consenso" width="520"/>
+<p><em>Votos / Consenso: explicación visual de la decisión del bot por símbolo, agente y régimen.</em></p>
+</div>
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_trades.png" alt="Historial de trades" width="520"/>
+<p><em>Historial: trades cerrados con PnL, razón de salida y filtros aplicados.</em></p>
+</div>
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_blocked.png" alt="Señales bloqueadas" width="520"/>
+<p><em>Bloqueados: señales vetadas con motivo exacto (RRR, Markov, MTF, OI, MIN_ATR_PCT).</em></p>
+</div>
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_equity.png" alt="Curva de equity" width="520"/>
+<p><em>Equity: curva de balance persistida con métricas de drawdown y crecimiento.</em></p>
+</div>
+
+<div align="center">
+<img src="docs/README/sniper_dashboard_intelligence.png" alt="Pestaña Intelligence" width="520"/>
+<p><em>Intelligence: KPIs diarios/semanales, advisories, anotaciones y postmortem por trade.</em></p>
+</div>
 
 ---
 
