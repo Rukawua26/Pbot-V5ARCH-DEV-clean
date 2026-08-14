@@ -88,33 +88,33 @@ Endurecimiento crítico del runtime tras validación de fills REAL, validación 
 ### 🖼️ Capturas del dashboard
 
 <div align="center">
-<img src="docs/README/sniper_dashboard_runtime.png" alt="Vista runtime principal" width="520"/>
-<p><em>Vista runtime principal: modo, posiciones abiertas, sentiment, radar y logs en vivo.</em></p>
+<img src="docs/README/graph_equity_curve.png" alt="Curva de equity" width="520"/>
+<p><em>Curva de equity: balance con Δ% y marcadores inicio/fin.</em></p>
 </div>
 
 <div align="center">
-<img src="docs/README/sniper_dashboard_consensus.png" alt="Votos / Consenso" width="520"/>
-<p><em>Votos / Consenso: explicación visual de la decisión del bot por símbolo, agente y régimen.</em></p>
+<img src="docs/README/graph_consensus_probability.png" alt="Probabilidad de consenso" width="520"/>
+<p><em>Probabilidad final por ronda de consenso con umbrales 65%/75%.</em></p>
 </div>
 
 <div align="center">
-<img src="docs/README/sniper_dashboard_trades.png" alt="Historial de trades" width="520"/>
-<p><em>Historial: trades cerrados con PnL, razón de salida y filtros aplicados.</em></p>
+<img src="docs/README/graph_pnl_distribution.png" alt="Distribución de PnL" width="520"/>
+<p><em>Distribución de PnL% por trade.</em></p>
 </div>
 
 <div align="center">
-<img src="docs/README/sniper_dashboard_blocked.png" alt="Señales bloqueadas" width="520"/>
-<p><em>Bloqueados: señales vetadas con motivo exacto (RRR, Markov, MTF, OI, MIN_ATR_PCT).</em></p>
+<img src="docs/README/graph_blocked_reasons.png" alt="Razones de bloqueo" width="520"/>
+<p><em>Frecuencia de razones de veto (ventana reciente).</em></p>
 </div>
 
 <div align="center">
-<img src="docs/README/sniper_dashboard_equity.png" alt="Curva de equity" width="520"/>
-<p><em>Equity: curva de balance persistida con métricas de drawdown y crecimiento.</em></p>
+<img src="docs/README/graph_daily_pnl_calendar.png" alt="Calendario PnL" width="520"/>
+<p><em>PnL diario heatmap semanal.</em></p>
 </div>
 
 <div align="center">
-<img src="docs/README/sniper_dashboard_intelligence.png" alt="Pestaña Intelligence" width="520"/>
-<p><em>Intelligence: KPIs diarios/semanales, advisories, anotaciones y postmortem por trade.</em></p>
+<img src="docs/README/graph_winrate_by_symbol.png" alt="Winrate por símbolo" width="520"/>
+<p><em>Ganados/perdidos por símbolo con WR%.</em></p>
 </div>
 
 ---
